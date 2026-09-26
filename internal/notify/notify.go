@@ -19,6 +19,7 @@ const stream = "notifications"
 
 type Message struct {
 	TaskID   int64     `json:"taskId"`
+	UserID   int64     `json:"userId"`
 	Title    string    `json:"title"`
 	RemindAt time.Time `json:"remindAt"`
 	Dedupe   string    `json:"dedupe"`
@@ -81,6 +82,7 @@ func publishDue(ctx context.Context, db *store.Store, client *redis.Client, loc 
 	for _, item := range due {
 		msg := Message{
 			TaskID:   item.TaskID,
+			UserID:   item.UserID,
 			Title:    item.Title,
 			RemindAt: item.RemindAt,
 			Dedupe:   item.RemindAt.UTC().Format(time.RFC3339Nano) + ":" + itoa(item.TaskID),
@@ -154,7 +156,11 @@ func handle(ctx context.Context, db *store.Store, client *redis.Client, publicKe
 		_ = client.XAck(ctx, stream, "push", entry.ID).Err()
 		return
 	}
-	subs, err := db.Subscriptions(ctx)
+	if msg.UserID == 0 {
+		_ = client.XAck(ctx, stream, "push", entry.ID).Err()
+		return
+	}
+	subs, err := db.Subscriptions(ctx, msg.UserID)
 	if err != nil {
 		slog.Error("subscriptions", "err", err)
 		return

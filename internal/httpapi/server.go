@@ -1,15 +1,18 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/mail"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/redis/go-redis/v9"
+	"golang.org/x/crypto/bcrypt"
 
 	"hoy/internal/schedule"
 	"hoy/internal/session"
@@ -17,20 +20,28 @@ import (
 	"hoy/internal/task"
 )
 
+// Hash of a value that is never a real password, so a missing account still spends a bcrypt compare.
+var dummyPasswordHash = []byte("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy")
+
 type Server struct {
 	Store         *store.Store
 	Redis         *redis.Client
-	Loc           *time.Location
-	Password      string
-	SessionSecret string
-	CookieSecure  bool
-	VAPIDPublic   string
+	Loc            *time.Location
+	SessionSecret  string
+	CookieSecure   bool
+	VAPIDPublic    string
+	GoogleID       string
+	GoogleSecret   string
+	GoogleRedirect string
 }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("POST /api/session", s.login)
+	mux.HandleFunc("POST /api/register", s.register)
+	mux.HandleFunc("GET /api/auth/google", s.googleStart)
+	mux.HandleFunc("GET /api/auth/google/callback", s.googleCallback)
 	mux.HandleFunc("DELETE /api/session", s.logout)
 	mux.HandleFunc("GET /api/session", s.protected(s.sessionInfo))
 	mux.HandleFunc("GET /api/lists", s.protected(s.lists))
@@ -67,19 +78,74 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+	email, password, ok := s.readCredentials(w, r)
+	if !ok {
+		return
+	}
+	id, hash, err := s.Store.UserByEmail(r.Context(), email)
+	stored := dummyPasswordHash
+	if err == nil && hash != nil {
+		stored = []byte(*hash)
+	}
+	if bcrypt.CompareHashAndPassword(stored, []byte(password)) != nil || err != nil || hash == nil {
+		writeError(w, http.StatusUnauthorized, "Correo o contraseña incorrectos")
+		return
+	}
+	s.setSession(w, id, time.Now().Add(30*24*time.Hour))
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (s *Server) register(w http.ResponseWriter, r *http.Request) {
+	email, password, ok := s.readCredentials(w, r)
+	if !ok {
+		return
+	}
+	if len(password) < 8 {
+		writeError(w, http.StatusUnprocessableEntity, "La contraseña necesita al menos 8 caracteres")
+		return
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudo crear la cuenta")
+		return
+	}
+	id, err := s.Store.Register(r.Context(), email, string(hash))
+	if errors.Is(err, store.ErrEmailTaken) {
+		writeError(w, http.StatusConflict, "Ese correo ya tiene cuenta")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudo crear la cuenta")
+		return
+	}
+	s.setSession(w, id, time.Now().Add(30*24*time.Hour))
+	writeJSON(w, http.StatusCreated, map[string]bool{"ok": true})
+}
+
+func (s *Server) readCredentials(w http.ResponseWriter, r *http.Request) (string, string, bool) {
 	var body struct {
+		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
 	if err := readJSON(w, r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "JSON inválido")
-		return
+		return "", "", false
 	}
-	if !session.PasswordOK(body.Password, s.Password) {
-		writeError(w, http.StatusUnauthorized, "Contraseña incorrecta")
-		return
+	email, ok := normalizeEmail(body.Email)
+	if !ok {
+		writeError(w, http.StatusUnprocessableEntity, "El correo no sirve")
+		return "", "", false
 	}
-	s.setSession(w, time.Now().Add(30*24*time.Hour))
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	return email, body.Password, true
+}
+
+func normalizeEmail(value string) (string, bool) {
+	email := strings.ToLower(strings.TrimSpace(value))
+	parsed, err := mail.ParseAddress(email)
+	if err != nil || parsed.Address != email || len(email) > 200 {
+		return "", false
+	}
+	return email, true
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +169,7 @@ func (s *Server) sessionInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) lists(w http.ResponseWriter, r *http.Request) {
-	lists, err := s.Store.Lists(r.Context())
+	lists, err := s.Store.Lists(r.Context(), currentUser(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudieron leer las listas")
 		return
@@ -128,7 +194,7 @@ func (s *Server) createList(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "El nombre de la lista no sirve")
 		return
 	}
-	list, err := s.Store.CreateList(r.Context(), name)
+	list, err := s.Store.CreateList(r.Context(), currentUser(r), name)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudo crear la lista")
 		return
@@ -153,7 +219,7 @@ func (s *Server) renameList(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "El nombre de la lista no sirve")
 		return
 	}
-	list, err := s.Store.RenameList(r.Context(), id, name)
+	list, err := s.Store.RenameList(r.Context(), currentUser(r), id, name)
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "Lista no encontrada")
 		return
@@ -170,7 +236,7 @@ func (s *Server) deleteList(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	err := s.Store.DeleteList(r.Context(), id)
+	err := s.Store.DeleteList(r.Context(), currentUser(r), id)
 	if errors.Is(err, store.ErrLastList) {
 		writeError(w, http.StatusConflict, "Deja al menos una lista")
 		return
@@ -198,7 +264,7 @@ func (s *Server) reorder(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "JSON inválido")
 		return
 	}
-	if err := s.Store.Reorder(r.Context(), id, body.TaskIDs); err != nil {
+	if err := s.Store.Reorder(r.Context(), currentUser(r), id, body.TaskIDs); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "Hay una tarea que no está en la lista")
 			return
@@ -211,7 +277,7 @@ func (s *Server) reorder(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) tasks(w http.ResponseWriter, r *http.Request) {
 	since := schedule.StartOfDay(time.Now(), s.Loc).AddDate(0, 0, -14)
-	all, err := s.Store.Tasks(r.Context(), since)
+	all, err := s.Store.Tasks(r.Context(), currentUser(r), since)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudieron leer las tareas")
 		return
@@ -284,7 +350,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		writeValidation(w, err)
 		return
 	}
-	created, err := s.Store.CreateTask(r.Context(), normalized)
+	created, err := s.Store.CreateTask(r.Context(), currentUser(r), normalized)
 	if isFK(err) {
 		writeError(w, http.StatusUnprocessableEntity, "La lista no existe")
 		return
@@ -317,7 +383,7 @@ func (s *Server) updateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	normalized.Status = current.Status
 	normalized.CompletedAt = current.CompletedAt
-	updated, err := s.Store.UpdateTask(r.Context(), normalized)
+	updated, err := s.Store.UpdateTask(r.Context(), currentUser(r), normalized)
 	if isFK(err) {
 		writeError(w, http.StatusUnprocessableEntity, "La lista no existe")
 		return
@@ -334,7 +400,7 @@ func (s *Server) deleteTask(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := s.Store.DeleteTask(r.Context(), id); errors.Is(err, store.ErrNotFound) {
+	if err := s.Store.DeleteTask(r.Context(), currentUser(r), id); errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "Tarea no encontrada")
 		return
 	} else if err != nil {
@@ -389,7 +455,7 @@ func (s *Server) savePush(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Suscripción incompleta")
 		return
 	}
-	err := s.Store.SaveSubscription(r.Context(), store.Subscription{
+	err := s.Store.SaveSubscription(r.Context(), currentUser(r), store.Subscription{
 		Endpoint: body.Endpoint,
 		P256dh:   body.Keys.P256dh,
 		Auth:     body.Keys.Auth,
@@ -421,7 +487,7 @@ func (s *Server) mutate(w http.ResponseWriter, r *http.Request, fn func(task.Tas
 	if !ok {
 		return
 	}
-	updated, err := s.Store.UpdateTask(r.Context(), fn(current))
+	updated, err := s.Store.UpdateTask(r.Context(), currentUser(r), fn(current))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudo actualizar la tarea")
 		return
@@ -435,7 +501,7 @@ func (s *Server) loadTask(w http.ResponseWriter, r *http.Request) (task.Task, bo
 		return task.Task{}, false
 	}
 	since := time.Now().AddDate(-5, 0, 0)
-	all, err := s.Store.Tasks(r.Context(), since)
+	all, err := s.Store.Tasks(r.Context(), currentUser(r), since)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudo leer la tarea")
 		return task.Task{}, false
@@ -500,24 +566,36 @@ func (s *Server) toTask(item task.Task) taskDTO {
 func (s *Server) protected(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(session.CookieName())
-		if err != nil || !session.Valid(s.SessionSecret, cookie.Value, time.Now()) {
+		if err != nil {
 			writeError(w, http.StatusUnauthorized, "Necesitas entrar")
 			return
 		}
-		next(w, r)
+		id, ok := session.UserID(s.SessionSecret, cookie.Value, time.Now())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "Necesitas entrar")
+			return
+		}
+		next(w, r.WithContext(context.WithValue(r.Context(), userContextKey{}, id)))
 	}
 }
 
-func (s *Server) setSession(w http.ResponseWriter, exp time.Time) {
+func (s *Server) setSession(w http.ResponseWriter, userID int64, exp time.Time) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     session.CookieName(),
-		Value:    session.Sign(s.SessionSecret, exp),
+		Value:    session.Sign(s.SessionSecret, userID, exp),
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		Secure:   s.CookieSecure,
 		MaxAge:   int(time.Until(exp).Seconds()),
 	})
+}
+
+type userContextKey struct{}
+
+func currentUser(r *http.Request) int64 {
+	id, _ := r.Context().Value(userContextKey{}).(int64)
+	return id
 }
 
 type listDTO struct {

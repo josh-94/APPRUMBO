@@ -269,6 +269,17 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .panel h2 { margin: 0 0 8px; font-size: 1rem; }
 .panel p { margin: 0 0 12px; color: var(--muted); }
 
-.login { display: grid; align-content: center; min-height: 100dvh; }
+.login { display: grid; align-content: center; gap: 12px; min-height: 100dvh; }
+.login form { display: grid; gap: 12px; }
+.text-button { justify-self: start; padding: 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; }
+.google {
+  display: inline-flex;
+  justify-content: center;
+  padding: 12px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
 .nudge { display: flex; justify-content: flex-end; gap: 8px; margin: -2px 0 8px; }
 .nudge button { padding: 6px 10px; font-size: 0.75rem; }

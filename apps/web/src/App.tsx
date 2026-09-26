@@ -19,8 +19,13 @@ export function App() {
   const [authed, setAuthed] = useState<boolean | null>(null)
   const [pushReady, setPushReady] = useState(false)
   const [lists, setLists] = useState<TaskList[] | null>(null)
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [loginError, setLoginError] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [loginError, setLoginError] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('error') === 'google' ? 'Google no pudo confirmar la cuenta' : ''
+  })
   const [sheet, setSheet] = useState<Sheet>(null)
   const [sort, setSort] = useState<'time' | 'manual'>('time')
   const location = useLocation()
@@ -53,7 +58,8 @@ export function App() {
   async function enter(event: FormEvent) {
     event.preventDefault()
     try {
-      await api.login(password)
+      if (creating) await api.register(email, password)
+      else await api.login(email, password)
       setAuthed(true)
       setLoginError('')
       const session = await api.session()
@@ -104,17 +110,33 @@ export function App() {
         <h1>Tu día, en orden.</h1>
         <form onSubmit={(event) => void enter(event)}>
           <label className="field">
+            Correo
+            <input
+              type="email"
+              value={email}
+              autoComplete="email"
+              required
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </label>
+          <label className="field">
             Contraseña
             <input
               type="password"
               value={password}
-              autoComplete="current-password"
+              autoComplete={creating ? 'new-password' : 'current-password'}
+              minLength={creating ? 8 : undefined}
+              required
               onChange={(event) => setPassword(event.target.value)}
             />
           </label>
           {loginError && <p className="error">{loginError}</p>}
-          <button type="submit" className="primary">Entrar</button>
+          <button type="submit" className="primary">{creating ? 'Crear cuenta' : 'Entrar'}</button>
         </form>
+        <button type="button" className="text-button" onClick={() => { setCreating((value) => !value); setLoginError('') }}>
+          {creating ? 'Ya tengo cuenta' : 'Crear cuenta'}
+        </button>
+        <a className="google" href="/api/auth/google">Entrar con Google</a>
       </div>
     )
   }

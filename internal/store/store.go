@@ -37,6 +37,7 @@ type Subscription struct {
 
 type DueReminder struct {
 	TaskID     int64
+	UserID     int64
 	Title      string
 	RemindAt   time.Time
 	RepeatMask int
@@ -121,14 +122,15 @@ func (s *Store) Migrate(ctx context.Context) error {
 	return nil
 }
 
-func (s *Store) Lists(ctx context.Context) ([]List, error) {
+func (s *Store) Lists(ctx context.Context, userID int64) ([]List, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT l.id, l.name, l.position,
 		       COALESCE(COUNT(t.id) FILTER (WHERE t.status = 'open'), 0)::int
 		FROM lists l
 		LEFT JOIN tasks t ON t.list_id = l.id
+		WHERE l.user_id = $1
 		GROUP BY l.id
-		ORDER BY l.position, l.id`)
+		ORDER BY l.position, l.id`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -144,35 +146,35 @@ func (s *Store) Lists(ctx context.Context) ([]List, error) {
 	return out, rows.Err()
 }
 
-func (s *Store) CreateList(ctx context.Context, name string) (List, error) {
+func (s *Store) CreateList(ctx context.Context, userID int64, name string) (List, error) {
 	var list List
 	err := s.pool.QueryRow(ctx, `
-		INSERT INTO lists (name, position)
-		VALUES ($1, COALESCE((SELECT MAX(position) + 1 FROM lists), 0))
-		RETURNING id, name, position`, name).Scan(&list.ID, &list.Name, &list.Position)
+		INSERT INTO lists (name, position, user_id)
+		VALUES ($1, COALESCE((SELECT MAX(position) + 1 FROM lists WHERE user_id = $2), 0), $2)
+		RETURNING id, name, position`, name, userID).Scan(&list.ID, &list.Name, &list.Position)
 	return list, err
 }
 
-func (s *Store) RenameList(ctx context.Context, id int64, name string) (List, error) {
+func (s *Store) RenameList(ctx context.Context, userID, id int64, name string) (List, error) {
 	var list List
 	err := s.pool.QueryRow(ctx, `
-		UPDATE lists SET name = $2 WHERE id = $1
-		RETURNING id, name, position`, id, name).Scan(&list.ID, &list.Name, &list.Position)
+		UPDATE lists SET name = $2 WHERE id = $1 AND user_id = $3
+		RETURNING id, name, position`, id, name, userID).Scan(&list.ID, &list.Name, &list.Position)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return List{}, ErrNotFound
 	}
 	return list, err
 }
 
-func (s *Store) DeleteList(ctx context.Context, id int64) error {
+func (s *Store) DeleteList(ctx context.Context, userID, id int64) error {
 	var count int
-	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM lists`).Scan(&count); err != nil {
+	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM lists WHERE user_id = $1`, userID).Scan(&count); err != nil {
 		return err
 	}
 	if count <= 1 {
 		return ErrLastList
 	}
-	tag, err := s.pool.Exec(ctx, `DELETE FROM lists WHERE id = $1`, id)
+	tag, err := s.pool.Exec(ctx, `DELETE FROM lists WHERE id = $1 AND user_id = $2`, id, userID)
 	if err != nil {
 		return err
 	}
@@ -182,13 +184,14 @@ func (s *Store) DeleteList(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *Store) Tasks(ctx context.Context, doneSince time.Time) ([]task.Task, error) {
+func (s *Store) Tasks(ctx context.Context, userID int64, doneSince time.Time) ([]task.Task, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, list_id, title, notes, due_at, remind_at, status, pinned, position,
-		       repeat_weekdays, completed_at, created_at, updated_at
-		FROM tasks
-		WHERE status = 'open' OR completed_at >= $1
-		ORDER BY position, id`, doneSince)
+		SELECT t.id, t.list_id, t.title, t.notes, t.due_at, t.remind_at, t.status, t.pinned, t.position,
+		       t.repeat_weekdays, t.completed_at, t.created_at, t.updated_at
+		FROM tasks t
+		JOIN lists l ON l.id = t.list_id
+		WHERE l.user_id = $1 AND (t.status = 'open' OR t.completed_at >= $2)
+		ORDER BY t.position, t.id`, userID, doneSince)
 	if err != nil {
 		return nil, err
 	}
@@ -204,21 +207,25 @@ func (s *Store) Tasks(ctx context.Context, doneSince time.Time) ([]task.Task, er
 	return out, rows.Err()
 }
 
-func (s *Store) CreateTask(ctx context.Context, item task.Task) (task.Task, error) {
+func (s *Store) CreateTask(ctx context.Context, userID int64, item task.Task) (task.Task, error) {
 	row := s.pool.QueryRow(ctx, `
 		INSERT INTO tasks (list_id, title, notes, due_at, remind_at, pinned, position, repeat_weekdays)
-		VALUES (
-			$1, $2, $3, $4, $5, $6,
-			COALESCE((SELECT MAX(position) + 1 FROM tasks WHERE list_id = $1), 0),
-			$7
-		)
+		SELECT l.id, $2, $3, $4, $5, $6,
+		       COALESCE((SELECT MAX(position) + 1 FROM tasks WHERE list_id = l.id), 0),
+		       $7
+		FROM lists l
+		WHERE l.id = $1 AND l.user_id = $8
 		RETURNING id, list_id, title, notes, due_at, remind_at, status, pinned, position,
 		          repeat_weekdays, completed_at, created_at, updated_at`,
-		item.ListID, item.Title, item.Notes, item.DueAt, item.RemindAt, item.Pinned, item.RepeatMask)
-	return scanTask(row)
+		item.ListID, item.Title, item.Notes, item.DueAt, item.RemindAt, item.Pinned, item.RepeatMask, userID)
+	got, err := scanTask(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return task.Task{}, ErrNotFound
+	}
+	return got, err
 }
 
-func (s *Store) UpdateTask(ctx context.Context, item task.Task) (task.Task, error) {
+func (s *Store) UpdateTask(ctx context.Context, userID int64, item task.Task) (task.Task, error) {
 	row := s.pool.QueryRow(ctx, `
 		UPDATE tasks SET
 			list_id = $2,
@@ -232,10 +239,12 @@ func (s *Store) UpdateTask(ctx context.Context, item task.Task) (task.Task, erro
 			completed_at = $10,
 			updated_at = now()
 		WHERE id = $1
+		  AND list_id IN (SELECT id FROM lists WHERE user_id = $11)
+		  AND $2 IN (SELECT id FROM lists WHERE user_id = $11)
 		RETURNING id, list_id, title, notes, due_at, remind_at, status, pinned, position,
 		          repeat_weekdays, completed_at, created_at, updated_at`,
 		item.ID, item.ListID, item.Title, item.Notes, item.DueAt, item.RemindAt,
-		item.Status, item.Pinned, item.RepeatMask, item.CompletedAt)
+		item.Status, item.Pinned, item.RepeatMask, item.CompletedAt, userID)
 	got, err := scanTask(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return task.Task{}, ErrNotFound
@@ -243,8 +252,10 @@ func (s *Store) UpdateTask(ctx context.Context, item task.Task) (task.Task, erro
 	return got, err
 }
 
-func (s *Store) DeleteTask(ctx context.Context, id int64) error {
-	tag, err := s.pool.Exec(ctx, `DELETE FROM tasks WHERE id = $1`, id)
+func (s *Store) DeleteTask(ctx context.Context, userID, id int64) error {
+	tag, err := s.pool.Exec(ctx, `
+		DELETE FROM tasks WHERE id = $1
+		AND list_id IN (SELECT id FROM lists WHERE user_id = $2)`, id, userID)
 	if err != nil {
 		return err
 	}
@@ -254,7 +265,17 @@ func (s *Store) DeleteTask(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *Store) Reorder(ctx context.Context, listID int64, ids []int64) error {
+func (s *Store) Reorder(ctx context.Context, userID, listID int64, ids []int64) error {
+	var owner int64
+	if err := s.pool.QueryRow(ctx, `SELECT user_id FROM lists WHERE id = $1`, listID).Scan(&owner); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	}
+	if owner != userID {
+		return ErrNotFound
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -272,12 +293,12 @@ func (s *Store) Reorder(ctx context.Context, listID int64, ids []int64) error {
 	return tx.Commit(ctx)
 }
 
-func (s *Store) SaveSubscription(ctx context.Context, sub Subscription) error {
+func (s *Store) SaveSubscription(ctx context.Context, userID int64, sub Subscription) error {
 	_, err := s.pool.Exec(ctx, `
-		INSERT INTO push_subscriptions (endpoint, p256dh, auth_key)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (endpoint) DO UPDATE SET p256dh = EXCLUDED.p256dh, auth_key = EXCLUDED.auth_key`,
-		sub.Endpoint, sub.P256dh, sub.Auth)
+		INSERT INTO push_subscriptions (endpoint, p256dh, auth_key, user_id)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (endpoint) DO UPDATE SET p256dh = EXCLUDED.p256dh, auth_key = EXCLUDED.auth_key, user_id = EXCLUDED.user_id`,
+		sub.Endpoint, sub.P256dh, sub.Auth, userID)
 	return err
 }
 
@@ -286,8 +307,8 @@ func (s *Store) DeleteSubscription(ctx context.Context, endpoint string) error {
 	return err
 }
 
-func (s *Store) Subscriptions(ctx context.Context) ([]Subscription, error) {
-	rows, err := s.pool.Query(ctx, `SELECT endpoint, p256dh, auth_key FROM push_subscriptions ORDER BY id`)
+func (s *Store) Subscriptions(ctx context.Context, userID int64) ([]Subscription, error) {
+	rows, err := s.pool.Query(ctx, `SELECT endpoint, p256dh, auth_key FROM push_subscriptions WHERE user_id = $1 ORDER BY id`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -305,16 +326,17 @@ func (s *Store) Subscriptions(ctx context.Context) ([]Subscription, error) {
 
 func (s *Store) DueReminders(ctx context.Context, limit int) ([]DueReminder, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, title, remind_at, repeat_weekdays
+		SELECT tasks.id, lists.user_id, tasks.title, tasks.remind_at, tasks.repeat_weekdays
 		FROM tasks
-		WHERE status = 'open'
-		  AND remind_at IS NOT NULL
-		  AND remind_at <= now()
+		JOIN lists ON lists.id = tasks.list_id
+		WHERE tasks.status = 'open'
+		  AND tasks.remind_at IS NOT NULL
+		  AND tasks.remind_at <= now()
 		  AND NOT EXISTS (
 		    SELECT 1 FROM reminder_log l
 		    WHERE l.task_id = tasks.id AND l.remind_at = tasks.remind_at
 		  )
-		ORDER BY remind_at
+		ORDER BY tasks.remind_at
 		LIMIT $1`, limit)
 	if err != nil {
 		return nil, err
@@ -324,7 +346,7 @@ func (s *Store) DueReminders(ctx context.Context, limit int) ([]DueReminder, err
 	for rows.Next() {
 		var item DueReminder
 		var mask int16
-		if err := rows.Scan(&item.TaskID, &item.Title, &item.RemindAt, &mask); err != nil {
+		if err := rows.Scan(&item.TaskID, &item.UserID, &item.Title, &item.RemindAt, &mask); err != nil {
 			return nil, err
 		}
 		item.RepeatMask = int(mask)

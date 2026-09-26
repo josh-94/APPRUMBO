@@ -29,8 +29,10 @@ async function request<T>(path: string, options: RequestInit = {}, redirectOnAut
 
 export const api = {
   session: () => request<{ ok: boolean; push: boolean }>('/api/session'),
-  login: (password: string) =>
-    request<{ ok: boolean }>('/api/session', { method: 'POST', body: JSON.stringify({ password }) }, false),
+  login: (email: string, password: string) =>
+    request<{ ok: boolean }>('/api/session', { method: 'POST', body: JSON.stringify({ email, password }) }, false),
+  register: (email: string, password: string) =>
+    request<{ ok: boolean }>('/api/register', { method: 'POST', body: JSON.stringify({ email, password }) }, false),
   logout: () => request<void>('/api/session', { method: 'DELETE' }),
   lists: () => request<{ lists: TaskList[] }>('/api/lists'),
   createList: (name: string) =>

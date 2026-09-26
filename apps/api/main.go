@@ -60,11 +60,13 @@ func main() {
 	api := &httpapi.Server{
 		Store:         db,
 		Redis:         redisClient,
-		Loc:           cfg.Location,
-		Password:      cfg.Password,
-		SessionSecret: cfg.SessionSecret,
-		CookieSecure:  cfg.CookieSecure,
-		VAPIDPublic:   cfg.VAPIDPublic,
+		Loc:            cfg.Location,
+		SessionSecret:  cfg.SessionSecret,
+		CookieSecure:   cfg.CookieSecure,
+		VAPIDPublic:    cfg.VAPIDPublic,
+		GoogleID:       cfg.GoogleID,
+		GoogleSecret:   cfg.GoogleSecret,
+		GoogleRedirect: cfg.GoogleRedirect,
 	}
 	server := &http.Server{
 		Addr:              cfg.Addr,
