@@ -50,6 +50,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/lists/{id}", s.protected(s.deleteList))
 	mux.HandleFunc("POST /api/lists/{id}/order", s.protected(s.reorder))
 	mux.HandleFunc("GET /api/tasks", s.protected(s.tasks))
+	mux.HandleFunc("GET /api/tasks/{id}", s.protected(s.taskByID))
 	mux.HandleFunc("POST /api/tasks", s.protected(s.createTask))
 	mux.HandleFunc("PATCH /api/tasks/{id}", s.protected(s.updateTask))
 	mux.HandleFunc("DELETE /api/tasks/{id}", s.protected(s.deleteTask))
@@ -273,6 +274,14 @@ func (s *Server) reorder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) taskByID(w http.ResponseWriter, r *http.Request) {
+	item, ok := s.loadTask(w, r)
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusOK, s.toTask(item))
 }
 
 func (s *Server) tasks(w http.ResponseWriter, r *http.Request) {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, setUnauthorized } from './api'
 import { atLocalDate } from './format'
 import type { Task, TaskInput, TaskList } from './types'
@@ -29,6 +29,7 @@ export function App() {
   const [sheet, setSheet] = useState<Sheet>(null)
   const [sort, setSort] = useState<'time' | 'manual'>('time')
   const location = useLocation()
+  const openTask = useCallback((task: Task) => setSheet({ mode: 'edit', task }), [])
 
   const loadLists = useCallback(() => {
     api.lists().then((data) => setLists(data.lists)).catch(() => setLists([]))
@@ -205,6 +206,7 @@ export function App() {
             />
           }
         />
+        <Route path="/tarea/:id" element={<TaskRoute onOpen={openTask} />} />
         <Route
           path="/ajustes"
           element={
@@ -236,6 +238,23 @@ export function App() {
       )}
     </>
   )
+}
+
+function TaskRoute({ onOpen }: { onOpen: (task: Task) => void }) {
+  const params = useParams()
+  const navigate = useNavigate()
+  useEffect(() => {
+    const id = Number(params.id)
+    if (!id) {
+      navigate('/dia', { replace: true })
+      return
+    }
+    api.task(id).then((task) => {
+      onOpen(task)
+      navigate('/dia', { replace: true })
+    }).catch(() => navigate('/dia', { replace: true }))
+  }, [params.id, navigate, onOpen])
+  return <div className="app"><p className="empty">Abriendo la tarea</p></div>
 }
 
 function viewFor(path: string, sort: 'time' | 'manual') {

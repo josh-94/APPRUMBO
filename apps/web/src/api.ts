@@ -43,6 +43,7 @@ export const api = {
   reorder: (id: number, taskIds: number[]) =>
     request<void>(`/api/lists/${id}/order`, { method: 'POST', body: JSON.stringify({ taskIds }) }),
   tasks: (query: string) => request<{ tasks: Task[] }>(`/api/tasks?${query}`),
+  task: (id: number) => request<Task>(`/api/tasks/${id}`),
   createTask: (input: TaskInput) =>
     request<Task>('/api/tasks', { method: 'POST', body: JSON.stringify(input) }),
   updateTask: (id: number, input: TaskInput) =>

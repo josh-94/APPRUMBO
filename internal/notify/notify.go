@@ -169,6 +169,7 @@ func handle(ctx context.Context, db *store.Store, client *redis.Client, publicKe
 		"title": "Hoy",
 		"body":  msg.Title,
 		"tag":   msg.Dedupe,
+		"url":   "/tarea/" + itoa(msg.TaskID),
 	})
 	for _, sub := range subs {
 		resp, err := webpush.SendNotification(payload, &webpush.Subscription{
