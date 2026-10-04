@@ -285,5 +285,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
   color: inherit;
   text-decoration: none;
 }
+.login-links { display: flex; gap: 14px; margin: 4px 0 0; font-size: 0.85rem; }
+.login-links a { color: var(--muted); }
 .nudge { display: flex; justify-content: flex-end; gap: 8px; margin: -2px 0 8px; }
 .nudge button { padding: 6px 10px; font-size: 0.75rem; }

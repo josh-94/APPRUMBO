@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       manifest: {
-        name: 'Hoy',
-        short_name: 'Hoy',
+        name: 'RUMBO',
+        short_name: 'RUMBO',
         description: 'Tareas, rutinas y el día de hoy',
         lang: 'es',
         display: 'standalone',

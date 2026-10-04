@@ -10,7 +10,7 @@ self.addEventListener('push', (event) => {
   const data = event.data?.json() as { title?: string; body?: string; tag?: string; url?: string } | undefined
   const url = data?.url || '/dia'
   event.waitUntil(
-    self.registration.showNotification(data?.title || 'Hoy', {
+    self.registration.showNotification(data?.title || 'RUMBO', {
       body: data?.body || '',
       tag: data?.tag,
       data: { url },

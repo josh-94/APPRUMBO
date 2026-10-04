@@ -53,7 +53,7 @@ class _HoyAppState extends State<HoyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Hoy',
+      title: 'RUMBO',
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xfff3efe7),

@@ -34,7 +34,7 @@ export function Settings({ pushReady, onLogout }: { pushReady: boolean; onLogout
         throw new Error('Este navegador no puede recibir notificaciones')
       }
       if (iosDevice() && !standalone()) {
-        throw new Error('En el iPhone, primero añade Hoy a la pantalla de inicio y ábrelo desde el icono')
+        throw new Error('En el iPhone, primero añade RUMBO a la pantalla de inicio y ábrelo desde el icono')
       }
       const ready = await navigator.serviceWorker.ready
       const { publicKey } = await api.vapid()

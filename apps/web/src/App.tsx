@@ -107,7 +107,7 @@ export function App() {
   if (!authed) {
     return (
       <div className="app login">
-        <p className="eyebrow">Hoy</p>
+        <p className="eyebrow">RUMBO</p>
         <h1>Tu día, en orden.</h1>
         <form onSubmit={(event) => void enter(event)}>
           <label className="field">
@@ -138,6 +138,10 @@ export function App() {
           {creating ? 'Ya tengo cuenta' : 'Crear cuenta'}
         </button>
         <a className="google" href="/api/auth/google">Entrar con Google</a>
+        <p className="login-links">
+          <a href="/privacidad">Privacidad</a>
+          <a href="/condiciones">Condiciones</a>
+        </p>
       </div>
     )
   }

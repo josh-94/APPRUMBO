@@ -169,7 +169,7 @@ func handle(ctx context.Context, db *store.Store, client *redis.Client, publicKe
 		return
 	}
 	payload, _ := json.Marshal(map[string]string{
-		"title": "Hoy",
+		"title": "RUMBO",
 		"body":  msg.Title,
 		"tag":   msg.Dedupe,
 		"url":   "/tarea/" + itoa(msg.TaskID),

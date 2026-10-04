@@ -8,11 +8,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="Hoy">
+  <meta name="apple-mobile-web-app-title" content="RUMBO">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="favicon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Hoy</title>
+  <title>RUMBO</title>
 </head>
 <body>
   <script>
@@ -28,7 +28,7 @@
       const ios = /iphone|ipad|ipod/i.test(navigator.userAgent)
       const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true
       if (ios && !standalone) {
-        throw new Error('En el iPhone, primero añade Hoy a la pantalla de inicio y ábrelo desde el icono')
+        throw new Error('En el iPhone, primero añade RUMBO a la pantalla de inicio y ábrelo desde el icono')
       }
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
         throw new Error('Este navegador no puede recibir notificaciones')

@@ -118,7 +118,7 @@ def handle(store, client, public_key, private_key, subject, entry_id, fields) ->
         log.exception("subscriptions")
         return
     payload = json.dumps({
-        "title": "Hoy",
+        "title": "RUMBO",
         "body": message.get("title") or "",
         "tag": dedupe,
         "url": f"/tarea/{task_id}",
