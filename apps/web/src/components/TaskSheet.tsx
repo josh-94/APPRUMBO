@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Task, TaskInput, TaskList } from '../types'
 import { combineLocal, dateInput, timeInput, weekdayLabel } from '../format'
 
@@ -22,6 +22,8 @@ export function TaskSheet({ lists, task, defaultListId, onClose, onSave, onDelet
   const [days, setDays] = useState<number[]>(task?.repeatWeekdays ?? [])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [frame, setFrame] = useState(() => visibleFrame())
+  const sheetRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -30,6 +32,29 @@ export function TaskSheet({ lists, task, defaultListId, onClose, onSave, onDelet
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  useEffect(() => {
+    const viewport = window.visualViewport
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    function place() {
+      setFrame(visibleFrame())
+      const active = document.activeElement
+      if (active instanceof HTMLElement && sheetRef.current?.contains(active)) {
+        active.scrollIntoView({ block: 'nearest' })
+      }
+    }
+
+    place()
+    viewport?.addEventListener('resize', place)
+    viewport?.addEventListener('scroll', place)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      viewport?.removeEventListener('resize', place)
+      viewport?.removeEventListener('scroll', place)
+    }
+  }, [])
 
   async function save() {
     setBusy(true)
@@ -56,8 +81,32 @@ export function TaskSheet({ lists, task, defaultListId, onClose, onSave, onDelet
   }
 
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-labelledby="sheet-title" onClick={(event) => event.stopPropagation()}>
+    <div
+      className="sheet-backdrop"
+      style={{
+        top: frame.top,
+        left: frame.left,
+        width: frame.width,
+        height: frame.height,
+        right: 'auto',
+        bottom: 'auto',
+      }}
+      onClick={onClose}
+    >
+      <div
+        ref={sheetRef}
+        className="sheet"
+        style={{ maxHeight: Math.max(frame.height - 12, 160) }}
+        role="dialog"
+        aria-labelledby="sheet-title"
+        onClick={(event) => event.stopPropagation()}
+        onFocus={(event) => {
+          const target = event.target
+          if (target instanceof HTMLElement) {
+            window.setTimeout(() => target.scrollIntoView({ block: 'nearest' }), 280)
+          }
+        }}
+      >
         <div className="sheet-handle" />
         <h2 id="sheet-title">{task ? 'Tarea' : 'Nueva tarea'}</h2>
         <label className="field">
@@ -133,4 +182,17 @@ export function TaskSheet({ lists, task, defaultListId, onClose, onSave, onDelet
       </div>
     </div>
   )
+}
+
+function visibleFrame() {
+  const viewport = window.visualViewport
+  if (!viewport) {
+    return { top: 0, left: 0, width: window.innerWidth, height: window.innerHeight }
+  }
+  return {
+    top: viewport.offsetTop,
+    left: viewport.offsetLeft,
+    width: viewport.width,
+    height: viewport.height,
+  }
 }

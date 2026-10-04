@@ -203,6 +203,8 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .inline-form { margin-top: 16px; }
 .inline-form input, .field input, .field textarea, .field select, .row-actions input {
   width: 100%;
+  max-width: 100%;
+  font-size: 16px;
   border: 1px solid var(--line);
   background: white;
   border-radius: 12px;
@@ -211,10 +213,10 @@ button, input, textarea, select { font: inherit; color: inherit; }
 
 .field, .checkline { display: grid; gap: 6px; margin: 12px 0; font-size: 0.85rem; color: var(--muted); }
 .field-label { margin: 8px 0 0; font-size: 0.85rem; color: var(--muted); }
-.split .field { flex: 1; }
+.split .field { flex: 1; min-width: 0; }
 .checkline { grid-auto-flow: column; justify-content: start; align-items: center; color: var(--ink); }
 
-.weekdays { display: flex; gap: 6px; margin: 8px 0 12px; }
+.weekdays { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
 .weekday { width: 36px; height: 36px; padding: 0; }
 .weekday.on { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
 
@@ -227,13 +229,15 @@ button, input, textarea, select { font: inherit; color: inherit; }
   z-index: 5;
 }
 .sheet {
-  width: min(480px, 100%);
+  width: 100%;
+  max-width: 480px;
   margin: 0 auto;
   background: var(--paper);
   border-radius: 24px 24px 0 0;
   padding: 10px 18px calc(18px + env(safe-area-inset-bottom));
   max-height: 92dvh;
   overflow: auto;
+  scroll-padding-bottom: 24px;
 }
 .sheet-handle {
   width: 42px;
