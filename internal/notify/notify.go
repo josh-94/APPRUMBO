@@ -3,7 +3,10 @@ package notify
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log/slog"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -176,25 +179,25 @@ func handle(ctx context.Context, db *store.Store, client *redis.Client, publicKe
 			Endpoint: sub.Endpoint,
 			Keys:     webpush.Keys{P256dh: sub.P256dh, Auth: sub.Auth},
 		}, &webpush.Options{
-			Subscriber:      subject,
+			Subscriber:      vapidContact(subject),
 			VAPIDPublicKey:  publicKey,
 			VAPIDPrivateKey: privateKey,
 			TTL:             60,
+			HTTPClient:      applePushClient{publicKey: publicKey, inner: &http.Client{Timeout: 15 * time.Second}},
 		})
-		if resp != nil {
-			_ = resp.Body.Close()
-		}
 		if err != nil || resp == nil {
 			slog.Error("web push", "err", err)
-			return
+			continue
 		}
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 180))
+		_ = resp.Body.Close()
 		if resp.StatusCode == 404 || resp.StatusCode == 410 {
 			_ = db.DeleteSubscription(ctx, sub.Endpoint)
 			continue
 		}
 		if resp.StatusCode >= 300 {
-			slog.Error("web push status", "status", resp.StatusCode)
-			return
+			slog.Error("web push status", "status", resp.StatusCode, "body", string(body))
+			continue
 		}
 	}
 	if err := client.Set(ctx, sentKey, "1", 7*24*time.Hour).Err(); err != nil {
@@ -204,6 +207,28 @@ func handle(ctx context.Context, db *store.Store, client *redis.Client, publicKe
 	if err := client.XAck(ctx, stream, "push", entry.ID).Err(); err != nil {
 		slog.Error("ack", "err", err)
 	}
+}
+
+// vapidContact is the address the push library puts in the JWT.
+// That library adds "mailto:" unless the value already starts with "https:",
+// so a subject that is already "mailto:..." would be sent twice and Apple rejects it.
+func vapidContact(subject string) string {
+	subject = strings.TrimSpace(subject)
+	return strings.TrimPrefix(subject, "mailto:")
+}
+
+type applePushClient struct {
+	publicKey string
+	inner     *http.Client
+}
+
+func (c applePushClient) Do(req *http.Request) (*http.Response, error) {
+	if strings.Contains(req.URL.Host, "push.apple.com") {
+		req.Header.Set("apns-push-type", "alert")
+		req.Header.Set("apns-priority", "10")
+		req.Header.Set("apns-topic", url.QueryEscape(c.publicKey))
+	}
+	return c.inner.Do(req)
 }
 
 func isBusyGroup(err error) bool {
