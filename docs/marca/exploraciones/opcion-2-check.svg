@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Opción 2: El check que sube (Tareas + Finanzas en ascenso) -->
+  <polygon points="120,296 168,248 232,312 344,200 380,236 232,384" fill="#C2461F" />
+  <!-- Faceta ascendente / punta dinámica -->
+  <polygon points="344,200 380,236 406,146" fill="#9E3714" />
+  <!-- Nodo de logro / meta -->
+  <circle cx="406" cy="146" r="18" fill="#F4B860" />
+</svg>

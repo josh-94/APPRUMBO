@@ -1,0 +1,220 @@
+/*
+ * RUMBO — Design tokens v2.0 (direccion verde)
+ * Fuente de verdad: docs/marca/manual-de-marca.md (seccion 6)
+ * Fuentes: Bricolage Grotesque (titulares) + Inter (texto y montos), Google Fonts.
+ */
+
+:root {
+  /* ---------- Marca ---------- */
+  --rumbo-color-primary: #066B49;          /* Verde Rumbo: CTA, links, iconos activos */
+  --rumbo-color-primary-hover: #055B3E;
+  --rumbo-color-primary-strong: #04432F;   /* texto sobre primary-soft */
+  --rumbo-color-primary-soft: #DBF1E4;     /* Verde Bruma (circulos de icono, chips) */
+  --rumbo-color-on-primary: #FFFFFF;
+
+  --rumbo-color-secondary: #17F296;        /* Verde Impulso: tab activa, anillo, rachas */
+  --rumbo-color-secondary-hover: #0CC97D;  /* Verde Brote */
+  --rumbo-color-secondary-soft: #D9FBEC;
+  --rumbo-color-on-secondary: #06321F;     /* nunca texto blanco sobre Verde Impulso */
+
+  /* ---------- Semanticos ---------- */
+  --rumbo-color-income: #066B49;           /* Verde Rumbo */
+  --rumbo-color-income-soft: #DBF1E4;
+  --rumbo-color-expense: #8E3A9E;          /* Ciruela */
+  --rumbo-color-expense-soft: #F1E2F4;
+  --rumbo-color-alert: #B3261E;            /* Rojo Alto: presupuesto excedido */
+  --rumbo-color-alert-soft: #FBE4E2;
+  --rumbo-color-success: #17F296;          /* Verde Impulso (relleno): habito completado */
+  --rumbo-color-success-text: #05543A;     /* texto sobre success-soft */
+  --rumbo-color-success-soft: #D9FBEC;
+  --rumbo-color-info: #3C5FB8;             /* Azul Horizonte (texto e iconos) */
+  --rumbo-color-info-light: #7BA0E6;       /* Azul Horizonte claro: graficos e ilustracion */
+  --rumbo-color-info-soft: #E4EBFA;
+
+  /* ---------- Neutrales ---------- */
+  --rumbo-color-bg: #F4F9F2;               /* Lino Verde */
+  --rumbo-color-surface: #FFFFFF;          /* Papel */
+  --rumbo-color-surface-strong: #2A3932;   /* Noche Bosque: tarjeta oscura y tab bar */
+  --rumbo-color-on-strong: #FFFFFF;
+  --rumbo-color-on-strong-muted: #A9B8B0;  /* Bruma */
+  --rumbo-color-ink: #1A2620;              /* Tinta Bosque */
+  --rumbo-color-ink-secondary: #5A6B62;    /* Pizarra */
+  --rumbo-color-ink-muted: #83938B;        /* Niebla: solo texto >= 24px */
+  --rumbo-color-border: #E3ECE4;           /* Linea */
+  --rumbo-color-disabled: #B6C3BA;
+  --rumbo-color-disabled-bg: #EDF3EE;
+  --rumbo-color-track: #E3ECE4;            /* fondo de barras y anillos */
+  --rumbo-color-track-on-strong: #3E5048;
+
+  --rumbo-gradient-account: linear-gradient(135deg, #D9FBEC 0%, #E4EBFA 100%);
+  --rumbo-gradient-aleta: linear-gradient(180deg, #066B49 0%, #0CC97D 100%);
+
+  /* ---------- Tipografia ---------- */
+  --rumbo-font-display: "Bricolage Grotesque", "Inter", system-ui, sans-serif;
+  --rumbo-font-text: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --rumbo-font-numeric-features: "tnum" 1, "lnum" 1;
+
+  --rumbo-font-size-display: 40px;   /* montos heroe y numero del anillo */
+  --rumbo-font-size-h1: 30px;
+  --rumbo-font-size-h2: 24px;
+  --rumbo-font-size-h3: 19px;
+  --rumbo-font-size-body: 15px;
+  --rumbo-font-size-small: 13.5px;
+  --rumbo-font-size-label: 11.5px;
+
+  --rumbo-line-height-display: 1.0;
+  --rumbo-line-height-h1: 1.1;
+  --rumbo-line-height-h2: 1.15;
+  --rumbo-line-height-h3: 1.25;
+  --rumbo-line-height-body: 1.45;
+  --rumbo-line-height-small: 1.4;
+  --rumbo-line-height-label: 1.2;
+
+  --rumbo-tracking-display: -0.03em;
+  --rumbo-tracking-heading: -0.03em;
+  --rumbo-tracking-h3: -0.015em;
+  --rumbo-tracking-body: 0;
+  --rumbo-tracking-label: 0.08em;
+
+  --rumbo-font-weight-regular: 400;
+  --rumbo-font-weight-medium: 500;
+  --rumbo-font-weight-semibold: 600;
+  --rumbo-font-weight-bold: 700;
+  --rumbo-font-weight-extrabold: 800;
+
+  /* ---------- Espaciado (base 4) ---------- */
+  --rumbo-space-1: 4px;
+  --rumbo-space-2: 8px;
+  --rumbo-space-3: 12px;
+  --rumbo-space-4: 16px;
+  --rumbo-space-5: 20px;
+  --rumbo-space-6: 24px;
+  --rumbo-space-8: 32px;
+  --rumbo-space-10: 40px;
+  --rumbo-space-12: 48px;
+  --rumbo-screen-padding: 20px;
+
+  /* ---------- Radios ---------- */
+  --rumbo-radius-xs: 10px;
+  --rumbo-radius-sm: 12px;
+  --rumbo-radius-md: 14px;
+  --rumbo-radius-lg: 18px;
+  --rumbo-radius-card: 20px;
+  --rumbo-radius-pill: 999px;
+
+  /* ---------- Bordes ---------- */
+  --rumbo-border-width: 1px;
+  --rumbo-border-width-strong: 1.5px;
+  --rumbo-focus-ring: 0 0 0 3px rgba(6, 107, 73, 0.35);
+
+  /* ---------- Sombras ---------- */
+  --rumbo-shadow-sm: 0 1px 2px rgba(26, 38, 32, 0.06);
+  --rumbo-shadow-md: 0 2px 6px rgba(26, 38, 32, 0.05), 0 14px 30px -16px rgba(26, 38, 32, 0.18);
+  --rumbo-shadow-lg: 0 6px 16px rgba(26, 38, 32, 0.10), 0 24px 48px -20px rgba(26, 38, 32, 0.35);
+
+  /* ---------- Iconos ---------- */
+  --rumbo-icon-size-sm: 18px;
+  --rumbo-icon-size-md: 22px;
+  --rumbo-icon-size-lg: 28px;
+  --rumbo-icon-stroke: 1.75;
+
+  /* ---------- Motion ---------- */
+  --rumbo-duration-instant: 120ms;
+  --rumbo-duration-fast: 200ms;
+  --rumbo-duration-base: 320ms;
+  --rumbo-duration-slow: 600ms;
+  --rumbo-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --rumbo-ease-emphasized: cubic-bezier(0.3, 0, 0, 1.2);
+  --rumbo-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ---------- Componentes (referencia estructural) ---------- */
+  --rumbo-tabbar-bg: var(--rumbo-color-surface-strong);
+  --rumbo-tabbar-height: 64px;
+  --rumbo-tabbar-radius: var(--rumbo-radius-pill);
+  --rumbo-tabbar-inset: 16px;
+  --rumbo-tabbar-shadow: var(--rumbo-shadow-lg);
+  --rumbo-tabbar-icon: var(--rumbo-color-on-strong-muted);
+  --rumbo-tab-active-bg: var(--rumbo-color-secondary);
+  --rumbo-tab-active-fg: var(--rumbo-color-on-secondary);
+  --rumbo-tab-active-height: 48px;
+
+  --rumbo-summary-bg: var(--rumbo-color-surface-strong);
+  --rumbo-summary-fg: var(--rumbo-color-on-strong);
+  --rumbo-summary-fg-muted: var(--rumbo-color-on-strong-muted);
+  --rumbo-summary-label: var(--rumbo-color-secondary);
+
+  --rumbo-ring-size: 120px;
+  --rumbo-ring-stroke: 12px;
+  --rumbo-ring-progress: var(--rumbo-color-secondary);
+  --rumbo-ring-track: var(--rumbo-color-track-on-strong);
+
+  --rumbo-week-chip-bg: var(--rumbo-color-bg);
+  --rumbo-week-chip-done-bg: var(--rumbo-color-primary-soft);
+  --rumbo-week-chip-done-fg: var(--rumbo-color-primary-strong);
+  --rumbo-week-chip-today-border: var(--rumbo-color-primary);
+  --rumbo-week-chip-radius: var(--rumbo-radius-md);
+
+  --rumbo-quick-card-bg: var(--rumbo-color-surface);
+  --rumbo-quick-card-radius: var(--rumbo-radius-card);
+  --rumbo-quick-icon-circle: 40px;
+
+  --rumbo-greeting-pill-bg: var(--rumbo-color-surface);
+  --rumbo-greeting-pill-height: 44px;
+}
+
+[data-theme="dark"] {
+  --rumbo-color-primary: #22E79A;
+  --rumbo-color-primary-hover: #4EEFB0;
+  --rumbo-color-primary-strong: #4EEFB0;
+  --rumbo-color-primary-soft: #0B3A28;
+  --rumbo-color-on-primary: #06231A;
+
+  --rumbo-color-secondary: #17F296;
+  --rumbo-color-secondary-hover: #56F7B4;
+  --rumbo-color-secondary-soft: #123B2B;
+  --rumbo-color-on-secondary: #06321F;
+
+  --rumbo-color-income: #3DD68C;
+  --rumbo-color-income-soft: #0F3326;
+  --rumbo-color-expense: #C98BE0;
+  --rumbo-color-expense-soft: #331F3B;
+  --rumbo-color-alert: #FF6B5E;
+  --rumbo-color-alert-soft: #44191A;
+  --rumbo-color-success: #17F296;
+  --rumbo-color-success-text: #8CF7C8;
+  --rumbo-color-success-soft: #123B2B;
+  --rumbo-color-info: #8FAEF2;
+  --rumbo-color-info-light: #7BA0E6;
+  --rumbo-color-info-soft: #1A2740;
+
+  --rumbo-color-bg: #0D140F;
+  --rumbo-color-surface: #141D17;
+  --rumbo-color-surface-strong: #1E2A23;
+  --rumbo-color-on-strong: #FFFFFF;
+  --rumbo-color-on-strong-muted: #B8C6BE;
+  --rumbo-color-ink: #EDF4EE;
+  --rumbo-color-ink-secondary: #A9B8B0;
+  --rumbo-color-ink-muted: #83938B;
+  --rumbo-color-border: #2A3932;
+  --rumbo-color-disabled: #4E5C54;
+  --rumbo-color-disabled-bg: #1F2A24;
+  --rumbo-color-track: #2A3932;
+  --rumbo-color-track-on-strong: #35443C;
+
+  --rumbo-gradient-account: linear-gradient(135deg, #123B2B 0%, #1A2740 100%);
+  --rumbo-gradient-aleta: linear-gradient(180deg, #0A8559 0%, #0CC97D 100%);
+
+  --rumbo-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --rumbo-shadow-md: 0 2px 6px rgba(0, 0, 0, 0.35), 0 14px 30px -16px rgba(0, 0, 0, 0.60);
+  --rumbo-shadow-lg: 0 6px 16px rgba(0, 0, 0, 0.45), 0 24px 48px -20px rgba(0, 0, 0, 0.70);
+  --rumbo-focus-ring: 0 0 0 3px rgba(34, 231, 154, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --rumbo-duration-instant: 0ms;
+    --rumbo-duration-fast: 0ms;
+    --rumbo-duration-base: 0ms;
+    --rumbo-duration-slow: 0ms;
+  }
+}

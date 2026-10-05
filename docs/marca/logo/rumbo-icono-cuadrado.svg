@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fondo completo, sin esquinas redondeadas: iOS y Android recortan el icono. -->
   <rect width="512" height="512" fill="#2A3932"/>
   <defs>
     <linearGradient id="rumbo-aleta-icono" x1="0" y1="239" x2="0" y2="429" gradientUnits="userSpaceOnUse" gradientTransform="translate(10.8 8.9) scale(0.9635)">

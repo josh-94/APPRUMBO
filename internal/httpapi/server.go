@@ -24,8 +24,8 @@ import (
 var dummyPasswordHash = []byte("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy")
 
 type Server struct {
-	Store         *store.Store
-	Redis         *redis.Client
+	Store          *store.Store
+	Redis          *redis.Client
 	Loc            *time.Location
 	SessionSecret  string
 	CookieSecure   bool
@@ -60,6 +60,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/push/vapid", s.protected(s.vapid))
 	mux.HandleFunc("POST /api/push/subscriptions", s.protected(s.savePush))
 	mux.HandleFunc("DELETE /api/push/subscriptions", s.protected(s.deletePush))
+	mux.HandleFunc("GET /api/habits", s.protected(s.habits))
+	mux.HandleFunc("POST /api/habits", s.protected(s.createHabit))
+	mux.HandleFunc("POST /api/habits/{id}/checks", s.protected(s.habitCheck))
+	mux.HandleFunc("DELETE /api/habits/{id}/checks", s.protected(s.habitCheck))
+	mux.HandleFunc("GET /api/money/month", s.protected(s.moneyMonth))
+	mux.HandleFunc("POST /api/movements", s.protected(s.createMovement))
+	mux.HandleFunc("GET /api/export", s.protected(s.exportData))
 	return mux
 }
 
@@ -163,9 +170,11 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) sessionInfo(w http.ResponseWriter, r *http.Request) {
+	email, _ := s.Store.Email(r.Context(), currentUser(r))
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":   true,
-		"push": s.VAPIDPublic != "",
+		"ok":    true,
+		"push":  s.VAPIDPublic != "",
+		"email": email,
 	})
 }
 

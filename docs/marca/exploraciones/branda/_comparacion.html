@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Rescate Branda — Rumbo</title>
+  <style>
+    :root { --lino:#F4F9F2; --tinta:#1A2620; --pizarra:#5A6B62; --linea:#E3ECE4; --papel:#fff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: var(--lino); color: var(--tinta); padding: 32px 20px 80px; }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    h1 { font-size: 26px; letter-spacing: -0.03em; margin: 0 0 8px; }
+    h2 { font-size: 18px; letter-spacing: -0.02em; margin: 32px 0 12px; }
+    p { color: var(--pizarra); max-width: 68ch; }
+    .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    figure { margin: 0; background: var(--papel); border: 1px solid var(--linea); border-radius: 16px; overflow: hidden; width: auto; }
+    figure.wide { width: 100%; max-width: 520px; }
+    .tile { width: 100%; aspect-ratio: 1; height: auto; min-height: 160px; background: #F4F9F2 center/cover no-repeat; display: block; object-fit: contain; }
+    .crop { background-image: url("branda-moodboard.jpg"); background-size: 791px 791px; background-position: -18px -18px; }
+    figcaption { padding: 10px 12px; font-size: 12px; color: var(--pizarra); }
+    .swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+    .swatch { background: var(--papel); border: 1px solid var(--linea); border-radius: 14px; overflow: hidden; }
+    .chip { height: 56px; }
+    .meta { padding: 8px 10px; font-size: 12px; }
+    .meta code { color: var(--pizarra); }
+    table { width: 100%; border-collapse: collapse; background: var(--papel); border-radius: 16px; overflow: hidden; font-size: 13px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--linea); }
+    th { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pizarra); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Rescate de la exploracion de Branda</h1>
+    <p>Sin Brand Kit no hay SVG oficial ni tipografias empaquetadas. Esto es lo que se puede usar: la captura, la paleta medida pixel a pixel y una recreacion vectorial de la flecha plegada.</p>
+
+    <h2>Simbolo</h2>
+    <div class="row">
+      <figure>
+        <div class="tile crop"></div>
+        <figcaption>Branda (recorte de la captura)</figcaption>
+      </figure>
+      <figure>
+        <img class="tile" src="/logo/rumbo-simbolo.svg?v=4" alt="SVG oficial actual">
+        <figcaption>Oficial actual: dos cunas</figcaption>
+      </figure>
+      <figure>
+        <img class="tile" src="rumbo-flecha-branda.svg?v=4" alt="Recreacion de la cinta plegada">
+        <figcaption>Rescate: una cinta plegada</figcaption>
+      </figure>
+    </div>
+
+    <h2>Paleta medida en la captura</h2>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#1BF297"></div><div class="meta"><strong>Menta</strong><br><code>#1BF297</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#066B49"></div><div class="meta"><strong>Bosque</strong><br><code>#066B49</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#D9F1E3"></div><div class="meta"><strong>Niebla</strong><br><code>#D9F1E3</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#7DA2E8"></div><div class="meta"><strong>Periwinkle</strong><br><code>#7DA2E8</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#2A3932"></div><div class="meta"><strong>Noche</strong><br><code>#2A3932</code></div></div>
+    </div>
+    <p>Esos cinco hex ya viven en los tokens del repo (o a un paso). El hueco no es el color: es que el simbolo oficial todavia no es esta cinta.</p>
+
+    <h2>Que se puede rescatar y que no</h2>
+    <table>
+      <tr><th>Pieza</th><th>Estado</th></tr>
+      <tr><td>Direccion (verde, flecha, UI limpia, 3D editorial)</td><td>Si. Ya esta en el manual v2.0</td></tr>
+      <tr><td>Paleta de 5 colores</td><td>Si. Medida de la captura; coincide con tokens.css</td></tr>
+      <tr><td>Simbolo</td><td>Recreado a mano en SVG. No es el archivo de Branda; es un trazo propio inspirado en la captura</td></tr>
+      <tr><td>Wordmark, fuentes, mockups, brand book</td><td>No. Requieren el kit de pago o recrearlos aqui</td></tr>
+      <tr><td>Personaje 3D y fotos de producto</td><td>Solo como mood (la JPG). No usarlas como marca oficial</td></tr>
+    </table>
+
+    <h2>Moodboard completo</h2>
+    <div class="row">
+      <figure class="wide">
+        <img src="branda-moodboard.jpg" alt="Moodboard Branda" style="width:100%; display:block;">
+        <figcaption>branda-moodboard.jpg — referencia visual, no asset de produccion</figcaption>
+      </figure>
+    </div>
+  </div>
+</body>
+</html>

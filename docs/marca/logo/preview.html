@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Logotipo — Rumbo</title>
+  <style>
+    :root {
+      --verde: #066B49;
+      --verde-profundo: #04432F;
+      --impulso: #17F296;
+      --brote: #0CC97D;
+      --lino: #F4F9F2;
+      --noche: #2A3932;
+      --tinta: #1A2620;
+      --pizarra: #5A6B62;
+      --linea: #E3ECE4;
+      --papel: #FFFFFF;
+      --bruma: #A9B8B0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--lino);
+      color: var(--tinta);
+      padding: 40px 24px 80px;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 1040px;
+      margin: 0 auto;
+    }
+    header {
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--linea);
+      padding-bottom: 24px;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 8px 0 16px;
+    }
+    p.lead {
+      color: var(--pizarra);
+      font-size: 16px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+    .card {
+      background: var(--papel);
+      border: 1px solid var(--linea);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .card.dark {
+      background: var(--noche);
+      border-color: #3E5048;
+      color: var(--lino);
+    }
+    .preview-box {
+      height: 220px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: var(--lino);
+    }
+    .card.dark .preview-box {
+      background: var(--noche);
+    }
+    .card.transparent-checker .preview-box {
+      background: repeating-conic-gradient(#E3ECE4 0% 25%, #F4F9F2 0% 50%) 50% / 16px 16px;
+    }
+    .preview-box img, .preview-box object {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    .info {
+      padding: 16px 20px;
+      border-top: 1px solid var(--linea);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .card.dark .info {
+      border-color: #3E5048;
+    }
+    .info h3 {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .info p {
+      font-size: 12px;
+      color: var(--pizarra);
+    }
+    .card.dark .info p {
+      color: var(--bruma);
+    }
+    .badge {
+      font-size: 11px;
+      font-family: monospace;
+      padding: 4px 8px;
+      background: #EDF3EE;
+      border-radius: 6px;
+      color: var(--tinta);
+      white-space: nowrap;
+    }
+    .card.dark .badge {
+      background: #1E2A23;
+      color: var(--lino);
+    }
+
+    /* Paleta */
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 40px;
+    }
+    .swatch {
+      border-radius: 14px;
+      border: 1px solid var(--linea);
+      overflow: hidden;
+      background: var(--papel);
+    }
+    .swatch .chip { height: 72px; }
+    .swatch .meta { padding: 10px 12px; }
+    .swatch .meta strong { display: block; font-size: 13px; }
+    .swatch .meta code { font-size: 11px; color: var(--pizarra); }
+
+    /* Escalas */
+    .sizes {
+      display: flex;
+      align-items: flex-end;
+      gap: 28px;
+      flex-wrap: wrap;
+      background: var(--papel);
+      border: 1px solid var(--linea);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 40px;
+    }
+    .sizes figure { text-align: center; }
+    .sizes figcaption { font-size: 11px; color: var(--pizarra); margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Sistema de logotipo de Rumbo</h1>
+      <p class="lead">Direccion verde (v2.0). Simbolo "La flecha": la hoja menta marca el rumbo, la aleta en degradado es la base. Archivos SVG listos para produccion.</p>
+    </header>
+
+    <h2>Versiones</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="preview-box">
+          <img src="rumbo-horizontal.svg" alt="Rumbo horizontal">
+        </div>
+        <div class="info">
+          <div>
+            <h3>Principal horizontal</h3>
+            <p>Flecha a la izq. + wordmark Tinta Bosque</p>
+          </div>
+          <span class="badge">rumbo-horizontal.svg</span>
+        </div>
+      </div>
+
+      <div class="card dark">
+        <div class="preview-box">
+          <img src="rumbo-horizontal-oscuro.svg" alt="Rumbo horizontal sobre oscuro">
+        </div>
+        <div class="info">
+          <div>
+            <h3>Horizontal sobre oscuro</h3>
+            <p>Wordmark blanco sobre Noche Bosque</p>
+          </div>
+          <span class="badge">rumbo-horizontal-oscuro.svg</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="preview-box">
+          <img src="rumbo-apilado.svg" alt="Rumbo apilado">
+        </div>
+        <div class="info">
+          <div>
+            <h3>Apilado</h3>
+            <p>Flecha centrada arriba + wordmark</p>
+          </div>
+          <span class="badge">rumbo-apilado.svg</span>
+        </div>
+      </div>
+
+      <div class="card dark">
+        <div class="preview-box">
+          <img src="rumbo-apilado-oscuro.svg" alt="Rumbo apilado sobre oscuro">
+        </div>
+        <div class="info">
+          <div>
+            <h3>Apilado sobre oscuro</h3>
+            <p>Splash y pantallas nocturnas</p>
+          </div>
+          <span class="badge">rumbo-apilado-oscuro.svg</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="preview-box">
+          <img src="rumbo-simbolo.svg" alt="Rumbo isotipo">
+        </div>
+        <div class="info">
+          <div>
+            <h3>Isotipo solo</h3>
+            <p>Hoja menta + aleta en degradado</p>
+          </div>
+          <span class="badge">rumbo-simbolo.svg</span>
+        </div>
+      </div>
+
+      <div class="card dark">
+        <div class="preview-box">
+          <img src="rumbo-icono-app.svg" alt="Rumbo icono de app" style="max-height: 160px;">
+        </div>
+        <div class="info">
+          <div>
+            <h3>Icono de app</h3>
+            <p>Radio 22%, flecha al 62% de la caja</p>
+          </div>
+          <span class="badge">rumbo-icono-app.svg</span>
+        </div>
+      </div>
+
+      <div class="card transparent-checker">
+        <div class="preview-box">
+          <img src="rumbo-mono-negro.svg" alt="Rumbo monocromo negro">
+        </div>
+        <div class="info">
+          <div>
+            <h3>Monocromo negro</h3>
+            <p>Calado del 4% entre hoja y aleta</p>
+          </div>
+          <span class="badge">rumbo-mono-negro.svg</span>
+        </div>
+      </div>
+
+      <div class="card dark">
+        <div class="preview-box" style="background: #0D140F;">
+          <img src="rumbo-mono-blanco.svg" alt="Rumbo monocromo blanco">
+        </div>
+        <div class="info">
+          <div>
+            <h3>Monocromo blanco</h3>
+            <p>Sellos y fondos fotograficos</p>
+          </div>
+          <span class="badge">rumbo-mono-blanco.svg</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="preview-box">
+          <img src="rumbo-favicon.svg" alt="Rumbo favicon" style="width: 48px; height: 48px;">
+        </div>
+        <div class="info">
+          <div>
+            <h3>Favicon / micro (16 a 48 px)</h3>
+            <p>Aleta en plano, sin degradado</p>
+          </div>
+          <span class="badge">rumbo-favicon.svg</span>
+        </div>
+      </div>
+    </div>
+
+    <h2>Prueba de reduccion</h2>
+    <div class="sizes">
+      <figure><img src="rumbo-simbolo.svg" width="128" height="128" alt=""><figcaption>128 px</figcaption></figure>
+      <figure><img src="rumbo-simbolo.svg" width="64" height="64" alt=""><figcaption>64 px</figcaption></figure>
+      <figure><img src="rumbo-favicon.svg" width="32" height="32" alt=""><figcaption>32 px</figcaption></figure>
+      <figure><img src="rumbo-favicon.svg" width="16" height="16" alt=""><figcaption>16 px</figcaption></figure>
+      <figure><img src="rumbo-icono-app.svg" width="96" height="96" alt=""><figcaption>Icono 96 px</figcaption></figure>
+      <figure><img src="rumbo-horizontal.svg" width="190" alt=""><figcaption>Horizontal 190 px</figcaption></figure>
+      <figure><img src="rumbo-horizontal.svg" width="96" alt=""><figcaption>Horizontal 96 px (minimo)</figcaption></figure>
+    </div>
+
+    <h2>Paleta</h2>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#066B49"></div><div class="meta"><strong>Verde Rumbo</strong><code>#066B49</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#04432F"></div><div class="meta"><strong>Verde Profundo</strong><code>#04432F</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#17F296"></div><div class="meta"><strong>Verde Impulso</strong><code>#17F296</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#0CC97D"></div><div class="meta"><strong>Verde Brote</strong><code>#0CC97D</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#DBF1E4"></div><div class="meta"><strong>Verde Bruma</strong><code>#DBF1E4</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#2A3932"></div><div class="meta"><strong>Noche Bosque</strong><code>#2A3932</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#1A2620"></div><div class="meta"><strong>Tinta Bosque</strong><code>#1A2620</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#F4F9F2"></div><div class="meta"><strong>Lino Verde</strong><code>#F4F9F2</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#8E3A9E"></div><div class="meta"><strong>Ciruela (gasto)</strong><code>#8E3A9E</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#B3261E"></div><div class="meta"><strong>Rojo Alto (alerta)</strong><code>#B3261E</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#3C5FB8"></div><div class="meta"><strong>Azul Horizonte</strong><code>#3C5FB8</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#7BA0E6"></div><div class="meta"><strong>Azul Horizonte claro</strong><code>#7BA0E6</code></div></div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comparativa de Conceptos de Logo — Rumbo</title>
+  <style>
+    :root {
+      /* Paleta 1: Atardecer Andino (Elegida) */
+      --color-facet-1: #C2461F;
+      --color-facet-2: #9E3714;
+      --color-accent: #F4B860;
+      --color-bg-light: #FAF6F2;
+      --color-bg-dark: #1F1A1C;
+      --color-text-light: #231D1F;
+      --color-text-dark: #FAF6F2;
+      --color-muted: #6B6062;
+      --color-card-border: #EDE5DF;
+      --color-card-bg: #FFFFFF;
+      --app-bg: var(--color-bg-light);
+      --app-text: var(--color-text-light);
+    }
+
+    /* Paleta 2: Índigo + Sol (Descartada por genérica) */
+    body.theme-indigo {
+      --color-facet-1: #2B428C;
+      --color-facet-2: #192754;
+      --color-accent: #F5A623;
+      --color-bg-light: #F4F6FB;
+      --color-bg-dark: #111728;
+      --color-text-light: #161D2E;
+      --color-text-dark: #F4F6FB;
+      --color-muted: #616F8D;
+      --color-card-border: #E0E5F0;
+      --color-card-bg: #FFFFFF;
+    }
+
+    /* Paleta 3: Amazonía / Cosecha */
+    body.theme-amazon {
+      --color-facet-1: #13854F;
+      --color-facet-2: #0B5331;
+      --color-accent: #E2A740;
+      --color-bg-light: #F4F8F5;
+      --color-bg-dark: #131E18;
+      --color-text-light: #18261E;
+      --color-text-dark: #F4F8F5;
+      --color-muted: #596E62;
+      --color-card-border: #DDE8E0;
+      --color-card-bg: #FFFFFF;
+    }
+
+    /* Paleta 4: Identidad Inicial (Teal + Papel) */
+    body.theme-teal {
+      --color-facet-1: #0E6E68;
+      --color-facet-2: #084844;
+      --color-accent: #D48B38;
+      --color-bg-light: #F5F1E9;
+      --color-bg-dark: #1C1915;
+      --color-text-light: #1C1915;
+      --color-text-dark: #F5F1E9;
+      --color-muted: #6E685E;
+      --color-card-border: #E3DDD2;
+      --color-card-bg: #FFFFFF;
+    }
+
+    body.dark-mode {
+      --app-bg: var(--color-bg-dark);
+      --app-text: var(--color-text-dark);
+      --color-card-bg: #282124;
+      --color-card-border: #3D3337;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--app-bg);
+      color: var(--app-text);
+      padding: 40px 24px 80px;
+      line-height: 1.5;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--color-card-border);
+      padding-bottom: 20px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    p.lead {
+      color: var(--color-muted);
+      font-size: 16px;
+      max-width: 860px;
+    }
+
+    /* Sticky Control Panel */
+    .controls-panel {
+      background: var(--color-card-bg);
+      border: 1px solid var(--color-card-border);
+      border-radius: 18px;
+      padding: 16px 20px;
+      margin-bottom: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .control-label {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-muted);
+      min-width: 80px;
+    }
+    .btn-toggle {
+      background: var(--app-bg);
+      border: 1px solid var(--color-card-border);
+      color: var(--app-text);
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .btn-toggle:hover {
+      border-color: var(--color-facet-1);
+    }
+    .btn-toggle.active {
+      background: var(--color-facet-1);
+      color: #FFFFFF;
+      border-color: var(--color-facet-1);
+    }
+    .swatch {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* Cards Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 24px;
+      margin-bottom: 48px;
+    }
+    .concept-card {
+      background: var(--color-card-bg);
+      border: 1px solid var(--color-card-border);
+      border-radius: 20px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .concept-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 14px 28px -10px rgba(0,0,0,0.12);
+    }
+    .concept-card.featured {
+      border: 2px solid var(--color-facet-1);
+    }
+    .badge-status {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      z-index: 2;
+    }
+    .badge-selected {
+      background: var(--color-facet-1);
+      color: #FFFFFF;
+    }
+    .badge-alt {
+      background: var(--color-card-border);
+      color: var(--color-muted);
+    }
+
+    /* Main Preview Stage inside card */
+    .preview-canvas {
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 20px;
+      background: var(--app-bg);
+      border-bottom: 1px solid var(--color-card-border);
+      position: relative;
+    }
+    .preview-canvas svg {
+      width: 100%;
+      height: 100%;
+      max-width: 320px;
+      max-height: 140px;
+    }
+
+    /* Sub-Scale & Alternate Lockup Strip */
+    .scale-bar {
+      padding: 12px 18px;
+      background: rgba(0,0,0,0.02);
+      border-bottom: 1px solid var(--color-card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .scale-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .scale-item span {
+      font-size: 10px;
+      color: var(--color-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .app-icon-mock {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: var(--color-bg-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+    }
+    .app-icon-mock svg {
+      width: 100%;
+      height: 100%;
+    }
+    .dark-pill-mock {
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: var(--color-bg-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 38px;
+    }
+    .dark-pill-mock svg {
+      height: 22px;
+      width: auto;
+    }
+
+    /* Card Details */
+    .card-body {
+      padding: 20px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .card-title {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .card-metaphor {
+      font-size: 13px;
+      color: var(--color-muted);
+      margin-bottom: 16px;
+      min-height: 42px;
+    }
+    .analysis-list {
+      list-style: none;
+      font-size: 12px;
+      margin-top: auto;
+    }
+    .analysis-list li {
+      margin-bottom: 8px;
+      padding-left: 20px;
+      position: relative;
+    }
+    .analysis-list li::before {
+      position: absolute;
+      left: 0;
+      font-weight: bold;
+    }
+    .analysis-list li.pro::before { content: "✓"; color: #13854F; }
+    .analysis-list li.con::before { content: "✕"; color: #B0122F; }
+
+    /* Live Product Context Preview Section */
+    .context-section {
+      background: var(--color-card-bg);
+      border: 1px solid var(--color-card-border);
+      border-radius: 24px;
+      padding: 32px;
+      margin-top: 48px;
+    }
+    .context-header {
+      margin-bottom: 24px;
+    }
+    .context-header h2 {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .context-header p {
+      color: var(--color-muted);
+      font-size: 14.5px;
+    }
+
+    .mockup-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+    }
+
+    .device-frame {
+      background: var(--app-bg);
+      border: 2px solid var(--color-card-border);
+      border-radius: 32px;
+      padding: 20px;
+      box-shadow: 0 16px 36px -12px rgba(0,0,0,0.12);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .device-title {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-muted);
+      text-align: center;
+      margin-bottom: 4px;
+    }
+
+    /* 1. App Header Mockup */
+    .app-header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--color-card-bg);
+      border: 1px solid var(--color-card-border);
+      border-radius: 999px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+    .app-header-brand svg {
+      height: 28px;
+      width: auto;
+      display: block;
+    }
+    .app-header-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .avatar-circle {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      color: var(--color-text-light);
+      font-size: 11px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* 2. Today Summary Card */
+    .summary-card {
+      background: var(--color-bg-dark);
+      color: #FAF6F2;
+      border-radius: 20px;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .summary-label {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--color-accent);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .summary-amount {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 2px;
+    }
+    .summary-sub {
+      font-size: 12px;
+      color: #BDB2AF;
+    }
+    .ring-box {
+      width: 58px;
+      height: 58px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      border: 4px solid var(--color-accent);
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--color-accent);
+    }
+
+    /* 3. Splash Screen Frame */
+    .splash-frame {
+      background: var(--color-bg-dark);
+      border-radius: 24px;
+      padding: 48px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #FFFFFF;
+      min-height: 260px;
+    }
+    .splash-logo svg {
+      width: 140px;
+      height: auto;
+      margin-bottom: 16px;
+    }
+    .splash-tagline {
+      font-size: 13px;
+      color: #BDB2AF;
+      letter-spacing: 0.02em;
+    }
+
+    /* View Switcher Visibility Rules */
+    body[data-view="horizontal"] .view-horizontal { display: flex !important; }
+    body[data-view="horizontal"] .view-stacked,
+    body[data-view="horizontal"] .view-symbol { display: none !important; }
+
+    body[data-view="stacked"] .view-stacked { display: flex !important; }
+    body[data-view="stacked"] .view-horizontal,
+    body[data-view="stacked"] .view-symbol { display: none !important; }
+
+    body[data-view="symbol"] .view-symbol { display: flex !important; }
+    body[data-view="symbol"] .view-horizontal,
+    body[data-view="symbol"] .view-stacked { display: none !important; }
+  </style>
+</head>
+<body data-view="horizontal">
+  <div class="container">
+    <header>
+      <h1>Sistema de Identidad & Comparativa — Rumbo</h1>
+      <p class="lead">Explora cada concepto tanto de forma aislada como en su <strong>lockup oficial junto al wordmark "rumbo"</strong> (Bricolage Grotesque ExtraBold 800), con diferentes paletas y en componentes reales de interfaz.</p>
+    </header>
+
+    <!-- Global Interactive Control Panel -->
+    <div class="controls-panel">
+      <!-- Row 1: Brand Composition View -->
+      <div class="controls-row">
+        <div class="control-group">
+          <span class="control-label">Composición:</span>
+          <button class="btn-toggle active" onclick="setView('horizontal', this)">
+            🏷️ Logo Horizontal (Junto a la marca)
+          </button>
+          <button class="btn-toggle" onclick="setView('stacked', this)">
+            📐 Logo Apilado (Símbolo + Nombre)
+          </button>
+          <button class="btn-toggle" onclick="setView('symbol', this)">
+            💎 Símbolo Solo (Isotipo)
+          </button>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">Fondo:</span>
+          <button class="btn-toggle active" id="btn-light" onclick="setMode('light')">☀️ Claro</button>
+          <button class="btn-toggle" id="btn-dark" onclick="setMode('dark')">🌙 Oscuro</button>
+        </div>
+      </div>
+
+      <!-- Row 2: Color Palette Selection -->
+      <div class="controls-row">
+        <div class="control-group">
+          <span class="control-label">Paleta:</span>
+          <button class="btn-toggle active" onclick="setPalette('default', this)">
+            <span class="swatch" style="background: #C2461F;"></span> Atardecer Andino (Elegida)
+          </button>
+          <button class="btn-toggle" onclick="setPalette('theme-indigo', this)">
+            <span class="swatch" style="background: #2B428C;"></span> Índigo + Sol (Descartada)
+          </button>
+          <button class="btn-toggle" onclick="setPalette('theme-amazon', this)">
+            <span class="swatch" style="background: #13854F;"></span> Amazonía / Cosecha
+          </button>
+          <button class="btn-toggle" onclick="setPalette('theme-teal', this)">
+            <span class="swatch" style="background: #0E6E68;"></span> Papel & Teal (Original)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- The 4 Logo Concepts Grid -->
+    <div class="grid">
+      
+      <!-- ================= OPTION 1 ================= -->
+      <div class="concept-card featured">
+        <span class="badge-status badge-selected">Elegida en Cuestionario</span>
+        
+        <!-- Canvas View: Horizontal Lockup -->
+        <div class="preview-canvas view-horizontal">
+          <svg viewBox="0 0 380 120">
+            <g transform="translate(66, 61) scale(0.2396) translate(-256, -256)">
+              
+  <polygon points="376,136 216,216 136,376" fill="var(--color-facet-1)" />
+  <polygon points="376,136 136,376 296,296" fill="var(--color-facet-2)" />
+  <circle cx="256" cy="256" r="13" fill="var(--color-accent)" />
+
+            </g>
+            <path d="M135.23 82L124.22 82L124.22 65.34L124.22 46.10L133.19 46.10L133.40 58.27L134.76 58.27Q135.23 53.51 136.56 50.69Q137.88 47.86 140.37 46.57Q142.85 45.28 146.52 45.28L146.52 45.28Q147.06 45.28 147.74 45.31Q148.42 45.35 149.31 45.48L149.31 45.48L148.90 57.18Q147.81 56.64 146.55 56.47Q145.30 56.30 144.34 56.30L144.34 56.30Q141.69 56.30 139.75 57.32Q137.82 58.34 136.69 60.44Q135.57 62.55 135.23 65.75L135.23 65.75L135.23 82ZM164.81 82.95L164.81 82.95Q158.42 82.95 155.19 78.63Q151.96 74.32 151.96 65.48L151.96 65.48L151.96 46.10L162.98 46.10L162.98 64.05Q162.98 69.08 164.47 71.56Q165.97 74.04 169.03 74.04L169.03 74.04Q170.86 74.04 172.19 73.13Q173.52 72.21 174.43 70.54Q175.35 68.88 175.79 66.70Q176.24 64.52 176.24 61.94L176.24 61.94L176.24 46.10L187.18 46.10L187.18 67.45L187.18 82L178.48 82L178.28 70.92L176.92 70.92Q175.90 75.13 174.37 77.82Q172.84 80.50 170.52 81.73Q168.21 82.95 164.81 82.95ZM204.52 82L193.58 82L193.58 58.81L193.58 46.10L202.21 46.10L202.35 56.64L203.71 56.64Q204.66 52.76 206.22 50.21Q207.79 47.66 210.03 46.40Q212.28 45.14 215.27 45.14L215.27 45.14Q218.40 45.14 220.47 46.47Q222.54 47.80 223.77 50.35Q224.99 52.90 225.40 56.64L225.40 56.64L226.56 56.64Q227.64 52.62 229.41 50.07Q231.18 47.52 233.63 46.33Q236.08 45.14 238.93 45.14L238.93 45.14Q241.99 45.14 244.27 46.33Q246.55 47.52 248.08 49.87Q249.61 52.22 250.36 55.72Q251.10 59.22 251.10 63.84L251.10 63.84L251.10 82L240.09 82L240.09 65.20Q240.09 61.60 239.51 59.22Q238.93 56.84 237.71 55.65Q236.48 54.46 234.58 54.46L234.58 54.46Q232.40 54.46 230.87 55.89Q229.34 57.32 228.53 59.87Q227.71 62.42 227.71 65.61L227.71 65.61L227.71 82L216.97 82L216.97 65.41Q216.97 61.67 216.32 59.29Q215.68 56.91 214.42 55.68Q213.16 54.46 211.26 54.46L211.26 54.46Q209.08 54.46 207.58 55.89Q206.09 57.32 205.31 59.87Q204.52 62.42 204.52 65.61L204.52 65.61L204.52 82ZM279.73 82.95L279.73 82.95Q276.33 82.95 273.78 81.66Q271.23 80.37 269.63 77.78Q268.04 75.20 267.49 71.39L267.49 71.39L266.20 71.39L266.00 82L257.02 82L257.02 64.39L257.02 33.04L267.97 33.04L267.97 44.94Q267.97 46.57 267.73 48.37Q267.49 50.18 267.12 52.15Q266.74 54.12 266.34 56.36L266.34 56.36L267.90 56.36Q268.85 52.69 270.42 50.24Q271.98 47.80 274.33 46.54Q276.67 45.28 279.87 45.28L279.87 45.28Q284.36 45.28 287.65 47.59Q290.95 49.90 292.79 54.15Q294.62 58.40 294.62 64.32L294.62 64.32Q294.62 70.03 292.82 74.21Q291.02 78.40 287.69 80.67Q284.36 82.95 279.73 82.95ZM275.65 74.11L275.65 74.11Q277.90 74.11 279.60 72.85Q281.30 71.60 282.21 69.32Q283.13 67.04 283.13 63.98L283.13 63.98Q283.13 60.85 282.25 58.64Q281.36 56.43 279.77 55.21Q278.17 53.98 275.92 53.98L275.92 53.98Q274.43 53.98 273.17 54.53Q271.91 55.07 270.96 56.02Q270.01 56.98 269.33 58.17Q268.65 59.36 268.31 60.68Q267.97 62.01 267.97 63.30L267.97 63.30L267.97 64.73Q267.97 66.16 268.38 67.79Q268.78 69.42 269.70 70.85Q270.62 72.28 272.08 73.19Q273.54 74.11 275.65 74.11ZM315.57 82.95L315.57 82.95Q310.13 82.95 305.95 80.84Q301.76 78.74 299.38 74.52Q297.00 70.30 297.00 63.98L297.00 63.98Q297.00 57.66 299.38 53.47Q301.76 49.29 305.98 47.22Q310.20 45.14 315.64 45.14L315.64 45.14Q321.08 45.14 325.29 47.25Q329.51 49.36 331.89 53.54Q334.27 57.72 334.27 64.05L334.27 64.05Q334.27 70.51 331.82 74.72Q329.37 78.94 325.12 80.95Q320.87 82.95 315.57 82.95ZM315.91 75.00L315.91 75.00Q318.36 75.00 319.99 73.87Q321.62 72.75 322.44 70.44Q323.25 68.13 323.25 64.73L323.25 64.73Q323.25 61.12 322.37 58.64Q321.48 56.16 319.75 54.83Q318.02 53.51 315.30 53.51L315.30 53.51Q312.98 53.51 311.32 54.63Q309.65 55.75 308.84 58.06Q308.02 60.38 308.02 63.84L308.02 63.84Q308.02 69.42 310.09 72.21Q312.17 75.00 315.91 75.00Z" fill="var(--app-text)" />
+          </svg>
+        </div>
+
+        <!-- Canvas View: Stacked Lockup -->
+        <div class="preview-canvas view-stacked" style="display: none;">
+          <svg viewBox="0 0 320 250">
+            <g transform="translate(160, 80) scale(0.3833) translate(-256, -256)">
+              
+  <polygon points="376,136 216,216 136,376" fill="var(--color-facet-1)" />
+  <polygon points="376,136 136,376 296,296" fill="var(--color-facet-2)" />
+  <circle cx="256" cy="256" r="13" fill="var(--color-accent)" />
+
+            </g>
+            <path d="M82.58 200L73.51 200L73.51 186.28L73.51 170.43L80.90 170.43L81.07 180.46L82.19 180.46Q82.58 176.54 83.68 174.21Q84.77 171.89 86.81 170.82Q88.86 169.76 91.88 169.76L91.88 169.76Q92.33 169.76 92.89 169.79Q93.45 169.82 94.18 169.93L94.18 169.93L93.84 179.56Q92.94 179.11 91.91 178.97Q90.87 178.83 90.09 178.83L90.09 178.83Q87.90 178.83 86.31 179.67Q84.71 180.51 83.79 182.25Q82.86 183.98 82.58 186.62L82.58 186.62L82.58 200ZM106.94 200.78L106.94 200.78Q101.68 200.78 99.02 197.23Q96.36 193.67 96.36 186.39L96.36 186.39L96.36 170.43L105.43 170.43L105.43 185.22Q105.43 189.36 106.66 191.40Q107.90 193.45 110.42 193.45L110.42 193.45Q111.93 193.45 113.02 192.69Q114.11 191.94 114.87 190.56Q115.62 189.19 115.99 187.40Q116.35 185.61 116.35 183.48L116.35 183.48L116.35 170.43L125.37 170.43L125.37 188.02L125.37 200L118.20 200L118.03 190.87L116.91 190.87Q116.07 194.34 114.81 196.56Q113.55 198.77 111.65 199.78Q109.74 200.78 106.94 200.78ZM139.65 200L130.63 200L130.63 180.90L130.63 170.43L137.74 170.43L137.86 179.11L138.98 179.11Q139.76 175.92 141.05 173.82Q142.34 171.72 144.18 170.68Q146.03 169.65 148.50 169.65L148.50 169.65Q151.07 169.65 152.78 170.74Q154.49 171.83 155.50 173.93Q156.50 176.03 156.84 179.11L156.84 179.11L157.79 179.11Q158.69 175.81 160.14 173.71Q161.60 171.61 163.62 170.63Q165.63 169.65 167.98 169.65L167.98 169.65Q170.50 169.65 172.38 170.63Q174.26 171.61 175.52 173.54Q176.78 175.47 177.39 178.36Q178.01 181.24 178.01 185.05L178.01 185.05L178.01 200L168.94 200L168.94 186.17Q168.94 183.20 168.46 181.24Q167.98 179.28 166.98 178.30Q165.97 177.32 164.40 177.32L164.40 177.32Q162.61 177.32 161.35 178.50Q160.09 179.67 159.42 181.77Q158.74 183.87 158.74 186.50L158.74 186.50L158.74 200L149.90 200L149.90 186.34Q149.90 183.26 149.36 181.30Q148.83 179.34 147.80 178.33Q146.76 177.32 145.19 177.32L145.19 177.32Q143.40 177.32 142.17 178.50Q140.94 179.67 140.29 181.77Q139.65 183.87 139.65 186.50L139.65 186.50L139.65 200ZM201.58 200.78L201.58 200.78Q198.78 200.78 196.68 199.72Q194.58 198.66 193.27 196.53Q191.95 194.40 191.50 191.26L191.50 191.26L190.44 191.26L190.27 200L182.88 200L182.88 185.50L182.88 159.68L191.90 159.68L191.90 169.48Q191.90 170.82 191.70 172.31Q191.50 173.79 191.20 175.42Q190.89 177.04 190.55 178.89L190.55 178.89L191.84 178.89Q192.62 175.86 193.91 173.85Q195.20 171.83 197.13 170.80Q199.06 169.76 201.70 169.76L201.70 169.76Q205.39 169.76 208.11 171.66Q210.82 173.57 212.34 177.07Q213.85 180.57 213.85 185.44L213.85 185.44Q213.85 190.14 212.36 193.59Q210.88 197.03 208.14 198.91Q205.39 200.78 201.58 200.78ZM198.22 193.50L198.22 193.50Q200.07 193.50 201.47 192.47Q202.87 191.43 203.63 189.56Q204.38 187.68 204.38 185.16L204.38 185.16Q204.38 182.58 203.66 180.76Q202.93 178.94 201.61 177.94Q200.30 176.93 198.45 176.93L198.45 176.93Q197.22 176.93 196.18 177.38Q195.14 177.82 194.36 178.61Q193.58 179.39 193.02 180.37Q192.46 181.35 192.18 182.44Q191.90 183.54 191.90 184.60L191.90 184.60L191.90 185.78Q191.90 186.95 192.23 188.30Q192.57 189.64 193.32 190.82Q194.08 191.99 195.28 192.75Q196.49 193.50 198.22 193.50ZM231.10 200.78L231.10 200.78Q226.62 200.78 223.17 199.05Q219.73 197.31 217.77 193.84Q215.81 190.37 215.81 185.16L215.81 185.16Q215.81 179.95 217.77 176.51Q219.73 173.06 223.20 171.36Q226.67 169.65 231.15 169.65L231.15 169.65Q235.63 169.65 239.10 171.38Q242.58 173.12 244.54 176.56Q246.50 180.01 246.50 185.22L246.50 185.22Q246.50 190.54 244.48 194.01Q242.46 197.48 238.96 199.13Q235.46 200.78 231.10 200.78ZM231.38 194.23L231.38 194.23Q233.39 194.23 234.74 193.31Q236.08 192.38 236.75 190.48Q237.42 188.58 237.42 185.78L237.42 185.78Q237.42 182.81 236.70 180.76Q235.97 178.72 234.54 177.63Q233.11 176.54 230.87 176.54L230.87 176.54Q228.97 176.54 227.60 177.46Q226.22 178.38 225.55 180.29Q224.88 182.19 224.88 185.05L224.88 185.05Q224.88 189.64 226.59 191.94Q228.30 194.23 231.38 194.23Z" fill="var(--app-text)" />
+          </svg>
+        </div>
+
+        <!-- Canvas View: Symbol Alone -->
+        <div class="preview-canvas view-symbol" style="display: none;">
+          <svg viewBox="0 0 512 512" style="max-width: 140px;">
+            
+  <polygon points="376,136 216,216 136,376" fill="var(--color-facet-1)" />
+  <polygon points="376,136 136,376 296,296" fill="var(--color-facet-2)" />
+  <circle cx="256" cy="256" r="13" fill="var(--color-accent)" />
+
+          </svg>
+        </div>
+
+        <!-- Sub-Scale Strip -->
+        <div class="scale-bar">
+          <div class="scale-item">
+            <div class="app-icon-mock">
+              <svg viewBox="0 0 512 512">
+  <polygon points="376,136 216,216 136,376" fill="var(--color-facet-1)" />
+  <polygon points="376,136 136,376 296,296" fill="var(--color-facet-2)" />
+  <circle cx="256" cy="256" r="13" fill="var(--color-accent)" />
+</svg>
+            </div>
+            <span>Ícono 48px</span>
+          </div>
+
+          <div class="scale-item">
+            <div class="dark-pill-mock">
+              <svg viewBox="0 0 380 120">
+                <g transform="translate(66, 61) scale(0.2396) translate(-256, -256)">
+                  
+  <polygon points="376,136 216,216 136,376" fill="var(--color-facet-1)" />
+  <polygon points="376,136 136,376 296,296" fill="var(--color-facet-2)" />
+  <circle cx="256" cy="256" r="13" fill="var(--color-accent)" />
+
+                </g>
+                <path d="M135.23 82L124.22 82L124.22 65.34L124.22 46.10L133.19 46.10L133.40 58.27L134.76 58.27Q135.23 53.51 136.56 50.69Q137.88 47.86 140.37 46.57Q142.85 45.28 146.52 45.28L146.52 45.28Q147.06 45.28 147.74 45.31Q148.42 45.35 149.31 45.48L149.31 45.48L148.90 57.18Q147.81 56.64 146.55 56.47Q145.30 56.30 144.34 56.30L144.34 56.30Q141.69 56.30 139.75 57.32Q137.82 58.34 136.69 60.44Q135.57 62.55 135.23 65.75L135.23 65.75L135.23 82ZM164.81 82.95L164.81 82.95Q158.42 82.95 155.19 78.63Q151.96 74.32 151.96 65.48L151.96 65.48L151.96 46.10L162.98 46.10L162.98 64.05Q162.98 69.08 164.47 71.56Q165.97 74.04 169.03 74.04L169.03 74.04Q170.86 74.04 172.19 73.13Q173.52 72.21 174.43 70.54Q175.35 68.88 175.79 66.70Q176.24 64.52 176.24 61.94L176.24 61.94L176.24 46.10L187.18 46.10L187.18 67.45L187.18 82L178.48 82L178.28 70.92L176.92 70.92Q175.90 75.13 174.37 77.82Q172.84 80.50 170.52 81.73Q168.21 82.95 164.81 82.95ZM204.52 82L193.58 82L193.58 58.81L193.58 46.10L202.21 46.10L202.35 56.64L203.71 56.64Q204.66 52.76 206.22 50.21Q207.79 47.66 210.03 46.40Q212.28 45.14 215.27 45.14L215.27 45.14Q218.40 45.14 220.47 46.47Q222.54 47.80 223.77 50.35Q224.99 52.90 225.40 56.64L225.40 56.64L226.56 56.64Q227.64 52.62 229.41 50.07Q231.18 47.52 233.63 46.33Q236.08 45.14 238.93 45.14L238.93 45.14Q241.99 45.14 244.27 46.33Q246.55 47.52 248.08 49.87Q249.61 52.22 250.36 55.72Q251.10 59.22 251.10 63.84L251.10 63.84L251.10 82L240.09 82L240.09 65.20Q240.09 61.60 239.51 59.22Q238.93 56.84 237.71 55.65Q236.48 54.46 234.58 54.46L234.58 54.46Q232.40 54.46 230.87 55.89Q229.34 57.32 228.53 59.87Q227.71 62.42 227.71 65.61L227.71 65.61L227.71 82L216.97 82L216.97 65.41Q216.97 61.67 216.32 59.29Q215.68 56.91 214.42 55.68Q213.16 54.46 211.26 54.46L211.26 54.46Q209.08 54.46 207.58 55.89Q206.09 57.32 205.31 59.87Q204.52 62.42 204.52 65.61L204.52 65.61L204.52 82ZM279.73 82.95L279.73 82.95Q276.33 82.95 273.78 81.66Q271.23 80.37 269.63 77.78Q268.04 75.20 267.49 71.39L267.49 71.39L266.20 71.39L266.00 82L257.02 82L257.02 64.39L257.02 33.04L267.97 33.04L267.97 44.94Q267.97 46.57 267.73 48.37Q267.49 50.18 267.12 52.15Q266.74 54.12 266.34 56.36L266.34 56.36L267.90 56.36Q268.85 52.69 270.42 50.24Q271.98 47.80 274.33 46.54Q276.67 45.28 279.87 45.28L279.87 45.28Q284.36 45.28 287.65 47.59Q290.95 49.90 292.79 54.15Q294.62 58.40 294.62 64.32L294.62 64.32Q294.62 70.03 292.82 74.21Q291.02 78.40 287.69 80.67Q284.36 82.95 279.73 82.95ZM275.65 74.11L275.65 74.11Q277.90 74.11 279.60 72.85Q281.30 71.60 282.21 69.32Q283.13 67.04 283.13 63.98L283.13 63.98Q283.13 60.85 282.25 58.64Q281.36 56.43 279.77 55.21Q278.17 53.98 275.92 53.98L275.92 53.98Q274.43 53.98 273.17 54.53Q271.91 55.07 270.96 56.02Q270.01 56.98 269.33 58.17Q268.65 59.36 268.31 60.68Q267.97 62.01 267.97 63.30L267.97 63.30L267.97 64.73Q267.97 66.16 268.38 67.79Q268.78 69.42 269.70 70.85Q270.62 72.28 272.08 73.19Q273.54 74.11 275.65 74.11ZM315.57 82.95L315.57 82.95Q310.13 82.95 305.95 80.84Q301.76 78.74 299.38 74.52Q297.00 70.30 297.00 63.98L297.00 63.98Q297.00 57.66 299.38 53.47Q301.76 49.29 305.98 47.22Q310.20 45.14 315.64 45.14L315.64 45.14Q321.08 45.14 325.29 47.25Q329.51 49.36 331.89 53.54Q334.27 57.72 334.27 64.05L334.27 64.05Q334.27 70.51 331.82 74.72Q329.37 78.94 325.12 80.95Q320.87 82.95 315.57 82.95ZM315.91 75.00L315.91 75.00Q318.36 75.00 319.99 73.87Q321.62 72.75 322.44 70.44Q323.25 68.13 323.25 64.73L323.25 64.73Q323.25 61.12 322.37 58.64Q321.48 56.16 319.75 54.83Q318.02 53.51 315.30 53.51L315.30 53.51Q312.98 53.51 311.32 54.63Q309.65 55.75 308.84 58.06Q308.02 60.38 308.02 63.84L308.02 63.84Q308.02 69.42 310.09 72.21Q312.17 75.00 315.91 75.00Z" fill="#FAF6F2" />
+              </svg>
+            </div>
+            <span>En Fondo Noche</span>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <h2 class="card-title">1. La Aguja de Brújula</h2>
+          <p class="card-metaphor">Rombo 1:3 facetado apuntando al noreste (45°) con pivote central. La punta de la aguja sobresale armónicamente sobre la altura de la x de las letras.</p>
+          <ul class="analysis-list">
+            <li class="pro">La aguja se funde con la palabra "rumbo" sin competir por protagonismo.</li>
+            <li class="pro">El ángulo a 45° genera ritmo diagonal que empuja la lectura hacia adelante.</li>
+            <li class="pro">A 16 px se reduce a dos facetas limpias sin empastes.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ================= OPTION 2 ================= -->
+      <div class="concept-card">
+        <span class="badge-status badge-alt">Opción Descartada</span>
+        
+        <!-- Canvas View: Horizontal Lockup -->
+        <div class="preview-canvas view-horizontal">
+          <svg viewBox="0 0 380 120">
+            <g transform="translate(66, 61) scale(0.24) translate(-256, -256)">
+              
+  <polygon points="120,296 168,248 232,312 344,200 380,236 232,384" fill="var(--color-facet-1)" />
+  <polygon points="344,200 380,236 406,146" fill="var(--color-facet-2)" />
+  <circle cx="406" cy="146" r="18" fill="var(--color-accent)" />
+
+            </g>
+            <path d="M135.23 82L124.22 82L124.22 65.34L124.22 46.10L133.19 46.10L133.40 58.27L134.76 58.27Q135.23 53.51 136.56 50.69Q137.88 47.86 140.37 46.57Q142.85 45.28 146.52 45.28L146.52 45.28Q147.06 45.28 147.74 45.31Q148.42 45.35 149.31 45.48L149.31 45.48L148.90 57.18Q147.81 56.64 146.55 56.47Q145.30 56.30 144.34 56.30L144.34 56.30Q141.69 56.30 139.75 57.32Q137.82 58.34 136.69 60.44Q135.57 62.55 135.23 65.75L135.23 65.75L135.23 82ZM164.81 82.95L164.81 82.95Q158.42 82.95 155.19 78.63Q151.96 74.32 151.96 65.48L151.96 65.48L151.96 46.10L162.98 46.10L162.98 64.05Q162.98 69.08 164.47 71.56Q165.97 74.04 169.03 74.04L169.03 74.04Q170.86 74.04 172.19 73.13Q173.52 72.21 174.43 70.54Q175.35 68.88 175.79 66.70Q176.24 64.52 176.24 61.94L176.24 61.94L176.24 46.10L187.18 46.10L187.18 67.45L187.18 82L178.48 82L178.28 70.92L176.92 70.92Q175.90 75.13 174.37 77.82Q172.84 80.50 170.52 81.73Q168.21 82.95 164.81 82.95ZM204.52 82L193.58 82L193.58 58.81L193.58 46.10L202.21 46.10L202.35 56.64L203.71 56.64Q204.66 52.76 206.22 50.21Q207.79 47.66 210.03 46.40Q212.28 45.14 215.27 45.14L215.27 45.14Q218.40 45.14 220.47 46.47Q222.54 47.80 223.77 50.35Q224.99 52.90 225.40 56.64L225.40 56.64L226.56 56.64Q227.64 52.62 229.41 50.07Q231.18 47.52 233.63 46.33Q236.08 45.14 238.93 45.14L238.93 45.14Q241.99 45.14 244.27 46.33Q246.55 47.52 248.08 49.87Q249.61 52.22 250.36 55.72Q251.10 59.22 251.10 63.84L251.10 63.84L251.10 82L240.09 82L240.09 65.20Q240.09 61.60 239.51 59.22Q238.93 56.84 237.71 55.65Q236.48 54.46 234.58 54.46L234.58 54.46Q232.40 54.46 230.87 55.89Q229.34 57.32 228.53 59.87Q227.71 62.42 227.71 65.61L227.71 65.61L227.71 82L216.97 82L216.97 65.41Q216.97 61.67 216.32 59.29Q215.68 56.91 214.42 55.68Q213.16 54.46 211.26 54.46L211.26 54.46Q209.08 54.46 207.58 55.89Q206.09 57.32 205.31 59.87Q204.52 62.42 204.52 65.61L204.52 65.61L204.52 82ZM279.73 82.95L279.73 82.95Q276.33 82.95 273.78 81.66Q271.23 80.37 269.63 77.78Q268.04 75.20 267.49 71.39L267.49 71.39L266.20 71.39L266.00 82L257.02 82L257.02 64.39L257.02 33.04L267.97 33.04L267.97 44.94Q267.97 46.57 267.73 48.37Q267.49 50.18 267.12 52.15Q266.74 54.12 266.34 56.36L266.34 56.36L267.90 56.36Q268.85 52.69 270.42 50.24Q271.98 47.80 274.33 46.54Q276.67 45.28 279.87 45.28L279.87 45.28Q284.36 45.28 287.65 47.59Q290.95 49.90 292.79 54.15Q294.62 58.40 294.62 64.32L294.62 64.32Q294.62 70.03 292.82 74.21Q291.02 78.40 287.69 80.67Q284.36 82.95 279.73 82.95ZM275.65 74.11L275.65 74.11Q277.90 74.11 279.60 72.85Q281.30 71.60 282.21 69.32Q283.13 67.04 283.13 63.98L283.13 63.98Q283.13 60.85 282.25 58.64Q281.36 56.43 279.77 55.21Q278.17 53.98 275.92 53.98L275.92 53.98Q274.43 53.98 273.17 54.53Q271.91 55.07 270.96 56.02Q270.01 56.98 269.33 58.17Q268.65 59.36 268.31 60.68Q267.97 62.01 267.97 63.30L267.97 63.30L267.97 64.73Q267.97 66.16 268.38 67.79Q268.78 69.42 269.70 70.85Q270.62 72.28 272.08 73.19Q273.54 74.11 275.65 74.11ZM315.57 82.95L315.57 82.95Q310.13 82.95 305.95 80.84Q301.76 78.74 299.38 74.52Q297.00 70.30 297.00 63.98L297.00 63.98Q297.00 57.66 299.38 53.47Q301.76 49.29 305.98 47.22Q310.20 45.14 315.64 45.14L315.64 45.14Q321.08 45.14 325.29 47.25Q329.51 49.36 331.89 53.54Q334.27 57.72 334.27 64.05L334.27 64.05Q334.27 70.51 331.82 74.72Q329.37 78.94 325.12 80.95Q320.87 82.95 315.57 82.95ZM315.91 75.00L315.91 75.00Q318.36 75.00 319.99 73.87Q321.62 72.75 322.44 70.44Q323.25 68.13 323.25 64.73L323.25 64.73Q323.25 61.12 322.37 58.64Q321.48 56.16 319.75 54.83Q318.02 53.51 315.30 53.51L315.30 53.51Q312.98 53.51 311.32 54.63Q309.65 55.75 308.84 58.06Q308.02 60.38 308.02 63.84L308.02 63.84Q308.02 69.42 310.09 72.21Q312.17 75.00 315.91 75.00Z" fill="var(--app-text)" />
+          </svg>
+        </div>
+
+        <!-- Canvas View: Stacked Lockup -->
+        <div class="preview-canvas view-stacked" style="display: none;">
+          <svg viewBox="0 0 320 250">
+            <g transform="translate(160, 80) scale(0.3833) translate(-256, -256)">
+              
+  <polygon points="120,296 168,248 232,312 344,200 380,236 232,384" fill="var(--color-facet-1)" />
+  <polygon points="344,200 380,236 406,146" fill="var(--color-facet-2)" />
+  <circle cx="406" cy="146" r="18" fill="var(--color-accent)" />
+
+            </g>
+            <path d="M82.58 200L73.51 200L73.51 186.28L73.51 170.43L80.90 170.43L81.07 180.46L82.19 180.46Q82.58 176.54 83.68 174.21Q84.77 171.89 86.81 170.82Q88.86 169.76 91.88 169.76L91.88 169.76Q92.33 169.76 92.89 169.79Q93.45 169.82 94.18 169.93L94.18 169.93L93.84 179.56Q92.94 179.11 91.91 178.97Q90.87 178.83 90.09 178.83L90.09 178.83Q87.90 178.83 86.31 179.67Q84.71 180.51 83.79 182.25Q82.86 183.98 82.58 186.62L82.58 186.62L82.58 200ZM106.94 200.78L106.94 200.78Q101.68 200.78 99.02 197.23Q96.36 193.67 96.36 186.39L96.36 186.39L96.36 170.43L105.43 170.43L105.43 185.22Q105.43 189.36 106.66 191.40Q107.90 193.45 110.42 193.45L110.42 193.45Q111.93 193.45 113.02 192.69Q114.11 191.94 114.87 190.56Q115.62 189.19 115.99 187.40Q116.35 185.61 116.35 183.48L116.35 183.48L116.35 170.43L125.37 170.43L125.37 188.02L125.37 200L118.20 200L118.03 190.87L116.91 190.87Q116.07 194.34 114.81 196.56Q113.55 198.77 111.65 199.78Q109.74 200.78 106.94 200.78ZM139.65 200L130.63 200L130.63 180.90L130.63 170.43L137.74 170.43L137.86 179.11L138.98 179.11Q139.76 175.92 141.05 173.82Q142.34 171.72 144.18 170.68Q146.03 169.65 148.50 169.65L148.50 169.65Q151.07 169.65 152.78 170.74Q154.49 171.83 155.50 173.93Q156.50 176.03 156.84 179.11L156.84 179.11L157.79 179.11Q158.69 175.81 160.14 173.71Q161.60 171.61 163.62 170.63Q165.63 169.65 167.98 169.65L167.98 169.65Q170.50 169.65 172.38 170.63Q174.26 171.61 175.52 173.54Q176.78 175.47 177.39 178.36Q178.01 181.24 178.01 185.05L178.01 185.05L178.01 200L168.94 200L168.94 186.17Q168.94 183.20 168.46 181.24Q167.98 179.28 166.98 178.30Q165.97 177.32 164.40 177.32L164.40 177.32Q162.61 177.32 161.35 178.50Q160.09 179.67 159.42 181.77Q158.74 183.87 158.74 186.50L158.74 186.50L158.74 200L149.90 200L149.90 186.34Q149.90 183.26 149.36 181.30Q148.83 179.34 147.80 178.33Q146.76 177.32 145.19 177.32L145.19 177.32Q143.40 177.32 142.17 178.50Q140.94 179.67 140.29 181.77Q139.65 183.87 139.65 186.50L139.65 186.50L139.65 200ZM201.58 200.78L201.58 200.78Q198.78 200.78 196.68 199.72Q194.58 198.66 193.27 196.53Q191.95 194.40 191.50 191.26L191.50 191.26L190.44 191.26L190.27 200L182.88 200L182.88 185.50L182.88 159.68L191.90 159.68L191.90 169.48Q191.90 170.82 191.70 172.31Q191.50 173.79 191.20 175.42Q190.89 177.04 190.55 178.89L190.55 178.89L191.84 178.89Q192.62 175.86 193.91 173.85Q195.20 171.83 197.13 170.80Q199.06 169.76 201.70 169.76L201.70 169.76Q205.39 169.76 208.11 171.66Q210.82 173.57 212.34 177.07Q213.85 180.57 213.85 185.44L213.85 185.44Q213.85 190.14 212.36 193.59Q210.88 197.03 208.14 198.91Q205.39 200.78 201.58 200.78ZM198.22 193.50L198.22 193.50Q200.07 193.50 201.47 192.47Q202.87 191.43 203.63 189.56Q204.38 187.68 204.38 185.16L204.38 185.16Q204.38 182.58 203.66 180.76Q202.93 178.94 201.61 177.94Q200.30 176.93 198.45 176.93L198.45 176.93Q197.22 176.93 196.18 177.38Q195.14 177.82 194.36 178.61Q193.58 179.39 193.02 180.37Q192.46 181.35 192.18 182.44Q191.90 183.54 191.90 184.60L191.90 184.60L191.90 185.78Q191.90 186.95 192.23 188.30Q192.57 189.64 193.32 190.82Q194.08 191.99 195.28 192.75Q196.49 193.50 198.22 193.50ZM231.10 200.78L231.10 200.78Q226.62 200.78 223.17 199.05Q219.73 197.31 217.77 193.84Q215.81 190.37 215.81 185.16L215.81 185.16Q215.81 179.95 217.77 176.51Q219.73 173.06 223.20 171.36Q226.67 169.65 231.15 169.65L231.15 169.65Q235.63 169.65 239.10 171.38Q242.58 173.12 244.54 176.56Q246.50 180.01 246.50 185.22L246.50 185.22Q246.50 190.54 244.48 194.01Q242.46 197.48 238.96 199.13Q235.46 200.78 231.10 200.78ZM231.38 194.23L231.38 194.23Q233.39 194.23 234.74 193.31Q236.08 192.38 236.75 190.48Q237.42 188.58 237.42 185.78L237.42 185.78Q237.42 182.81 236.70 180.76Q235.97 178.72 234.54 177.63Q233.11 176.54 230.87 176.54L230.87 176.54Q228.97 176.54 227.60 177.46Q226.22 178.38 225.55 180.29Q224.88 182.19 224.88 185.05L224.88 185.05Q224.88 189.64 226.59 191.94Q228.30 194.23 231.38 194.23Z" fill="var(--app-text)" />
+          </svg>
+        </div>
+
+        <!-- Canvas View: Symbol Alone -->
+        <div class="preview-canvas view-symbol" style="display: none;">
+          <svg viewBox="0 0 512 512" style="max-width: 140px;">
+            
+  <polygon points="120,296 168,248 232,312 344,200 380,236 232,384" fill="var(--color-facet-1)" />
+  <polygon points="344,200 380,236 406,146" fill="var(--color-facet-2)" />
+  <circle cx="406" cy="146" r="18" fill="var(--color-accent)" />
+
+          </svg>
+        </div>
+
+        <!-- Sub-Scale Strip -->
+        <div class="scale-bar">
+          <div class="scale-item">
+            <div class="app-icon-mock">
+              <svg viewBox="0 0 512 512">
+  <polygon points="120,296 168,248 232,312 344,200 380,236 232,384" fill="var(--color-facet-1)" />
+  <polygon points="344,200 380,236 406,146" fill="var(--color-facet-2)" />
+  <circle cx="406" cy="146" r="18" fill="var(--color-accent)" />
+</svg>
+            </div>
+            <span>Ícono 48px</span>
+          </div>
+
+          <div class="scale-item">
+            <div class="dark-pill-mock">
+              <svg viewBox="0 0 380 120">
+                <g transform="translate(66, 61) scale(0.24) translate(-256, -256)">
+                  
+  <polygon points="120,296 168,248 232,312 344,200 380,236 232,384" fill="var(--color-facet-1)" />
+  <polygon points="344,200 380,236 406,146" fill="var(--color-facet-2)" />
+  <circle cx="406" cy="146" r="18" fill="var(--color-accent)" />
+
+                </g>
+                <path d="M135.23 82L124.22 82L124.22 65.34L124.22 46.10L133.19 46.10L133.40 58.27L134.76 58.27Q135.23 53.51 136.56 50.69Q137.88 47.86 140.37 46.57Q142.85 45.28 146.52 45.28L146.52 45.28Q147.06 45.28 147.74 45.31Q148.42 45.35 149.31 45.48L149.31 45.48L148.90 57.18Q147.81 56.64 146.55 56.47Q145.30 56.30 144.34 56.30L144.34 56.30Q141.69 56.30 139.75 57.32Q137.82 58.34 136.69 60.44Q135.57 62.55 135.23 65.75L135.23 65.75L135.23 82ZM164.81 82.95L164.81 82.95Q158.42 82.95 155.19 78.63Q151.96 74.32 151.96 65.48L151.96 65.48L151.96 46.10L162.98 46.10L162.98 64.05Q162.98 69.08 164.47 71.56Q165.97 74.04 169.03 74.04L169.03 74.04Q170.86 74.04 172.19 73.13Q173.52 72.21 174.43 70.54Q175.35 68.88 175.79 66.70Q176.24 64.52 176.24 61.94L176.24 61.94L176.24 46.10L187.18 46.10L187.18 67.45L187.18 82L178.48 82L178.28 70.92L176.92 70.92Q175.90 75.13 174.37 77.82Q172.84 80.50 170.52 81.73Q168.21 82.95 164.81 82.95ZM204.52 82L193.58 82L193.58 58.81L193.58 46.10L202.21 46.10L202.35 56.64L203.71 56.64Q204.66 52.76 206.22 50.21Q207.79 47.66 210.03 46.40Q212.28 45.14 215.27 45.14L215.27 45.14Q218.40 45.14 220.47 46.47Q222.54 47.80 223.77 50.35Q224.99 52.90 225.40 56.64L225.40 56.64L226.56 56.64Q227.64 52.62 229.41 50.07Q231.18 47.52 233.63 46.33Q236.08 45.14 238.93 45.14L238.93 45.14Q241.99 45.14 244.27 46.33Q246.55 47.52 248.08 49.87Q249.61 52.22 250.36 55.72Q251.10 59.22 251.10 63.84L251.10 63.84L251.10 82L240.09 82L240.09 65.20Q240.09 61.60 239.51 59.22Q238.93 56.84 237.71 55.65Q236.48 54.46 234.58 54.46L234.58 54.46Q232.40 54.46 230.87 55.89Q229.34 57.32 228.53 59.87Q227.71 62.42 227.71 65.61L227.71 65.61L227.71 82L216.97 82L216.97 65.41Q216.97 61.67 216.32 59.29Q215.68 56.91 214.42 55.68Q213.16 54.46 211.26 54.46L211.26 54.46Q209.08 54.46 207.58 55.89Q206.09 57.32 205.31 59.87Q204.52 62.42 204.52 65.61L204.52 65.61L204.52 82ZM279.73 82.95L279.73 82.95Q276.33 82.95 273.78 81.66Q271.23 80.37 269.63 77.78Q268.04 75.20 267.49 71.39L267.49 71.39L266.20 71.39L266.00 82L257.02 82L257.02 64.39L257.02 33.04L267.97 33.04L267.97 44.94Q267.97 46.57 267.73 48.37Q267.49 50.18 267.12 52.15Q266.74 54.12 266.34 56.36L266.34 56.36L267.90 56.36Q268.85 52.69 270.42 50.24Q271.98 47.80 274.33 46.54Q276.67 45.28 279.87 45.28L279.87 45.28Q284.36 45.28 287.65 47.59Q290.95 49.90 292.79 54.15Q294.62 58.40 294.62 64.32L294.62 64.32Q294.62 70.03 292.82 74.21Q291.02 78.40 287.69 80.67Q284.36 82.95 279.73 82.95ZM275.65 74.11L275.65 74.11Q277.90 74.11 279.60 72.85Q281.30 71.60 282.21 69.32Q283.13 67.04 283.13 63.98L283.13 63.98Q283.13 60.85 282.25 58.64Q281.36 56.43 279.77 55.21Q278.17 53.98 275.92 53.98L275.92 53.98Q274.43 53.98 273.17 54.53Q271.91 55.07 270.96 56.02Q270.01 56.98 269.33 58.17Q268.65 59.36 268.31 60.68Q267.97 62.01 267.97 63.30L267.97 63.30L267.97 64.73Q267.97 66.16 268.38 67.79Q268.78 69.42 269.70 70.85Q270.62 72.28 272.08 73.19Q273.54 74.11 275.65 74.11ZM315.57 82.95L315.57 82.95Q310.13 82.95 305.95 80.84Q301.76 78.74 299.38 74.52Q297.00 70.30 297.00 63.98L297.00 63.98Q297.00 57.66 299.38 53.47Q301.76 49.29 305.98 47.22Q310.20 45.14 315.64 45.14L315.64 45.14Q321.08 45.14 325.29 47.25Q329.51 49.36 331.89 53.54Q334.27 57.72 334.27 64.05L334.27 64.05Q334.27 70.51 331.82 74.72Q329.37 78.94 325.12 80.95Q320.87 82.95 315.57 82.95ZM315.91 75.00L315.91 75.00Q318.36 75.00 319.99 73.87Q321.62 72.75 322.44 70.44Q323.25 68.13 323.25 64.73L323.25 64.73Q323.25 61.12 322.37 58.64Q321.48 56.16 319.75 54.83Q318.02 53.51 315.30 53.51L315.30 53.51Q312.98 53.51 311.32 54.63Q309.65 55.75 308.84 58.06Q308.02 60.38 308.02 63.84L308.02 63.84Q308.02 69.42 310.09 72.21Q312.17 75.00 315.91 75.00Z" fill="#FAF6F2" />
+              </svg>
+            </div>
+            <span>En Fondo Noche</span>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <h2 class="card-title">2. El Check que Sube</h2>
+          <p class="card-metaphor">Marca de verificación cuya ala derecha se alarga en diagonal con un punto de logro. Al lado del wordmark, parece una app tradicional de to-dos.</p>
+          <ul class="analysis-list">
+            <li class="pro">Lectura instantánea de productividad.</li>
+            <li class="con">Al ponerlo junto a "rumbo", parece un clon de Todoist o TickTick.</li>
+            <li class="con">No transmite la idea de finanzas personales ni de dirección integral.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ================= OPTION 3 ================= -->
+      <div class="concept-card">
+        <span class="badge-status badge-alt">Opción Descartada</span>
+        
+        <!-- Canvas View: Horizontal Lockup -->
+        <div class="preview-canvas view-horizontal">
+          <svg viewBox="0 0 380 120">
+            <g transform="translate(66, 61) scale(0.24) translate(-256, -256)">
+              
+  <rect x="140" y="176" width="48" height="192" rx="10" fill="var(--color-facet-2)" />
+  <path d="M164 256 C 164 190, 225 176, 276 176 C 316 176, 350 192, 372 216 L 372 152 L 408 152 L 408 252 L 308 252 L 344 216 C 326 202, 304 196, 276 196 C 242 196, 212 214, 212 256 L 212 368 L 164 368 Z" fill="var(--color-facet-1)" />
+  <circle cx="390" cy="170" r="14" fill="var(--color-accent)" />
+
+            </g>
+            <path d="M135.23 82L124.22 82L124.22 65.34L124.22 46.10L133.19 46.10L133.40 58.27L134.76 58.27Q135.23 53.51 136.56 50.69Q137.88 47.86 140.37 46.57Q142.85 45.28 146.52 45.28L146.52 45.28Q147.06 45.28 147.74 45.31Q148.42 45.35 149.31 45.48L149.31 45.48L148.90 57.18Q147.81 56.64 146.55 56.47Q145.30 56.30 144.34 56.30L144.34 56.30Q141.69 56.30 139.75 57.32Q137.82 58.34 136.69 60.44Q135.57 62.55 135.23 65.75L135.23 65.75L135.23 82ZM164.81 82.95L164.81 82.95Q158.42 82.95 155.19 78.63Q151.96 74.32 151.96 65.48L151.96 65.48L151.96 46.10L162.98 46.10L162.98 64.05Q162.98 69.08 164.47 71.56Q165.97 74.04 169.03 74.04L169.03 74.04Q170.86 74.04 172.19 73.13Q173.52 72.21 174.43 70.54Q175.35 68.88 175.79 66.70Q176.24 64.52 176.24 61.94L176.24 61.94L176.24 46.10L187.18 46.10L187.18 67.45L187.18 82L178.48 82L178.28 70.92L176.92 70.92Q175.90 75.13 174.37 77.82Q172.84 80.50 170.52 81.73Q168.21 82.95 164.81 82.95ZM204.52 82L193.58 82L193.58 58.81L193.58 46.10L202.21 46.10L202.35 56.64L203.71 56.64Q204.66 52.76 206.22 50.21Q207.79 47.66 210.03 46.40Q212.28 45.14 215.27 45.14L215.27 45.14Q218.40 45.14 220.47 46.47Q222.54 47.80 223.77 50.35Q224.99 52.90 225.40 56.64L225.40 56.64L226.56 56.64Q227.64 52.62 229.41 50.07Q231.18 47.52 233.63 46.33Q236.08 45.14 238.93 45.14L238.93 45.14Q241.99 45.14 244.27 46.33Q246.55 47.52 248.08 49.87Q249.61 52.22 250.36 55.72Q251.10 59.22 251.10 63.84L251.10 63.84L251.10 82L240.09 82L240.09 65.20Q240.09 61.60 239.51 59.22Q238.93 56.84 237.71 55.65Q236.48 54.46 234.58 54.46L234.58 54.46Q232.40 54.46 230.87 55.89Q229.34 57.32 228.53 59.87Q227.71 62.42 227.71 65.61L227.71 65.61L227.71 82L216.97 82L216.97 65.41Q216.97 61.67 216.32 59.29Q215.68 56.91 214.42 55.68Q213.16 54.46 211.26 54.46L211.26 54.46Q209.08 54.46 207.58 55.89Q206.09 57.32 205.31 59.87Q204.52 62.42 204.52 65.61L204.52 65.61L204.52 82ZM279.73 82.95L279.73 82.95Q276.33 82.95 273.78 81.66Q271.23 80.37 269.63 77.78Q268.04 75.20 267.49 71.39L267.49 71.39L266.20 71.39L266.00 82L257.02 82L257.02 64.39L257.02 33.04L267.97 33.04L267.97 44.94Q267.97 46.57 267.73 48.37Q267.49 50.18 267.12 52.15Q266.74 54.12 266.34 56.36L266.34 56.36L267.90 56.36Q268.85 52.69 270.42 50.24Q271.98 47.80 274.33 46.54Q276.67 45.28 279.87 45.28L279.87 45.28Q284.36 45.28 287.65 47.59Q290.95 49.90 292.79 54.15Q294.62 58.40 294.62 64.32L294.62 64.32Q294.62 70.03 292.82 74.21Q291.02 78.40 287.69 80.67Q284.36 82.95 279.73 82.95ZM275.65 74.11L275.65 74.11Q277.90 74.11 279.60 72.85Q281.30 71.60 282.21 69.32Q283.13 67.04 283.13 63.98L283.13 63.98Q283.13 60.85 282.25 58.64Q281.36 56.43 279.77 55.21Q278.17 53.98 275.92 53.98L275.92 53.98Q274.43 53.98 273.17 54.53Q271.91 55.07 270.96 56.02Q270.01 56.98 269.33 58.17Q268.65 59.36 268.31 60.68Q267.97 62.01 267.97 63.30L267.97 63.30L267.97 64.73Q267.97 66.16 268.38 67.79Q268.78 69.42 269.70 70.85Q270.62 72.28 272.08 73.19Q273.54 74.11 275.65 74.11ZM315.57 82.95L315.57 82.95Q310.13 82.95 305.95 80.84Q301.76 78.74 299.38 74.52Q297.00 70.30 297.00 63.98L297.00 63.98Q297.00 57.66 299.38 53.47Q301.76 49.29 305.98 47.22Q310.20 45.14 315.64 45.14L315.64 45.14Q321.08 45.14 325.29 47.25Q329.51 49.36 331.89 53.54Q334.27 57.72 334.27 64.05L334.27 64.05Q334.27 70.51 331.82 74.72Q329.37 78.94 325.12 80.95Q320.87 82.95 315.57 82.95ZM315.91 75.00L315.91 75.00Q318.36 75.00 319.99 73.87Q321.62 72.75 322.44 70.44Q323.25 68.13 323.25 64.73L323.25 64.73Q323.25 61.12 322.37 58.64Q321.48 56.16 319.75 54.83Q318.02 53.51 315.30 53.51L315.30 53.51Q312.98 53.51 311.32 54.63Q309.65 55.75 308.84 58.06Q308.02 60.38 308.02 63.84L308.02 63.84Q308.02 69.42 310.09 72.21Q312.17 75.00 315.91 75.00Z" fill="var(--app-text)" />
+          </svg>
+        </div>
+
+        <!-- Canvas View: Stacked Lockup -->
+        <div class="preview-canvas view-stacked" style="display: none;">
+          <svg viewBox="0 0 320 250">
+            <g transform="translate(160, 80) scale(0.3833) translate(-256, -256)">
+              
+  <rect x="140" y="176" width="48" height="192" rx="10" fill="var(--color-facet-2)" />
+  <path d="M164 256 C 164 190, 225 176, 276 176 C 316 176, 350 192, 372 216 L 372 152 L 408 152 L 408 252 L 308 252 L 344 216 C 326 202, 304 196, 276 196 C 242 196, 212 214, 212 256 L 212 368 L 164 368 Z" fill="var(--color-facet-1)" />
+  <circle cx="390" cy="170" r="14" fill="var(--color-accent)" />
+
+            </g>
+            <path d="M82.58 200L73.51 200L73.51 186.28L73.51 170.43L80.90 170.43L81.07 180.46L82.19 180.46Q82.58 176.54 83.68 174.21Q84.77 171.89 86.81 170.82Q88.86 169.76 91.88 169.76L91.88 169.76Q92.33 169.76 92.89 169.79Q93.45 169.82 94.18 169.93L94.18 169.93L93.84 179.56Q92.94 179.11 91.91 178.97Q90.87 178.83 90.09 178.83L90.09 178.83Q87.90 178.83 86.31 179.67Q84.71 180.51 83.79 182.25Q82.86 183.98 82.58 186.62L82.58 186.62L82.58 200ZM106.94 200.78L106.94 200.78Q101.68 200.78 99.02 197.23Q96.36 193.67 96.36 186.39L96.36 186.39L96.36 170.43L105.43 170.43L105.43 185.22Q105.43 189.36 106.66 191.40Q107.90 193.45 110.42 193.45L110.42 193.45Q111.93 193.45 113.02 192.69Q114.11 191.94 114.87 190.56Q115.62 189.19 115.99 187.40Q116.35 185.61 116.35 183.48L116.35 183.48L116.35 170.43L125.37 170.43L125.37 188.02L125.37 200L118.20 200L118.03 190.87L116.91 190.87Q116.07 194.34 114.81 196.56Q113.55 198.77 111.65 199.78Q109.74 200.78 106.94 200.78ZM139.65 200L130.63 200L130.63 180.90L130.63 170.43L137.74 170.43L137.86 179.11L138.98 179.11Q139.76 175.92 141.05 173.82Q142.34 171.72 144.18 170.68Q146.03 169.65 148.50 169.65L148.50 169.65Q151.07 169.65 152.78 170.74Q154.49 171.83 155.50 173.93Q156.50 176.03 156.84 179.11L156.84 179.11L157.79 179.11Q158.69 175.81 160.14 173.71Q161.60 171.61 163.62 170.63Q165.63 169.65 167.98 169.65L167.98 169.65Q170.50 169.65 172.38 170.63Q174.26 171.61 175.52 173.54Q176.78 175.47 177.39 178.36Q178.01 181.24 178.01 185.05L178.01 185.05L178.01 200L168.94 200L168.94 186.17Q168.94 183.20 168.46 181.24Q167.98 179.28 166.98 178.30Q165.97 177.32 164.40 177.32L164.40 177.32Q162.61 177.32 161.35 178.50Q160.09 179.67 159.42 181.77Q158.74 183.87 158.74 186.50L158.74 186.50L158.74 200L149.90 200L149.90 186.34Q149.90 183.26 149.36 181.30Q148.83 179.34 147.80 178.33Q146.76 177.32 145.19 177.32L145.19 177.32Q143.40 177.32 142.17 178.50Q140.94 179.67 140.29 181.77Q139.65 183.87 139.65 186.50L139.65 186.50L139.65 200ZM201.58 200.78L201.58 200.78Q198.78 200.78 196.68 199.72Q194.58 198.66 193.27 196.53Q191.95 194.40 191.50 191.26L191.50 191.26L190.44 191.26L190.27 200L182.88 200L182.88 185.50L182.88 159.68L191.90 159.68L191.90 169.48Q191.90 170.82 191.70 172.31Q191.50 173.79 191.20 175.42Q190.89 177.04 190.55 178.89L190.55 178.89L191.84 178.89Q192.62 175.86 193.91 173.85Q195.20 171.83 197.13 170.80Q199.06 169.76 201.70 169.76L201.70 169.76Q205.39 169.76 208.11 171.66Q210.82 173.57 212.34 177.07Q213.85 180.57 213.85 185.44L213.85 185.44Q213.85 190.14 212.36 193.59Q210.88 197.03 208.14 198.91Q205.39 200.78 201.58 200.78ZM198.22 193.50L198.22 193.50Q200.07 193.50 201.47 192.47Q202.87 191.43 203.63 189.56Q204.38 187.68 204.38 185.16L204.38 185.16Q204.38 182.58 203.66 180.76Q202.93 178.94 201.61 177.94Q200.30 176.93 198.45 176.93L198.45 176.93Q197.22 176.93 196.18 177.38Q195.14 177.82 194.36 178.61Q193.58 179.39 193.02 180.37Q192.46 181.35 192.18 182.44Q191.90 183.54 191.90 184.60L191.90 184.60L191.90 185.78Q191.90 186.95 192.23 188.30Q192.57 189.64 193.32 190.82Q194.08 191.99 195.28 192.75Q196.49 193.50 198.22 193.50ZM231.10 200.78L231.10 200.78Q226.62 200.78 223.17 199.05Q219.73 197.31 217.77 193.84Q215.81 190.37 215.81 185.16L215.81 185.16Q215.81 179.95 217.77 176.51Q219.73 173.06 223.20 171.36Q226.67 169.65 231.15 169.65L231.15 169.65Q235.63 169.65 239.10 171.38Q242.58 173.12 244.54 176.56Q246.50 180.01 246.50 185.22L246.50 185.22Q246.50 190.54 244.48 194.01Q242.46 197.48 238.96 199.13Q235.46 200.78 231.10 200.78ZM231.38 194.23L231.38 194.23Q233.39 194.23 234.74 193.31Q236.08 192.38 236.75 190.48Q237.42 188.58 237.42 185.78L237.42 185.78Q237.42 182.81 236.70 180.76Q235.97 178.72 234.54 177.63Q233.11 176.54 230.87 176.54L230.87 176.54Q228.97 176.54 227.60 177.46Q226.22 178.38 225.55 180.29Q224.88 182.19 224.88 185.05L224.88 185.05Q224.88 189.64 226.59 191.94Q228.30 194.23 231.38 194.23Z" fill="var(--app-text)" />
+          </svg>
+        </div>
+
+        <!-- Canvas View: Symbol Alone -->
+        <div class="preview-canvas view-symbol" style="display: none;">
+          <svg viewBox="0 0 512 512" style="max-width: 140px;">
+            
+  <rect x="140" y="176" width="48" height="192" rx="10" fill="var(--color-facet-2)" />
+  <path d="M164 256 C 164 190, 225 176, 276 176 C 316 176, 350 192, 372 216 L 372 152 L 408 152 L 408 252 L 308 252 L 344 216 C 326 202, 304 196, 276 196 C 242 196, 212 214, 212 256 L 212 368 L 164 368 Z" fill="var(--color-facet-1)" />
+  <circle cx="390" cy="170" r="14" fill="var(--color-accent)" />
+
+          </svg>
+        </div>
+
+        <!-- Sub-Scale Strip -->
+        <div class="scale-bar">
+          <div class="scale-item">
+            <div class="app-icon-mock">
+              <svg viewBox="0 0 512 512">
+  <rect x="140" y="176" width="48" height="192" rx="10" fill="var(--color-facet-2)" />
+  <path d="M164 256 C 164 190, 225 176, 276 176 C 316 176, 350 192, 372 216 L 372 152 L 408 152 L 408 252 L 308 252 L 344 216 C 326 202, 304 196, 276 196 C 242 196, 212 214, 212 256 L 212 368 L 164 368 Z" fill="var(--color-facet-1)" />
+  <circle cx="390" cy="170" r="14" fill="var(--color-accent)" />
+</svg>
+            </div>
+            <span>Ícono 48px</span>
+          </div>
+
+          <div class="scale-item">
+            <div class="dark-pill-mock">
+              <svg viewBox="0 0 380 120">
+                <g transform="translate(66, 61) scale(0.24) translate(-256, -256)">
+                  
+  <rect x="140" y="176" width="48" height="192" rx="10" fill="var(--color-facet-2)" />
+  <path d="M164 256 C 164 190, 225 176, 276 176 C 316 176, 350 192, 372 216 L 372 152 L 408 152 L 408 252 L 308 252 L 344 216 C 326 202, 304 196, 276 196 C 242 196, 212 214, 212 256 L 212 368 L 164 368 Z" fill="var(--color-facet-1)" />
+  <circle cx="390" cy="170" r="14" fill="var(--color-accent)" />
+
+                </g>
+                <path d="M135.23 82L124.22 82L124.22 65.34L124.22 46.10L133.19 46.10L133.40 58.27L134.76 58.27Q135.23 53.51 136.56 50.69Q137.88 47.86 140.37 46.57Q142.85 45.28 146.52 45.28L146.52 45.28Q147.06 45.28 147.74 45.31Q148.42 45.35 149.31 45.48L149.31 45.48L148.90 57.18Q147.81 56.64 146.55 56.47Q145.30 56.30 144.34 56.30L144.34 56.30Q141.69 56.30 139.75 57.32Q137.82 58.34 136.69 60.44Q135.57 62.55 135.23 65.75L135.23 65.75L135.23 82ZM164.81 82.95L164.81 82.95Q158.42 82.95 155.19 78.63Q151.96 74.32 151.96 65.48L151.96 65.48L151.96 46.10L162.98 46.10L162.98 64.05Q162.98 69.08 164.47 71.56Q165.97 74.04 169.03 74.04L169.03 74.04Q170.86 74.04 172.19 73.13Q173.52 72.21 174.43 70.54Q175.35 68.88 175.79 66.70Q176.24 64.52 176.24 61.94L176.24 61.94L176.24 46.10L187.18 46.10L187.18 67.45L187.18 82L178.48 82L178.28 70.92L176.92 70.92Q175.90 75.13 174.37 77.82Q172.84 80.50 170.52 81.73Q168.21 82.95 164.81 82.95ZM204.52 82L193.58 82L193.58 58.81L193.58 46.10L202.21 46.10L202.35 56.64L203.71 56.64Q204.66 52.76 206.22 50.21Q207.79 47.66 210.03 46.40Q212.28 45.14 215.27 45.14L215.27 45.14Q218.40 45.14 220.47 46.47Q222.54 47.80 223.77 50.35Q224.99 52.90 225.40 56.64L225.40 56.64L226.56 56.64Q227.64 52.62 229.41 50.07Q231.18 47.52 233.63 46.33Q236.08 45.14 238.93 45.14L238.93 45.14Q241.99 45.14 244.27 46.33Q246.55 47.52 248.08 49.87Q249.61 52.22 250.36 55.72Q251.10 59.22 251.10 63.84L251.10 63.84L251.10 82L240.09 82L240.09 65.20Q240.09 61.60 239.51 59.22Q238.93 56.84 237.71 55.65Q236.48 54.46 234.58 54.46L234.58 54.46Q232.40 54.46 230.87 55.89Q229.34 57.32 228.53 59.87Q227.71 62.42 227.71 65.61L227.71 65.61L227.71 82L216.97 82L216.97 65.41Q216.97 61.67 216.32 59.29Q215.68 56.91 214.42 55.68Q213.16 54.46 211.26 54.46L211.26 54.46Q209.08 54.46 207.58 55.89Q206.09 57.32 205.31 59.87Q204.52 62.42 204.52 65.61L204.52 65.61L204.52 82ZM279.73 82.95L279.73 82.95Q276.33 82.95 273.78 81.66Q271.23 80.37 269.63 77.78Q268.04 75.20 267.49 71.39L267.49 71.39L266.20 71.39L266.00 82L257.02 82L257.02 64.39L257.02 33.04L267.97 33.04L267.97 44.94Q267.97 46.57 267.73 48.37Q267.49 50.18 267.12 52.15Q266.74 54.12 266.34 56.36L266.34 56.36L267.90 56.36Q268.85 52.69 270.42 50.24Q271.98 47.80 274.33 46.54Q276.67 45.28 279.87 45.28L279.87 45.28Q284.36 45.28 287.65 47.59Q290.95 49.90 292.79 54.15Q294.62 58.40 294.62 64.32L294.62 64.32Q294.62 70.03 292.82 74.21Q291.02 78.40 287.69 80.67Q284.36 82.95 279.73 82.95ZM275.65 74.11L275.65 74.11Q277.90 74.11 279.60 72.85Q281.30 71.60 282.21 69.32Q283.13 67.04 283.13 63.98L283.13 63.98Q283.13 60.85 282.25 58.64Q281.36 56.43 279.77 55.21Q278.17 53.98 275.92 53.98L275.92 53.98Q274.43 53.98 273.17 54.53Q271.91 55.07 270.96 56.02Q270.01 56.98 269.33 58.17Q268.65 59.36 268.31 60.68Q267.97 62.01 267.97 63.30L267.97 63.30L267.97 64.73Q267.97 66.16 268.38 67.79Q268.78 69.42 269.70 70.85Q270.62 72.28 272.08 73.19Q273.54 74.11 275.65 74.11ZM315.57 82.95L315.57 82.95Q310.13 82.95 305.95 80.84Q301.76 78.74 299.38 74.52Q297.00 70.30 297.00 63.98L297.00 63.98Q297.00 57.66 299.38 53.47Q301.76 49.29 305.98 47.22Q310.20 45.14 315.64 45.14L315.64 45.14Q321.08 45.14 325.29 47.25Q329.51 49.36 331.89 53.54Q334.27 57.72 334.27 64.05L334.27 64.05Q334.27 70.51 331.82 74.72Q329.37 78.94 325.12 80.95Q320.87 82.95 315.57 82.95ZM315.91 75.00L315.91 75.00Q318.36 75.00 319.99 73.87Q321.62 72.75 322.44 70.44Q323.25 68.13 323.25 64.73L323.25 64.73Q323.25 61.12 322.37 58.64Q321.48 56.16 319.75 54.83Q318.02 53.51 315.30 53.51L315.30 53.51Q312.98 53.51 311.32 54.63Q309.65 55.75 308.84 58.06Q308.02 60.38 308.02 63.84L308.02 63.84Q308.02 69.42 310.09 72.21Q312.17 75.00 315.91 75.00Z" fill="#FAF6F2" />
+              </svg>
+            </div>
+            <span>En Fondo Noche</span>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <h2 class="card-title">3. La R que Avanza</h2>
+          <p class="card-metaphor">Monograma tipográfico 'r' con flecha. Al colocarlo junto a la marca se lee "r + rumbo", redundando la primera letra de manera innecesaria.</p>
+          <ul class="analysis-list">
+            <li class="con">Efecto redundante visual: doble 'r' consecutiva (símbolo + inicial).</li>
+            <li class="con">Asociación inmediata con empresas de delivery o mensajería (Rappi / courier).</li>
+            <li class="con">El lazo interno de la r se empasta a escalas pequeñas.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ================= OPTION 4 ================= -->
+      <div class="concept-card">
+        <span class="badge-status badge-alt">Opción Descartada</span>
+        
+        <!-- Canvas View: Horizontal Lockup -->
+        <div class="preview-canvas view-horizontal">
+          <svg viewBox="0 0 380 120">
+            <g transform="translate(66, 61) scale(0.24) translate(-256, -256)">
+              
+  <polygon points="256,256 238,212 396,116 300,274" fill="var(--color-facet-1)" />
+  <polygon points="256,256 300,274 396,116 312,238" fill="var(--color-facet-2)" />
+  <polygon points="256,256 242,204 256,142 270,204" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 308,242 370,256 308,270" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 270,308 256,370 242,308" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 204,270 142,256 204,242" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 226,218 178,178 218,226" fill="var(--color-facet-2)" opacity="0.45" />
+  <polygon points="256,256 218,286 178,334 226,294" fill="var(--color-facet-2)" opacity="0.45" />
+  <polygon points="256,256 286,294 334,334 294,286" fill="var(--color-facet-2)" opacity="0.45" />
+  <circle cx="256" cy="256" r="44" fill="var(--color-accent)" />
+  <circle cx="256" cy="256" r="22" fill="var(--color-facet-1)" />
+
+            </g>
+            <path d="M135.23 82L124.22 82L124.22 65.34L124.22 46.10L133.19 46.10L133.40 58.27L134.76 58.27Q135.23 53.51 136.56 50.69Q137.88 47.86 140.37 46.57Q142.85 45.28 146.52 45.28L146.52 45.28Q147.06 45.28 147.74 45.31Q148.42 45.35 149.31 45.48L149.31 45.48L148.90 57.18Q147.81 56.64 146.55 56.47Q145.30 56.30 144.34 56.30L144.34 56.30Q141.69 56.30 139.75 57.32Q137.82 58.34 136.69 60.44Q135.57 62.55 135.23 65.75L135.23 65.75L135.23 82ZM164.81 82.95L164.81 82.95Q158.42 82.95 155.19 78.63Q151.96 74.32 151.96 65.48L151.96 65.48L151.96 46.10L162.98 46.10L162.98 64.05Q162.98 69.08 164.47 71.56Q165.97 74.04 169.03 74.04L169.03 74.04Q170.86 74.04 172.19 73.13Q173.52 72.21 174.43 70.54Q175.35 68.88 175.79 66.70Q176.24 64.52 176.24 61.94L176.24 61.94L176.24 46.10L187.18 46.10L187.18 67.45L187.18 82L178.48 82L178.28 70.92L176.92 70.92Q175.90 75.13 174.37 77.82Q172.84 80.50 170.52 81.73Q168.21 82.95 164.81 82.95ZM204.52 82L193.58 82L193.58 58.81L193.58 46.10L202.21 46.10L202.35 56.64L203.71 56.64Q204.66 52.76 206.22 50.21Q207.79 47.66 210.03 46.40Q212.28 45.14 215.27 45.14L215.27 45.14Q218.40 45.14 220.47 46.47Q222.54 47.80 223.77 50.35Q224.99 52.90 225.40 56.64L225.40 56.64L226.56 56.64Q227.64 52.62 229.41 50.07Q231.18 47.52 233.63 46.33Q236.08 45.14 238.93 45.14L238.93 45.14Q241.99 45.14 244.27 46.33Q246.55 47.52 248.08 49.87Q249.61 52.22 250.36 55.72Q251.10 59.22 251.10 63.84L251.10 63.84L251.10 82L240.09 82L240.09 65.20Q240.09 61.60 239.51 59.22Q238.93 56.84 237.71 55.65Q236.48 54.46 234.58 54.46L234.58 54.46Q232.40 54.46 230.87 55.89Q229.34 57.32 228.53 59.87Q227.71 62.42 227.71 65.61L227.71 65.61L227.71 82L216.97 82L216.97 65.41Q216.97 61.67 216.32 59.29Q215.68 56.91 214.42 55.68Q213.16 54.46 211.26 54.46L211.26 54.46Q209.08 54.46 207.58 55.89Q206.09 57.32 205.31 59.87Q204.52 62.42 204.52 65.61L204.52 65.61L204.52 82ZM279.73 82.95L279.73 82.95Q276.33 82.95 273.78 81.66Q271.23 80.37 269.63 77.78Q268.04 75.20 267.49 71.39L267.49 71.39L266.20 71.39L266.00 82L257.02 82L257.02 64.39L257.02 33.04L267.97 33.04L267.97 44.94Q267.97 46.57 267.73 48.37Q267.49 50.18 267.12 52.15Q266.74 54.12 266.34 56.36L266.34 56.36L267.90 56.36Q268.85 52.69 270.42 50.24Q271.98 47.80 274.33 46.54Q276.67 45.28 279.87 45.28L279.87 45.28Q284.36 45.28 287.65 47.59Q290.95 49.90 292.79 54.15Q294.62 58.40 294.62 64.32L294.62 64.32Q294.62 70.03 292.82 74.21Q291.02 78.40 287.69 80.67Q284.36 82.95 279.73 82.95ZM275.65 74.11L275.65 74.11Q277.90 74.11 279.60 72.85Q281.30 71.60 282.21 69.32Q283.13 67.04 283.13 63.98L283.13 63.98Q283.13 60.85 282.25 58.64Q281.36 56.43 279.77 55.21Q278.17 53.98 275.92 53.98L275.92 53.98Q274.43 53.98 273.17 54.53Q271.91 55.07 270.96 56.02Q270.01 56.98 269.33 58.17Q268.65 59.36 268.31 60.68Q267.97 62.01 267.97 63.30L267.97 63.30L267.97 64.73Q267.97 66.16 268.38 67.79Q268.78 69.42 269.70 70.85Q270.62 72.28 272.08 73.19Q273.54 74.11 275.65 74.11ZM315.57 82.95L315.57 82.95Q310.13 82.95 305.95 80.84Q301.76 78.74 299.38 74.52Q297.00 70.30 297.00 63.98L297.00 63.98Q297.00 57.66 299.38 53.47Q301.76 49.29 305.98 47.22Q310.20 45.14 315.64 45.14L315.64 45.14Q321.08 45.14 325.29 47.25Q329.51 49.36 331.89 53.54Q334.27 57.72 334.27 64.05L334.27 64.05Q334.27 70.51 331.82 74.72Q329.37 78.94 325.12 80.95Q320.87 82.95 315.57 82.95ZM315.91 75.00L315.91 75.00Q318.36 75.00 319.99 73.87Q321.62 72.75 322.44 70.44Q323.25 68.13 323.25 64.73L323.25 64.73Q323.25 61.12 322.37 58.64Q321.48 56.16 319.75 54.83Q318.02 53.51 315.30 53.51L315.30 53.51Q312.98 53.51 311.32 54.63Q309.65 55.75 308.84 58.06Q308.02 60.38 308.02 63.84L308.02 63.84Q308.02 69.42 310.09 72.21Q312.17 75.00 315.91 75.00Z" fill="var(--app-text)" />
+          </svg>
+        </div>
+
+        <!-- Canvas View: Stacked Lockup -->
+        <div class="preview-canvas view-stacked" style="display: none;">
+          <svg viewBox="0 0 320 250">
+            <g transform="translate(160, 80) scale(0.3833) translate(-256, -256)">
+              
+  <polygon points="256,256 238,212 396,116 300,274" fill="var(--color-facet-1)" />
+  <polygon points="256,256 300,274 396,116 312,238" fill="var(--color-facet-2)" />
+  <polygon points="256,256 242,204 256,142 270,204" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 308,242 370,256 308,270" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 270,308 256,370 242,308" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 204,270 142,256 204,242" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 226,218 178,178 218,226" fill="var(--color-facet-2)" opacity="0.45" />
+  <polygon points="256,256 218,286 178,334 226,294" fill="var(--color-facet-2)" opacity="0.45" />
+  <polygon points="256,256 286,294 334,334 294,286" fill="var(--color-facet-2)" opacity="0.45" />
+  <circle cx="256" cy="256" r="44" fill="var(--color-accent)" />
+  <circle cx="256" cy="256" r="22" fill="var(--color-facet-1)" />
+
+            </g>
+            <path d="M82.58 200L73.51 200L73.51 186.28L73.51 170.43L80.90 170.43L81.07 180.46L82.19 180.46Q82.58 176.54 83.68 174.21Q84.77 171.89 86.81 170.82Q88.86 169.76 91.88 169.76L91.88 169.76Q92.33 169.76 92.89 169.79Q93.45 169.82 94.18 169.93L94.18 169.93L93.84 179.56Q92.94 179.11 91.91 178.97Q90.87 178.83 90.09 178.83L90.09 178.83Q87.90 178.83 86.31 179.67Q84.71 180.51 83.79 182.25Q82.86 183.98 82.58 186.62L82.58 186.62L82.58 200ZM106.94 200.78L106.94 200.78Q101.68 200.78 99.02 197.23Q96.36 193.67 96.36 186.39L96.36 186.39L96.36 170.43L105.43 170.43L105.43 185.22Q105.43 189.36 106.66 191.40Q107.90 193.45 110.42 193.45L110.42 193.45Q111.93 193.45 113.02 192.69Q114.11 191.94 114.87 190.56Q115.62 189.19 115.99 187.40Q116.35 185.61 116.35 183.48L116.35 183.48L116.35 170.43L125.37 170.43L125.37 188.02L125.37 200L118.20 200L118.03 190.87L116.91 190.87Q116.07 194.34 114.81 196.56Q113.55 198.77 111.65 199.78Q109.74 200.78 106.94 200.78ZM139.65 200L130.63 200L130.63 180.90L130.63 170.43L137.74 170.43L137.86 179.11L138.98 179.11Q139.76 175.92 141.05 173.82Q142.34 171.72 144.18 170.68Q146.03 169.65 148.50 169.65L148.50 169.65Q151.07 169.65 152.78 170.74Q154.49 171.83 155.50 173.93Q156.50 176.03 156.84 179.11L156.84 179.11L157.79 179.11Q158.69 175.81 160.14 173.71Q161.60 171.61 163.62 170.63Q165.63 169.65 167.98 169.65L167.98 169.65Q170.50 169.65 172.38 170.63Q174.26 171.61 175.52 173.54Q176.78 175.47 177.39 178.36Q178.01 181.24 178.01 185.05L178.01 185.05L178.01 200L168.94 200L168.94 186.17Q168.94 183.20 168.46 181.24Q167.98 179.28 166.98 178.30Q165.97 177.32 164.40 177.32L164.40 177.32Q162.61 177.32 161.35 178.50Q160.09 179.67 159.42 181.77Q158.74 183.87 158.74 186.50L158.74 186.50L158.74 200L149.90 200L149.90 186.34Q149.90 183.26 149.36 181.30Q148.83 179.34 147.80 178.33Q146.76 177.32 145.19 177.32L145.19 177.32Q143.40 177.32 142.17 178.50Q140.94 179.67 140.29 181.77Q139.65 183.87 139.65 186.50L139.65 186.50L139.65 200ZM201.58 200.78L201.58 200.78Q198.78 200.78 196.68 199.72Q194.58 198.66 193.27 196.53Q191.95 194.40 191.50 191.26L191.50 191.26L190.44 191.26L190.27 200L182.88 200L182.88 185.50L182.88 159.68L191.90 159.68L191.90 169.48Q191.90 170.82 191.70 172.31Q191.50 173.79 191.20 175.42Q190.89 177.04 190.55 178.89L190.55 178.89L191.84 178.89Q192.62 175.86 193.91 173.85Q195.20 171.83 197.13 170.80Q199.06 169.76 201.70 169.76L201.70 169.76Q205.39 169.76 208.11 171.66Q210.82 173.57 212.34 177.07Q213.85 180.57 213.85 185.44L213.85 185.44Q213.85 190.14 212.36 193.59Q210.88 197.03 208.14 198.91Q205.39 200.78 201.58 200.78ZM198.22 193.50L198.22 193.50Q200.07 193.50 201.47 192.47Q202.87 191.43 203.63 189.56Q204.38 187.68 204.38 185.16L204.38 185.16Q204.38 182.58 203.66 180.76Q202.93 178.94 201.61 177.94Q200.30 176.93 198.45 176.93L198.45 176.93Q197.22 176.93 196.18 177.38Q195.14 177.82 194.36 178.61Q193.58 179.39 193.02 180.37Q192.46 181.35 192.18 182.44Q191.90 183.54 191.90 184.60L191.90 184.60L191.90 185.78Q191.90 186.95 192.23 188.30Q192.57 189.64 193.32 190.82Q194.08 191.99 195.28 192.75Q196.49 193.50 198.22 193.50ZM231.10 200.78L231.10 200.78Q226.62 200.78 223.17 199.05Q219.73 197.31 217.77 193.84Q215.81 190.37 215.81 185.16L215.81 185.16Q215.81 179.95 217.77 176.51Q219.73 173.06 223.20 171.36Q226.67 169.65 231.15 169.65L231.15 169.65Q235.63 169.65 239.10 171.38Q242.58 173.12 244.54 176.56Q246.50 180.01 246.50 185.22L246.50 185.22Q246.50 190.54 244.48 194.01Q242.46 197.48 238.96 199.13Q235.46 200.78 231.10 200.78ZM231.38 194.23L231.38 194.23Q233.39 194.23 234.74 193.31Q236.08 192.38 236.75 190.48Q237.42 188.58 237.42 185.78L237.42 185.78Q237.42 182.81 236.70 180.76Q235.97 178.72 234.54 177.63Q233.11 176.54 230.87 176.54L230.87 176.54Q228.97 176.54 227.60 177.46Q226.22 178.38 225.55 180.29Q224.88 182.19 224.88 185.05L224.88 185.05Q224.88 189.64 226.59 191.94Q228.30 194.23 231.38 194.23Z" fill="var(--app-text)" />
+          </svg>
+        </div>
+
+        <!-- Canvas View: Symbol Alone -->
+        <div class="preview-canvas view-symbol" style="display: none;">
+          <svg viewBox="0 0 512 512" style="max-width: 140px;">
+            
+  <polygon points="256,256 238,212 396,116 300,274" fill="var(--color-facet-1)" />
+  <polygon points="256,256 300,274 396,116 312,238" fill="var(--color-facet-2)" />
+  <polygon points="256,256 242,204 256,142 270,204" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 308,242 370,256 308,270" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 270,308 256,370 242,308" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 204,270 142,256 204,242" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 226,218 178,178 218,226" fill="var(--color-facet-2)" opacity="0.45" />
+  <polygon points="256,256 218,286 178,334 226,294" fill="var(--color-facet-2)" opacity="0.45" />
+  <polygon points="256,256 286,294 334,334 294,286" fill="var(--color-facet-2)" opacity="0.45" />
+  <circle cx="256" cy="256" r="44" fill="var(--color-accent)" />
+  <circle cx="256" cy="256" r="22" fill="var(--color-facet-1)" />
+
+          </svg>
+        </div>
+
+        <!-- Sub-Scale Strip -->
+        <div class="scale-bar">
+          <div class="scale-item">
+            <div class="app-icon-mock">
+              <svg viewBox="0 0 512 512">
+  <polygon points="256,256 238,212 396,116 300,274" fill="var(--color-facet-1)" />
+  <polygon points="256,256 300,274 396,116 312,238" fill="var(--color-facet-2)" />
+  <polygon points="256,256 242,204 256,142 270,204" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 308,242 370,256 308,270" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 270,308 256,370 242,308" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 204,270 142,256 204,242" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 226,218 178,178 218,226" fill="var(--color-facet-2)" opacity="0.45" />
+  <polygon points="256,256 218,286 178,334 226,294" fill="var(--color-facet-2)" opacity="0.45" />
+  <polygon points="256,256 286,294 334,334 294,286" fill="var(--color-facet-2)" opacity="0.45" />
+  <circle cx="256" cy="256" r="44" fill="var(--color-accent)" />
+  <circle cx="256" cy="256" r="22" fill="var(--color-facet-1)" />
+</svg>
+            </div>
+            <span>Ícono 48px</span>
+          </div>
+
+          <div class="scale-item">
+            <div class="dark-pill-mock">
+              <svg viewBox="0 0 380 120">
+                <g transform="translate(66, 61) scale(0.24) translate(-256, -256)">
+                  
+  <polygon points="256,256 238,212 396,116 300,274" fill="var(--color-facet-1)" />
+  <polygon points="256,256 300,274 396,116 312,238" fill="var(--color-facet-2)" />
+  <polygon points="256,256 242,204 256,142 270,204" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 308,242 370,256 308,270" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 270,308 256,370 242,308" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 204,270 142,256 204,242" fill="var(--color-facet-2)" opacity="0.85" />
+  <polygon points="256,256 226,218 178,178 218,226" fill="var(--color-facet-2)" opacity="0.45" />
+  <polygon points="256,256 218,286 178,334 226,294" fill="var(--color-facet-2)" opacity="0.45" />
+  <polygon points="256,256 286,294 334,334 294,286" fill="var(--color-facet-2)" opacity="0.45" />
+  <circle cx="256" cy="256" r="44" fill="var(--color-accent)" />
+  <circle cx="256" cy="256" r="22" fill="var(--color-facet-1)" />
+
+                </g>
+                <path d="M135.23 82L124.22 82L124.22 65.34L124.22 46.10L133.19 46.10L133.40 58.27L134.76 58.27Q135.23 53.51 136.56 50.69Q137.88 47.86 140.37 46.57Q142.85 45.28 146.52 45.28L146.52 45.28Q147.06 45.28 147.74 45.31Q148.42 45.35 149.31 45.48L149.31 45.48L148.90 57.18Q147.81 56.64 146.55 56.47Q145.30 56.30 144.34 56.30L144.34 56.30Q141.69 56.30 139.75 57.32Q137.82 58.34 136.69 60.44Q135.57 62.55 135.23 65.75L135.23 65.75L135.23 82ZM164.81 82.95L164.81 82.95Q158.42 82.95 155.19 78.63Q151.96 74.32 151.96 65.48L151.96 65.48L151.96 46.10L162.98 46.10L162.98 64.05Q162.98 69.08 164.47 71.56Q165.97 74.04 169.03 74.04L169.03 74.04Q170.86 74.04 172.19 73.13Q173.52 72.21 174.43 70.54Q175.35 68.88 175.79 66.70Q176.24 64.52 176.24 61.94L176.24 61.94L176.24 46.10L187.18 46.10L187.18 67.45L187.18 82L178.48 82L178.28 70.92L176.92 70.92Q175.90 75.13 174.37 77.82Q172.84 80.50 170.52 81.73Q168.21 82.95 164.81 82.95ZM204.52 82L193.58 82L193.58 58.81L193.58 46.10L202.21 46.10L202.35 56.64L203.71 56.64Q204.66 52.76 206.22 50.21Q207.79 47.66 210.03 46.40Q212.28 45.14 215.27 45.14L215.27 45.14Q218.40 45.14 220.47 46.47Q222.54 47.80 223.77 50.35Q224.99 52.90 225.40 56.64L225.40 56.64L226.56 56.64Q227.64 52.62 229.41 50.07Q231.18 47.52 233.63 46.33Q236.08 45.14 238.93 45.14L238.93 45.14Q241.99 45.14 244.27 46.33Q246.55 47.52 248.08 49.87Q249.61 52.22 250.36 55.72Q251.10 59.22 251.10 63.84L251.10 63.84L251.10 82L240.09 82L240.09 65.20Q240.09 61.60 239.51 59.22Q238.93 56.84 237.71 55.65Q236.48 54.46 234.58 54.46L234.58 54.46Q232.40 54.46 230.87 55.89Q229.34 57.32 228.53 59.87Q227.71 62.42 227.71 65.61L227.71 65.61L227.71 82L216.97 82L216.97 65.41Q216.97 61.67 216.32 59.29Q215.68 56.91 214.42 55.68Q213.16 54.46 211.26 54.46L211.26 54.46Q209.08 54.46 207.58 55.89Q206.09 57.32 205.31 59.87Q204.52 62.42 204.52 65.61L204.52 65.61L204.52 82ZM279.73 82.95L279.73 82.95Q276.33 82.95 273.78 81.66Q271.23 80.37 269.63 77.78Q268.04 75.20 267.49 71.39L267.49 71.39L266.20 71.39L266.00 82L257.02 82L257.02 64.39L257.02 33.04L267.97 33.04L267.97 44.94Q267.97 46.57 267.73 48.37Q267.49 50.18 267.12 52.15Q266.74 54.12 266.34 56.36L266.34 56.36L267.90 56.36Q268.85 52.69 270.42 50.24Q271.98 47.80 274.33 46.54Q276.67 45.28 279.87 45.28L279.87 45.28Q284.36 45.28 287.65 47.59Q290.95 49.90 292.79 54.15Q294.62 58.40 294.62 64.32L294.62 64.32Q294.62 70.03 292.82 74.21Q291.02 78.40 287.69 80.67Q284.36 82.95 279.73 82.95ZM275.65 74.11L275.65 74.11Q277.90 74.11 279.60 72.85Q281.30 71.60 282.21 69.32Q283.13 67.04 283.13 63.98L283.13 63.98Q283.13 60.85 282.25 58.64Q281.36 56.43 279.77 55.21Q278.17 53.98 275.92 53.98L275.92 53.98Q274.43 53.98 273.17 54.53Q271.91 55.07 270.96 56.02Q270.01 56.98 269.33 58.17Q268.65 59.36 268.31 60.68Q267.97 62.01 267.97 63.30L267.97 63.30L267.97 64.73Q267.97 66.16 268.38 67.79Q268.78 69.42 269.70 70.85Q270.62 72.28 272.08 73.19Q273.54 74.11 275.65 74.11ZM315.57 82.95L315.57 82.95Q310.13 82.95 305.95 80.84Q301.76 78.74 299.38 74.52Q297.00 70.30 297.00 63.98L297.00 63.98Q297.00 57.66 299.38 53.47Q301.76 49.29 305.98 47.22Q310.20 45.14 315.64 45.14L315.64 45.14Q321.08 45.14 325.29 47.25Q329.51 49.36 331.89 53.54Q334.27 57.72 334.27 64.05L334.27 64.05Q334.27 70.51 331.82 74.72Q329.37 78.94 325.12 80.95Q320.87 82.95 315.57 82.95ZM315.91 75.00L315.91 75.00Q318.36 75.00 319.99 73.87Q321.62 72.75 322.44 70.44Q323.25 68.13 323.25 64.73L323.25 64.73Q323.25 61.12 322.37 58.64Q321.48 56.16 319.75 54.83Q318.02 53.51 315.30 53.51L315.30 53.51Q312.98 53.51 311.32 54.63Q309.65 55.75 308.84 58.06Q308.02 60.38 308.02 63.84L308.02 63.84Q308.02 69.42 310.09 72.21Q312.17 75.00 315.91 75.00Z" fill="#FAF6F2" />
+              </svg>
+            </div>
+            <span>En Fondo Noche</span>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <h2 class="card-title">4. Brújula Inti</h2>
+          <p class="card-metaphor">Sol andino de 8 rayos con rayo NE alargado. Junto al texto tiene demasiada masa gráfica y atrae la atención de forma desproporcionada.</p>
+          <ul class="analysis-list">
+            <li class="pro">Fuerte contenido identitario andino.</li>
+            <li class="con">Desequilibrio de pesos ópticos respecto al grosor del wordmark.</li>
+            <li class="con">A 32px parece un botón de "ajustes" o "clima/temperatura".</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ================= LIVE PRODUCT CONTEXT SECTION ================= -->
+    <section class="context-section">
+      <div class="context-header">
+        <h2>Prueba en Contexto Real de la App</h2>
+        <p>Observa cómo convive el logo con la marca en la cabecera real de Rumbo, en la tarjeta de finanzas y en la pantalla Splash de bienvenida:</p>
+        <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; align-items: center;">
+          <span class="control-label" style="align-self: center;">Ver en la App:</span>
+          <button class="btn-toggle active" onclick="switchMockupConcept(1, this)">1. La Aguja</button>
+          <button class="btn-toggle" onclick="switchMockupConcept(2, this)">2. El Check</button>
+          <button class="btn-toggle" onclick="switchMockupConcept(3, this)">3. La R que Avanza</button>
+          <button class="btn-toggle" onclick="switchMockupConcept(4, this)">4. Brújula Inti</button>
+        </div>
+      </div>
+
+      <div class="mockup-grid">
+        
+        <!-- Frame 1: Cabecera de la App -->
+        <div class="device-frame">
+          <div class="device-title">1. Cabecera Móvil (Navbar)</div>
+          <div class="app-header-bar">
+            <div class="app-header-brand" id="live-header-brand">
+              <svg viewBox="0 0 380 120">
+                <g transform="translate(66, 61) scale(0.2396) translate(-256, -256)">
+                  
+  <polygon points="376,136 216,216 136,376" fill="var(--color-facet-1)" />
+  <polygon points="376,136 136,376 296,296" fill="var(--color-facet-2)" />
+  <circle cx="256" cy="256" r="13" fill="var(--color-accent)" />
+
+                </g>
+                <path d="M135.23 82L124.22 82L124.22 65.34L124.22 46.10L133.19 46.10L133.40 58.27L134.76 58.27Q135.23 53.51 136.56 50.69Q137.88 47.86 140.37 46.57Q142.85 45.28 146.52 45.28L146.52 45.28Q147.06 45.28 147.74 45.31Q148.42 45.35 149.31 45.48L149.31 45.48L148.90 57.18Q147.81 56.64 146.55 56.47Q145.30 56.30 144.34 56.30L144.34 56.30Q141.69 56.30 139.75 57.32Q137.82 58.34 136.69 60.44Q135.57 62.55 135.23 65.75L135.23 65.75L135.23 82ZM164.81 82.95L164.81 82.95Q158.42 82.95 155.19 78.63Q151.96 74.32 151.96 65.48L151.96 65.48L151.96 46.10L162.98 46.10L162.98 64.05Q162.98 69.08 164.47 71.56Q165.97 74.04 169.03 74.04L169.03 74.04Q170.86 74.04 172.19 73.13Q173.52 72.21 174.43 70.54Q175.35 68.88 175.79 66.70Q176.24 64.52 176.24 61.94L176.24 61.94L176.24 46.10L187.18 46.10L187.18 67.45L187.18 82L178.48 82L178.28 70.92L176.92 70.92Q175.90 75.13 174.37 77.82Q172.84 80.50 170.52 81.73Q168.21 82.95 164.81 82.95ZM204.52 82L193.58 82L193.58 58.81L193.58 46.10L202.21 46.10L202.35 56.64L203.71 56.64Q204.66 52.76 206.22 50.21Q207.79 47.66 210.03 46.40Q212.28 45.14 215.27 45.14L215.27 45.14Q218.40 45.14 220.47 46.47Q222.54 47.80 223.77 50.35Q224.99 52.90 225.40 56.64L225.40 56.64L226.56 56.64Q227.64 52.62 229.41 50.07Q231.18 47.52 233.63 46.33Q236.08 45.14 238.93 45.14L238.93 45.14Q241.99 45.14 244.27 46.33Q246.55 47.52 248.08 49.87Q249.61 52.22 250.36 55.72Q251.10 59.22 251.10 63.84L251.10 63.84L251.10 82L240.09 82L240.09 65.20Q240.09 61.60 239.51 59.22Q238.93 56.84 237.71 55.65Q236.48 54.46 234.58 54.46L234.58 54.46Q232.40 54.46 230.87 55.89Q229.34 57.32 228.53 59.87Q227.71 62.42 227.71 65.61L227.71 65.61L227.71 82L216.97 82L216.97 65.41Q216.97 61.67 216.32 59.29Q215.68 56.91 214.42 55.68Q213.16 54.46 211.26 54.46L211.26 54.46Q209.08 54.46 207.58 55.89Q206.09 57.32 205.31 59.87Q204.52 62.42 204.52 65.61L204.52 65.61L204.52 82ZM279.73 82.95L279.73 82.95Q276.33 82.95 273.78 81.66Q271.23 80.37 269.63 77.78Q268.04 75.20 267.49 71.39L267.49 71.39L266.20 71.39L266.00 82L257.02 82L257.02 64.39L257.02 33.04L267.97 33.04L267.97 44.94Q267.97 46.57 267.73 48.37Q267.49 50.18 267.12 52.15Q266.74 54.12 266.34 56.36L266.34 56.36L267.90 56.36Q268.85 52.69 270.42 50.24Q271.98 47.80 274.33 46.54Q276.67 45.28 279.87 45.28L279.87 45.28Q284.36 45.28 287.65 47.59Q290.95 49.90 292.79 54.15Q294.62 58.40 294.62 64.32L294.62 64.32Q294.62 70.03 292.82 74.21Q291.02 78.40 287.69 80.67Q284.36 82.95 279.73 82.95ZM275.65 74.11L275.65 74.11Q277.90 74.11 279.60 72.85Q281.30 71.60 282.21 69.32Q283.13 67.04 283.13 63.98L283.13 63.98Q283.13 60.85 282.25 58.64Q281.36 56.43 279.77 55.21Q278.17 53.98 275.92 53.98L275.92 53.98Q274.43 53.98 273.17 54.53Q271.91 55.07 270.96 56.02Q270.01 56.98 269.33 58.17Q268.65 59.36 268.31 60.68Q267.97 62.01 267.97 63.30L267.97 63.30L267.97 64.73Q267.97 66.16 268.38 67.79Q268.78 69.42 269.70 70.85Q270.62 72.28 272.08 73.19Q273.54 74.11 275.65 74.11ZM315.57 82.95L315.57 82.95Q310.13 82.95 305.95 80.84Q301.76 78.74 299.38 74.52Q297.00 70.30 297.00 63.98L297.00 63.98Q297.00 57.66 299.38 53.47Q301.76 49.29 305.98 47.22Q310.20 45.14 315.64 45.14L315.64 45.14Q321.08 45.14 325.29 47.25Q329.51 49.36 331.89 53.54Q334.27 57.72 334.27 64.05L334.27 64.05Q334.27 70.51 331.82 74.72Q329.37 78.94 325.12 80.95Q320.87 82.95 315.57 82.95ZM315.91 75.00L315.91 75.00Q318.36 75.00 319.99 73.87Q321.62 72.75 322.44 70.44Q323.25 68.13 323.25 64.73L323.25 64.73Q323.25 61.12 322.37 58.64Q321.48 56.16 319.75 54.83Q318.02 53.51 315.30 53.51L315.30 53.51Q312.98 53.51 311.32 54.63Q309.65 55.75 308.84 58.06Q308.02 60.38 308.02 63.84L308.02 63.84Q308.02 69.42 310.09 72.21Q312.17 75.00 315.91 75.00Z" fill="var(--app-text)" />
+              </svg>
+            </div>
+            <div class="app-header-meta">
+              <span>Dom. 4 oct.</span>
+              <div class="avatar-circle">J</div>
+            </div>
+          </div>
+
+          <!-- UI Headline Sample -->
+          <div style="padding: 12px 6px;">
+            <div style="font-size: 13px; color: var(--color-muted); font-weight: 500;">Todo en orden,</div>
+            <div style="font-size: 22px; font-weight: 800; letter-spacing: -0.02em;">te quedan S/ 640</div>
+          </div>
+
+          <!-- Summary Card -->
+          <div class="summary-card">
+            <div>
+              <div class="summary-label">Tu Mes</div>
+              <div class="summary-amount">S/ 640.00</div>
+              <div class="summary-sub">Hasta el 31 oct. · 9 días</div>
+            </div>
+            <div class="ring-box">
+              68%
+            </div>
+          </div>
+        </div>
+
+        <!-- Frame 2: Splash Screen (Fondo Noche) -->
+        <div class="device-frame" style="background: #110E0F; border-color: #2E2628;">
+          <div class="device-title" style="color: #8E8385;">2. Splash Screen (Inicio Nocturno)</div>
+          <div class="splash-frame">
+            <div class="splash-logo" id="live-splash-brand">
+              <svg viewBox="0 0 320 250">
+                <g transform="translate(160, 80) scale(0.3833) translate(-256, -256)">
+                  
+  <polygon points="376,136 216,216 136,376" fill="var(--color-facet-1)" />
+  <polygon points="376,136 136,376 296,296" fill="var(--color-facet-2)" />
+  <circle cx="256" cy="256" r="13" fill="var(--color-accent)" />
+
+                </g>
+                <path d="M82.58 200L73.51 200L73.51 186.28L73.51 170.43L80.90 170.43L81.07 180.46L82.19 180.46Q82.58 176.54 83.68 174.21Q84.77 171.89 86.81 170.82Q88.86 169.76 91.88 169.76L91.88 169.76Q92.33 169.76 92.89 169.79Q93.45 169.82 94.18 169.93L94.18 169.93L93.84 179.56Q92.94 179.11 91.91 178.97Q90.87 178.83 90.09 178.83L90.09 178.83Q87.90 178.83 86.31 179.67Q84.71 180.51 83.79 182.25Q82.86 183.98 82.58 186.62L82.58 186.62L82.58 200ZM106.94 200.78L106.94 200.78Q101.68 200.78 99.02 197.23Q96.36 193.67 96.36 186.39L96.36 186.39L96.36 170.43L105.43 170.43L105.43 185.22Q105.43 189.36 106.66 191.40Q107.90 193.45 110.42 193.45L110.42 193.45Q111.93 193.45 113.02 192.69Q114.11 191.94 114.87 190.56Q115.62 189.19 115.99 187.40Q116.35 185.61 116.35 183.48L116.35 183.48L116.35 170.43L125.37 170.43L125.37 188.02L125.37 200L118.20 200L118.03 190.87L116.91 190.87Q116.07 194.34 114.81 196.56Q113.55 198.77 111.65 199.78Q109.74 200.78 106.94 200.78ZM139.65 200L130.63 200L130.63 180.90L130.63 170.43L137.74 170.43L137.86 179.11L138.98 179.11Q139.76 175.92 141.05 173.82Q142.34 171.72 144.18 170.68Q146.03 169.65 148.50 169.65L148.50 169.65Q151.07 169.65 152.78 170.74Q154.49 171.83 155.50 173.93Q156.50 176.03 156.84 179.11L156.84 179.11L157.79 179.11Q158.69 175.81 160.14 173.71Q161.60 171.61 163.62 170.63Q165.63 169.65 167.98 169.65L167.98 169.65Q170.50 169.65 172.38 170.63Q174.26 171.61 175.52 173.54Q176.78 175.47 177.39 178.36Q178.01 181.24 178.01 185.05L178.01 185.05L178.01 200L168.94 200L168.94 186.17Q168.94 183.20 168.46 181.24Q167.98 179.28 166.98 178.30Q165.97 177.32 164.40 177.32L164.40 177.32Q162.61 177.32 161.35 178.50Q160.09 179.67 159.42 181.77Q158.74 183.87 158.74 186.50L158.74 186.50L158.74 200L149.90 200L149.90 186.34Q149.90 183.26 149.36 181.30Q148.83 179.34 147.80 178.33Q146.76 177.32 145.19 177.32L145.19 177.32Q143.40 177.32 142.17 178.50Q140.94 179.67 140.29 181.77Q139.65 183.87 139.65 186.50L139.65 186.50L139.65 200ZM201.58 200.78L201.58 200.78Q198.78 200.78 196.68 199.72Q194.58 198.66 193.27 196.53Q191.95 194.40 191.50 191.26L191.50 191.26L190.44 191.26L190.27 200L182.88 200L182.88 185.50L182.88 159.68L191.90 159.68L191.90 169.48Q191.90 170.82 191.70 172.31Q191.50 173.79 191.20 175.42Q190.89 177.04 190.55 178.89L190.55 178.89L191.84 178.89Q192.62 175.86 193.91 173.85Q195.20 171.83 197.13 170.80Q199.06 169.76 201.70 169.76L201.70 169.76Q205.39 169.76 208.11 171.66Q210.82 173.57 212.34 177.07Q213.85 180.57 213.85 185.44L213.85 185.44Q213.85 190.14 212.36 193.59Q210.88 197.03 208.14 198.91Q205.39 200.78 201.58 200.78ZM198.22 193.50L198.22 193.50Q200.07 193.50 201.47 192.47Q202.87 191.43 203.63 189.56Q204.38 187.68 204.38 185.16L204.38 185.16Q204.38 182.58 203.66 180.76Q202.93 178.94 201.61 177.94Q200.30 176.93 198.45 176.93L198.45 176.93Q197.22 176.93 196.18 177.38Q195.14 177.82 194.36 178.61Q193.58 179.39 193.02 180.37Q192.46 181.35 192.18 182.44Q191.90 183.54 191.90 184.60L191.90 184.60L191.90 185.78Q191.90 186.95 192.23 188.30Q192.57 189.64 193.32 190.82Q194.08 191.99 195.28 192.75Q196.49 193.50 198.22 193.50ZM231.10 200.78L231.10 200.78Q226.62 200.78 223.17 199.05Q219.73 197.31 217.77 193.84Q215.81 190.37 215.81 185.16L215.81 185.16Q215.81 179.95 217.77 176.51Q219.73 173.06 223.20 171.36Q226.67 169.65 231.15 169.65L231.15 169.65Q235.63 169.65 239.10 171.38Q242.58 173.12 244.54 176.56Q246.50 180.01 246.50 185.22L246.50 185.22Q246.50 190.54 244.48 194.01Q242.46 197.48 238.96 199.13Q235.46 200.78 231.10 200.78ZM231.38 194.23L231.38 194.23Q233.39 194.23 234.74 193.31Q236.08 192.38 236.75 190.48Q237.42 188.58 237.42 185.78L237.42 185.78Q237.42 182.81 236.70 180.76Q235.97 178.72 234.54 177.63Q233.11 176.54 230.87 176.54L230.87 176.54Q228.97 176.54 227.60 177.46Q226.22 178.38 225.55 180.29Q224.88 182.19 224.88 185.05L224.88 185.05Q224.88 189.64 226.59 191.94Q228.30 194.23 231.38 194.23Z" fill="#FFFFFF" />
+              </svg>
+            </div>
+            <div class="splash-tagline">
+              "Tu día y tu plata, con rumbo."
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    function setView(viewType, btn) {
+      document.body.setAttribute('data-view', viewType);
+      document.querySelectorAll('.controls-panel button').forEach(b => {
+        if (b.innerText.includes('Logo Horizontal') || b.innerText.includes('Logo Apilado') || b.innerText.includes('Símbolo Solo')) {
+          b.classList.remove('active');
+        }
+      });
+      btn.classList.add('active');
+    }
+
+    function setPalette(themeClass, btn) {
+      document.body.className = document.body.className.replace(/theme-\w+/g, '').trim();
+      if (themeClass !== 'default') {
+        document.body.classList.add(themeClass);
+      }
+      document.querySelectorAll('.controls-panel button').forEach(b => {
+        if (b.innerText.includes('Andino') || b.innerText.includes('Índigo') || b.innerText.includes('Amazonía') || b.innerText.includes('Papel')) {
+          b.classList.remove('active');
+        }
+      });
+      btn.classList.add('active');
+    }
+
+    
+    const symbolsData = {
+      1: {
+        h: `<polygon points="376,136 216,216 136,376" fill="var(--color-facet-1)" />
+            <polygon points="376,136 136,376 296,296" fill="var(--color-facet-2)" />
+            <circle cx="256" cy="256" r="13" fill="var(--color-accent)" />`,
+        s: 0.2396,
+        stackedS: 0.3833
+      },
+      2: {
+        h: `<polygon points="120,296 168,248 232,312 344,200 380,236 232,384" fill="var(--color-facet-1)" />
+            <polygon points="344,200 380,236 406,146" fill="var(--color-facet-2)" />
+            <circle cx="406" cy="146" r="18" fill="var(--color-accent)" />`,
+        s: 0.24,
+        stackedS: 0.3833
+      },
+      3: {
+        h: `<rect x="140" y="176" width="48" height="192" rx="10" fill="var(--color-facet-2)" />
+            <path d="M164 256 C 164 190, 225 176, 276 176 C 316 176, 350 192, 372 216 L 372 152 L 408 152 L 408 252 L 308 252 L 344 216 C 326 202, 304 196, 276 196 C 242 196, 212 214, 212 256 L 212 368 L 164 368 Z" fill="var(--color-facet-1)" />
+            <circle cx="390" cy="170" r="14" fill="var(--color-accent)" />`,
+        s: 0.24,
+        stackedS: 0.3833
+      },
+      4: {
+        h: `<polygon points="256,256 238,212 396,116 300,274" fill="var(--color-facet-1)" />
+            <polygon points="256,256 300,274 396,116 312,238" fill="var(--color-facet-2)" />
+            <polygon points="256,256 242,204 256,142 270,204" fill="var(--color-facet-2)" opacity="0.85" />
+            <polygon points="256,256 308,242 370,256 308,270" fill="var(--color-facet-2)" opacity="0.85" />
+            <polygon points="256,256 270,308 256,370 242,308" fill="var(--color-facet-2)" opacity="0.85" />
+            <polygon points="256,256 204,270 142,256 204,242" fill="var(--color-facet-2)" opacity="0.85" />
+            <polygon points="256,256 226,218 178,178 218,226" fill="var(--color-facet-2)" opacity="0.45" />
+            <polygon points="256,256 218,286 178,334 226,294" fill="var(--color-facet-2)" opacity="0.45" />
+            <polygon points="256,256 286,294 334,334 294,286" fill="var(--color-facet-2)" opacity="0.45" />
+            <circle cx="256" cy="256" r="44" fill="var(--color-accent)" />
+            <circle cx="256" cy="256" r="22" fill="var(--color-facet-1)" />`,
+        s: 0.24,
+        stackedS: 0.3833
+      }
+    };
+
+    function switchMockupConcept(num, btn) {
+      document.querySelectorAll('.context-header button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const data = symbolsData[num];
+      // update header brand svg
+      const headerBrand = document.querySelector('#live-header-brand g');
+      if (headerBrand) {
+        headerBrand.setAttribute('transform', `translate(66, 61) scale(${data.s}) translate(-256, -256)`);
+        headerBrand.innerHTML = data.h;
+      }
+
+      // update splash brand svg
+      const splashBrand = document.querySelector('#live-splash-brand g');
+      if (splashBrand) {
+        splashBrand.setAttribute('transform', `translate(160, 80) scale(${data.stackedS}) translate(-256, -256)`);
+        splashBrand.innerHTML = data.h;
+      }
+    }
+
+    function setMode(mode) {
+      if (mode === 'dark') {
+        document.body.classList.add('dark-mode');
+        document.getElementById('btn-dark').classList.add('active');
+        document.getElementById('btn-light').classList.remove('active');
+      } else {
+        document.body.classList.remove('dark-mode');
+        document.getElementById('btn-light').classList.add('active');
+        document.getElementById('btn-dark').classList.remove('active');
+      }
+    }
+  </script>
+</body>
+</html>

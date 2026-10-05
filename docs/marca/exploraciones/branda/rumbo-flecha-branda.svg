@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Recreacion de la cinta plegada de Branda: dos brazos que comparten el vertice. -->
+  <rect width="512" height="512" fill="#F4F9F2"/>
+
+  <defs>
+    <linearGradient id="rumbo-fold" x1="338" y1="168" x2="248" y2="352" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#066B49"/>
+      <stop offset="0.55" stop-color="#068A59"/>
+      <stop offset="1" stop-color="#0CC97D"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Brazo de abajo (el pliegue). Se dibuja primero. -->
+  <path d="M 338 176 L 258 348"
+        fill="none"
+        stroke="url(#rumbo-fold)"
+        stroke-width="90"
+        stroke-linecap="round"/>
+
+  <!-- Brazo de arriba (la hoja menta). Tapa la junta y se lee como la cara frontal. -->
+  <path d="M 152 248 L 338 176"
+        fill="none"
+        stroke="#1BF297"
+        stroke-width="90"
+        stroke-linecap="round"/>
+</svg>

@@ -27,6 +27,9 @@ func (s *Store) Register(ctx context.Context, email, passwordHash string) (int64
 	if err := seedLists(ctx, tx, id); err != nil {
 		return 0, err
 	}
+	if err := seedMoney(ctx, tx, id); err != nil {
+		return 0, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return 0, err
 	}
@@ -89,10 +92,29 @@ func (s *Store) UpsertGoogleUser(ctx context.Context, email, subject string) (in
 	if err := seedLists(ctx, tx, id); err != nil {
 		return 0, err
 	}
+	if err := seedMoney(ctx, tx, id); err != nil {
+		return 0, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return 0, err
 	}
 	return id, nil
+}
+
+func seedMoney(ctx context.Context, tx pgx.Tx, userID int64) error {
+	if _, err := tx.Exec(ctx, `INSERT INTO accounts (user_id, name) VALUES ($1, 'Billetera')`, userID); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, `
+		INSERT INTO categories (user_id, name, kind, position) VALUES
+		($1, 'Almuerzo', 'gasto', 0),
+		($1, 'Comida', 'gasto', 1),
+		($1, 'Transporte', 'gasto', 2),
+		($1, 'Casa', 'gasto', 3),
+		($1, 'Salidas', 'gasto', 4),
+		($1, 'Otros', 'gasto', 5),
+		($1, 'Ingreso', 'ingreso', 6)`, userID)
+	return err
 }
 
 func seedLists(ctx context.Context, tx pgx.Tx, userID int64) error {

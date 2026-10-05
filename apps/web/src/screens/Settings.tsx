@@ -26,6 +26,23 @@ export function Settings({ pushReady, onLogout }: { pushReady: boolean; onLogout
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
+  async function download() {
+    setError('')
+    try {
+      const data = await api.exportData()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'rumbo.json'
+      link.click()
+      URL.revokeObjectURL(url)
+      setMessage('Listo, archivo descargado.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo exportar')
+    }
+  }
+
   async function enable() {
     setError('')
     setMessage('')
@@ -56,7 +73,7 @@ export function Settings({ pushReady, onLogout }: { pushReady: boolean; onLogout
   }
 
   return (
-    <Shell title="Ajustes" back="/dia">
+    <Shell title="Cuenta" tabs>
       <section className="panel">
         <h2>En el teléfono</h2>
         {iosDevice() ? (
@@ -74,6 +91,11 @@ export function Settings({ pushReady, onLogout }: { pushReady: boolean; onLogout
         {!pushReady && <p className="hint">Faltan las llaves VAPID en el servidor.</p>}
         {message && <p className="ok">{message}</p>}
         {error && <p className="error">{error}</p>}
+      </section>
+      <section className="panel">
+        <h2>Tus datos</h2>
+        <p>Tareas, hábitos y movimientos, en un archivo.</p>
+        <button type="button" className="ghost" onClick={() => void download()}>Exportar</button>
       </section>
       <button type="button" className="ghost" onClick={onLogout}>
         Salir

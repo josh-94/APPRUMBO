@@ -1,77 +1,71 @@
-import { Link } from 'react-router-dom'
-import type { Task } from '../types'
-import { greeting, longDate } from '../format'
+import type { Habit, MonthMoney, Task } from '../types'
+import { displayName, soles, weekChips } from '../format'
 import { Shell } from '../components/Shell'
 import { TaskRow } from '../components/TaskRow'
 
 type Props = {
+  email: string
   tasks: Task[] | null
+  habits: Habit[]
+  money: MonthMoney | null
   onOpen: (task: Task) => void
-  onCreate: () => void
+  onCreateTask: () => void
+  onCreateHabit: () => void
+  onCreateMoney: () => void
+  onToggleHabit: (habit: Habit) => void
   onDone: (task: Task) => void
   onLater: (task: Task, day: string) => void
   onDelete: (task: Task) => void
 }
 
-export function MyDay({ tasks, onOpen, onCreate, onDone, onLater, onDelete }: Props) {
-  const open = tasks?.filter((task) => task.status === 'open') ?? []
-  const pinned = open.filter((task) => task.pinned)
-  const rest = open.filter((task) => !task.pinned)
-  const done = tasks?.filter((task) => task.status === 'done') ?? []
-
-  return (
-    <Shell
-      eyebrow={longDate()}
-      title={greeting()}
-      tabs
-      action={
-        <Link className="icon-btn" to="/ajustes" aria-label="Ajustes">
-          ···
-        </Link>
-      }
-    >
-      <div className="shortcuts">
-        <Link className="pill" to="/momento">
-          Planear el día
-        </Link>
-        <Link className="pill quiet" to="/semana">
-          Esta semana
-        </Link>
-      </div>
-      {tasks === null && <p className="empty">Cargando</p>}
-      {tasks && open.length === 0 && done.length === 0 && (
-        <p className="empty">Nada para hoy. Planear el día o añadir una tarea.</p>
-      )}
-      <Group label="Fijadas" tasks={pinned} onOpen={onOpen} onDone={onDone} onLater={onLater} onDelete={onDelete} />
-      <Group label="Hoy" tasks={rest} onOpen={onOpen} onDone={onDone} onLater={onLater} onDelete={onDelete} />
-      <Group label="Hechas" tasks={done} onOpen={onOpen} onDone={onDone} onLater={onLater} onDelete={onDelete} />
-      <button type="button" className="fab" onClick={onCreate}>
-        Añadir tarea
-      </button>
-    </Shell>
-  )
-}
-
-function Group({
-  label,
+export function MyDay({
+  email,
   tasks,
+  habits,
+  money,
   onOpen,
+  onCreateTask,
+  onCreateHabit,
+  onCreateMoney,
+  onToggleHabit,
   onDone,
   onLater,
   onDelete,
-}: {
-  label: string
-  tasks: Task[]
-  onOpen: (task: Task) => void
-  onDone: (task: Task) => void
-  onLater: (task: Task, day: string) => void
-  onDelete: (task: Task) => void
-}) {
-  if (tasks.length === 0) return null
+}: Props) {
+  const open = tasks?.filter((task) => task.status === 'open') ?? []
+  const chips = weekChips()
+  const name = displayName(email)
+
   return (
-    <section>
-      <h2 className="section-label">{label}</h2>
-      {tasks.map((task) => (
+    <Shell tabs>
+      <div className="hello-row">
+        <span>Hola, {name}</span>
+        <span>{new Intl.DateTimeFormat('es', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date())}</span>
+      </div>
+      <p className="kicker">{open.length === 0 ? 'Todo listo,' : 'Hoy'}</p>
+      <h1 className="headline">
+        {tasks === null ? 'Cargando' : open.length === 0 ? 'no tienes nada pendiente' : `Te quedan ${open.length} ${open.length === 1 ? 'cosa' : 'cosas'}`}
+      </h1>
+      <div className="quick-grid">
+        <button type="button" className="quick-card" onClick={onCreateMoney}><i>S/</i>Anotar gasto</button>
+        <button type="button" className="quick-card" onClick={onCreateTask}><i>+</i>Nueva tarea</button>
+        <button type="button" className="quick-card" onClick={onCreateHabit}><i>o</i>Hábitos</button>
+      </div>
+      <section className="summary">
+        <p className="label">Tu mes</p>
+        <strong>{moneyLine(money)}</strong>
+        <p>{money && money.incomeCents > 0 ? 'Ingresos menos gastos de este mes.' : 'Anota un ingreso para ver cuánto te queda.'}</p>
+      </section>
+      <div className="week-row">
+        {chips.map((chip) => (
+          <div key={chip.key} className={chip.today ? 'day-chip today' : 'day-chip'}>
+            <small>{chip.label}</small>
+            <strong>{chip.day}</strong>
+          </div>
+        ))}
+      </div>
+      {tasks && open.length === 0 && <p className="empty">Nada pendiente por ahora. Agrega algo o disfruta el día.</p>}
+      {open.map((task) => (
         <TaskRow
           key={task.id}
           task={task}
@@ -81,6 +75,41 @@ function Group({
           onDelete={() => onDelete(task)}
         />
       ))}
-    </section>
+      {habits.length > 0 && <h2 className="section-label">Hábitos</h2>}
+      {habits.map((habit) => (
+        <HabitRow key={habit.id} habit={habit} onToggle={() => onToggleHabit(habit)} />
+      ))}
+    </Shell>
   )
+}
+
+export function HabitRow({ habit, onToggle }: { habit: Habit; onToggle: () => void }) {
+  return (
+    <div className="habit">
+      <div>
+        <strong>{habit.name}</strong>
+        <div className="dots" aria-hidden>
+          {Array.from({ length: habit.nGoal }, (_, index) => (
+            <span key={index} className={index < habit.doneThisWeek ? 'on' : ''} />
+          ))}
+        </div>
+        <p className="meta">{habit.doneThisWeek} de {habit.nGoal} · {habit.streakWeeks} {habit.streakWeeks === 1 ? 'semana' : 'semanas'}</p>
+      </div>
+      <button type="button" onClick={onToggle}>{habit.checks.includes(today()) ? 'Hecho' : 'Marcar'}</button>
+    </div>
+  )
+}
+
+function today() {
+  const date = new Date()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+function moneyLine(money: MonthMoney | null) {
+  if (!money) return '…'
+  if (money.incomeCents > 0 && money.remainingCents !== null) return `Te quedan ${soles(money.remainingCents)}`
+  if (money.spentCents > 0) return `Llevas ${soles(money.spentCents)} gastados`
+  return 'Aún sin movimientos'
 }

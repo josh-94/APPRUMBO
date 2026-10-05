@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Opción 4: Brújula Inti (Sol geométrico andino con rayo guía NE) -->
+  <!-- Rayo guía NE alargado como aguja de brújula -->
+  <polygon points="256,256 238,212 396,116 300,274" fill="#C2461F" />
+  <polygon points="256,256 300,274 396,116 312,238" fill="#9E3714" />
+  
+  <!-- Rayos cardinales simétricos -->
+  <!-- Norte -->
+  <polygon points="256,256 242,204 256,142 270,204" fill="#9E3714" opacity="0.85" />
+  <!-- Este -->
+  <polygon points="256,256 308,242 370,256 308,270" fill="#9E3714" opacity="0.85" />
+  <!-- Sur -->
+  <polygon points="256,256 270,308 256,370 242,308" fill="#9E3714" opacity="0.85" />
+  <!-- Oeste -->
+  <polygon points="256,256 204,270 142,256 204,242" fill="#9E3714" opacity="0.85" />
+  
+  <!-- Rayos diagonales menores (NO, SO, SE) -->
+  <polygon points="256,256 226,218 178,178 218,226" fill="#9E3714" opacity="0.5" />
+  <polygon points="256,256 218,286 178,334 226,294" fill="#9E3714" opacity="0.5" />
+  <polygon points="256,256 286,294 334,334 294,286" fill="#9E3714" opacity="0.5" />
+  
+  <!-- Sol central Inti -->
+  <circle cx="256" cy="256" r="44" fill="#F4B860" />
+  <circle cx="256" cy="256" r="22" fill="#C2461F" />
+</svg>

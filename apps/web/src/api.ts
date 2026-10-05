@@ -1,4 +1,4 @@
-import type { Task, TaskInput, TaskList } from './types'
+import type { Habit, MonthMoney, Movement, Task, TaskInput, TaskList } from './types'
 
 let onUnauthorized = () => {}
 
@@ -28,7 +28,7 @@ async function request<T>(path: string, options: RequestInit = {}, redirectOnAut
 }
 
 export const api = {
-  session: () => request<{ ok: boolean; push: boolean }>('/api/session'),
+  session: () => request<{ ok: boolean; push: boolean; email: string }>('/api/session'),
   login: (email: string, password: string) =>
     request<{ ok: boolean }>('/api/session', { method: 'POST', body: JSON.stringify({ email, password }) }, false),
   register: (email: string, password: string) =>
@@ -56,4 +56,15 @@ export const api = {
   vapid: () => request<{ publicKey: string }>('/api/push/vapid'),
   savePush: (body: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
     request<void>('/api/push/subscriptions', { method: 'POST', body: JSON.stringify(body) }),
+  habits: () => request<{ habits: Habit[] }>('/api/habits'),
+  createHabit: (name: string, nGoal: number) =>
+    request<Habit>('/api/habits', { method: 'POST', body: JSON.stringify({ name, nGoal }) }),
+  checkHabit: (id: number, day: string, on: boolean) =>
+    on
+      ? request<void>(`/api/habits/${id}/checks`, { method: 'POST', body: JSON.stringify({ day }) })
+      : request<void>(`/api/habits/${id}/checks?day=${day}`, { method: 'DELETE' }),
+  month: () => request<MonthMoney>('/api/money/month'),
+  createMovement: (body: { kind: 'gasto' | 'ingreso'; amountCents: number; accountId: number; categoryId: number; day: string }) =>
+    request<Movement>('/api/movements', { method: 'POST', body: JSON.stringify(body) }),
+  exportData: () => request<Record<string, unknown>>('/api/export'),
 }

@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, setUnauthorized } from './api'
-import { atLocalDate } from './format'
-import type { Task, TaskInput, TaskList } from './types'
+import { atLocalDate, todayKey } from './format'
+import type { Habit, MonthMoney, Task, TaskInput, TaskList } from './types'
 import { TaskSheet } from './components/TaskSheet'
+import { HabitSheet, MoneySheet } from './components/CaptureSheets'
 import { MyDay } from './screens/MyDay'
+import { Tiempo } from './screens/Tiempo'
+import { Plata } from './screens/Plata'
 import { ListDetail, ListsHome } from './screens/Lists'
 import { Moment } from './screens/Moment'
-import { Week } from './screens/Week'
 import { Settings } from './screens/Settings'
 
 type Sheet =
@@ -27,9 +29,19 @@ export function App() {
     return params.get('error') === 'google' ? 'Google no pudo confirmar la cuenta' : ''
   })
   const [sheet, setSheet] = useState<Sheet>(null)
+  const [habitOpen, setHabitOpen] = useState(false)
+  const [moneyOpen, setMoneyOpen] = useState(false)
+  const [accountEmail, setAccountEmail] = useState('')
+  const [habits, setHabits] = useState<Habit[]>([])
+  const [money, setMoney] = useState<MonthMoney | null>(null)
   const [sort, setSort] = useState<'time' | 'manual'>('time')
   const location = useLocation()
   const openTask = useCallback((task: Task) => setSheet({ mode: 'edit', task }), [])
+
+  const loadLife = useCallback(() => {
+    api.habits().then((data) => setHabits(data.habits)).catch(() => setHabits([]))
+    api.month().then(setMoney).catch(() => setMoney(null))
+  }, [])
 
   const loadLists = useCallback(() => {
     api.lists().then((data) => setLists(data.lists)).catch(() => setLists([]))
@@ -40,7 +52,9 @@ export function App() {
     api.session().then((data) => {
       setAuthed(true)
       setPushReady(data.push)
+      setAccountEmail(data.email || '')
       loadLists()
+      loadLife()
     }).catch(() => setAuthed(false))
   }, [loadLists])
 
@@ -65,7 +79,9 @@ export function App() {
       setLoginError('')
       const session = await api.session()
       setPushReady(session.push)
+      setAccountEmail(session.email || '')
       loadLists()
+      loadLife()
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : 'No se pudo entrar')
     }
@@ -96,6 +112,12 @@ export function App() {
     reloadTasks()
   }
 
+  async function toggleHabit(habit: Habit) {
+    const day = todayKey()
+    await api.checkHabit(habit.id, day, !habit.checks.includes(day))
+    loadLife()
+  }
+
   async function today(task: Task) {
     await api.today(task.id)
     reloadTasks()
@@ -108,7 +130,7 @@ export function App() {
     return (
       <div className="app login">
         <p className="eyebrow">RUMBO</p>
-        <h1>Tu día, en orden.</h1>
+        <h1>Tu día y tu plata, con rumbo.</h1>
         <form onSubmit={(event) => void enter(event)}>
           <label className="field">
             Correo
@@ -156,15 +178,40 @@ export function App() {
           path="/dia"
           element={
             <MyDay
+              email={accountEmail}
               tasks={tasks}
+              habits={habits}
+              money={money}
               onOpen={(task) => setSheet({ mode: 'edit', task })}
-              onCreate={() => setSheet({ mode: 'create', listId: defaultList })}
+              onCreateTask={() => setSheet({ mode: 'create', listId: defaultList })}
+              onCreateHabit={() => setHabitOpen(true)}
+              onCreateMoney={() => setMoneyOpen(true)}
+              onToggleHabit={(habit) => void toggleHabit(habit)}
               onDone={(task) => void done(task)}
               onLater={(task, day) => void later(task, day)}
               onDelete={(task) => void remove(task)}
             />
           }
         />
+        <Route path="/semana" element={<Navigate to="/tiempo" replace />} />
+        <Route path="/ajustes" element={<Navigate to="/cuenta" replace />} />
+        <Route
+          path="/tiempo"
+          element={
+            <Tiempo
+              tasks={tasks}
+              habits={habits}
+              lists={lists}
+              onOpen={(task) => setSheet({ mode: 'edit', task })}
+              onDone={(task) => void done(task)}
+              onLater={(task, day) => void later(task, day)}
+              onDelete={(task) => void remove(task)}
+              onToggleHabit={(habit) => void toggleHabit(habit)}
+              onCreateHabit={() => setHabitOpen(true)}
+            />
+          }
+        />
+        <Route path="/plata" element={<Plata money={money} onCreate={() => setMoneyOpen(true)} />} />
         <Route path="/listas" element={<ListsHome lists={lists} onReloadLists={loadLists} />} />
         <Route
           path="/listas/:id"
@@ -198,21 +245,9 @@ export function App() {
             />
           }
         />
-        <Route
-          path="/semana"
-          element={
-            <Week
-              tasks={tasks}
-              onOpen={(task) => setSheet({ mode: 'edit', task })}
-              onDone={(task) => void done(task)}
-              onLater={(task, day) => void later(task, day)}
-              onDelete={(task) => void remove(task)}
-            />
-          }
-        />
         <Route path="/tarea/:id" element={<TaskRoute onOpen={openTask} />} />
         <Route
-          path="/ajustes"
+          path="/cuenta"
           element={
             <Settings
               pushReady={pushReady}
@@ -224,6 +259,25 @@ export function App() {
         />
         <Route path="*" element={<Navigate to="/dia" replace />} />
       </Routes>
+      {habitOpen && (
+        <HabitSheet
+          onClose={() => setHabitOpen(false)}
+          onSave={async (name, nGoal) => {
+            await api.createHabit(name, nGoal)
+            loadLife()
+          }}
+        />
+      )}
+      {moneyOpen && money && (
+        <MoneySheet
+          money={money}
+          onClose={() => setMoneyOpen(false)}
+          onSave={async (input) => {
+            await api.createMovement(input)
+            loadLife()
+          }}
+        />
+      )}
       {sheet && lists && (
         <TaskSheet
           lists={lists}
@@ -264,7 +318,7 @@ function TaskRoute({ onOpen }: { onOpen: (task: Task) => void }) {
 function viewFor(path: string, sort: 'time' | 'manual') {
   if (path === '/dia' || path === '/') return 'view=myday'
   if (path === '/momento') return 'view=moment'
-  if (path === '/semana') return 'view=week'
+  if (path === '/tiempo' || path === '/semana') return 'view=week'
   const list = path.match(/^\/listas\/(\d+)/)
   if (list) return `listId=${list[1]}&sort=${sort}`
   return ''

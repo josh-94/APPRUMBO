@@ -1,3 +1,34 @@
+export function soles(cents: number) {
+  const sign = cents < 0 ? '−' : ''
+  const abs = Math.abs(cents) / 100
+  const formatted = new Intl.NumberFormat('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(abs)
+  return `${sign}S/ ${formatted}`
+}
+
+export function todayKey(date = new Date()) {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+export function displayName(email: string) {
+  const local = email.split('@')[0] || 'ahí'
+  const name = local.replace(/[._-]+/g, ' ').trim()
+  return name ? name.charAt(0).toUpperCase() + name.slice(1) : 'ahí'
+}
+
+export function weekChips(date = new Date()) {
+  const monday = new Date(date)
+  const delta = (monday.getDay() + 6) % 7
+  monday.setDate(monday.getDate() - delta)
+  const labels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie']
+  return labels.map((label, index) => {
+    const day = new Date(monday)
+    day.setDate(monday.getDate() + index)
+    return { label, day: day.getDate(), key: todayKey(day), today: todayKey(day) === todayKey(date) }
+  })
+}
+
 export function greeting(date = new Date()) {
   const hour = date.getHours()
   if (hour < 12) return 'Buenos días'

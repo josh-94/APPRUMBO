@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Opción 3: La R que avanza (Monograma geométrico + Vector directriz) -->
+  <!-- Tallo vertical estable -->
+  <rect x="140" y="176" width="48" height="192" rx="10" fill="#9E3714" />
+  <!-- Brazo / hombro de la r transformándose en flecha hacia el noreste -->
+  <path d="M164 256 C 164 190, 225 176, 276 176 C 316 176, 350 192, 372 216 L 372 152 L 408 152 L 408 252 L 308 252 L 344 216 C 326 202, 304 196, 276 196 C 242 196, 212 214, 212 256 L 212 368 L 164 368 Z" fill="#C2461F" />
+  <!-- Acento solar de dirección -->
+  <circle cx="390" cy="170" r="14" fill="#F4B860" />
+</svg>
