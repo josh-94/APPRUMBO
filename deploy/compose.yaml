@@ -69,8 +69,8 @@ services:
   web:
     image: ${HOY_WEB_IMAGE:-hoy-web:local}
     build:
-      context: ../apps/web
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/web/Dockerfile
     ports:
       - "8088:80"
     mem_limit: 64m
