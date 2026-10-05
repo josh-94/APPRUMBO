@@ -18,27 +18,16 @@
 
 * { box-sizing: border-box; }
 
-html, body, #root {
-  max-width: 100%;
-  overflow-x: clip;
-}
-
 body {
   margin: 0;
   min-height: 100dvh;
   background: var(--paper);
 }
 
-#root {
-  min-height: 100dvh;
-}
-
 button, input, textarea, select { font: inherit; color: inherit; }
 
 .app {
   width: min(480px, 100%);
-  max-width: 100%;
-  min-width: 0;
   min-height: 100dvh;
   margin: 0 auto;
   padding: calc(18px + env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom));
@@ -298,19 +287,9 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .panel h2 { margin: 0 0 8px; font-size: 1rem; }
 .panel p { margin: 0 0 12px; color: var(--muted); }
 
-.login {
-  display: grid;
-  align-content: center;
-  justify-items: stretch;
-  gap: 12px;
-  min-height: 100dvh;
-  min-width: 0;
-  max-width: min(480px, 100%);
-}
-.login > * { min-width: 0; max-width: 100%; }
-.login h1 { overflow-wrap: break-word; }
+.login { display: grid; align-content: center; gap: 12px; min-height: 100dvh; }
 .login-brand { display: flex; align-items: center; gap: 12px; }
-.login-brand img { width: 64px; height: 64px; flex: none; }
+.login-brand img { width: 64px; height: 64px; }
 .login-brand p {
   margin: 0;
   font-family: var(--rumbo-font-display);
