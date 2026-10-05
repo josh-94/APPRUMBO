@@ -129,7 +129,10 @@ export function App() {
   if (!authed) {
     return (
       <div className="app login">
-        <p className="eyebrow">RUMBO</p>
+        <div className="login-brand">
+          <img src="/logo.svg" alt="" width="64" height="64" />
+          <p>rumbo</p>
+        </div>
         <h1>Tu día y tu plata, con rumbo.</h1>
         <form onSubmit={(event) => void enter(event)}>
           <label className="field">

@@ -288,6 +288,16 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .panel p { margin: 0 0 12px; color: var(--muted); }
 
 .login { display: grid; align-content: center; gap: 12px; min-height: 100dvh; }
+.login-brand { display: flex; align-items: center; gap: 12px; }
+.login-brand img { width: 64px; height: 64px; }
+.login-brand p {
+  margin: 0;
+  font-family: var(--rumbo-font-display);
+  font-weight: 800;
+  font-size: 1.7rem;
+  letter-spacing: -0.04em;
+}
+.app-mark { width: 32px; height: 32px; display: block; }
 .login form { display: grid; gap: 12px; }
 .text-button { justify-self: start; padding: 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; }
 .google {

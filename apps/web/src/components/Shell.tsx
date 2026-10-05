@@ -45,6 +45,8 @@ export function Shell({ title, eyebrow, back, action, tabs, children }: Props) {
             <NavLink className="icon-btn" to={back} aria-label="Volver">
               ←
             </NavLink>
+          ) : tabs ? (
+            <img className="app-mark" src="/logo.svg" alt="Rumbo" width="32" height="32" />
           ) : (
             <span />
           )}
