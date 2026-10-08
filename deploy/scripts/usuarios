@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Consulta usuarios registrados en Postgres.
+#   usuarios         últimos 7 días
+#   usuarios hoy     desde medianoche en APP_TIMEZONE
+#   usuarios 30      últimos 30 días
+#   usuarios todos   los 200 más recientes
+set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+require_linux
+
+usage() {
+  echo "Uso: rumbo usuarios [hoy | todos | N]"
+  echo "  sin argumentos   últimos 7 días"
+  echo "  hoy              registrados hoy, en la zona de APP_TIMEZONE"
+  echo "  30               últimos 30 días"
+  echo "  todos            los 200 más recientes"
+}
+
+modo="dias"
+dias="7"
+case "${1:-}" in
+  -h|--help|ayuda) usage; exit 0 ;;
+  "" ) ;;
+  hoy|today) modo="hoy" ;;
+  todos|all) modo="todos" ;;
+  *)
+    if [[ "$1" =~ ^[0-9]+$ && "$1" -ge 1 && "$1" -le 3650 ]]; then
+      dias="$1"
+    else
+      usage >&2
+      exit 1
+    fi
+    ;;
+esac
+
+require_env
+ensure_docker
+tz="$(app_timezone)"
+
+case "$modo" in
+  hoy)
+    filtro="(u.created_at AT TIME ZONE :'tz')::date = (now() AT TIME ZONE :'tz')::date"
+    etiqueta="hoy ($tz)"
+    limite="200"
+    ;;
+  todos)
+    filtro="TRUE"
+    etiqueta="los más recientes"
+    limite="200"
+    ;;
+  *)
+    filtro="u.created_at >= now() - (:'dias' || ' days')::interval"
+    etiqueta="últimos $dias días ($tz)"
+    limite="200"
+    ;;
+esac
+
+resumen="$(compose exec -T postgres psql -X -U hoy -d hoy -v ON_ERROR_STOP=1 -tA -v tz="$tz" -v dias="$dias" -c \
+  "SELECT (SELECT count(*) FROM users), (SELECT count(*) FROM users u WHERE $filtro);")"
+resumen="${resumen//$'\r'/}"
+IFS='|' read -r total nuevos <<< "$resumen"
+
+echo "Usuarios registrados: ${total:-0}"
+if [[ "$modo" == "todos" ]]; then
+  if [[ "${total:-0}" == "0" ]]; then
+    echo "Todavía no hay usuarios."
+    exit 0
+  fi
+  if [[ "${total:-0}" -gt "$limite" ]]; then
+    echo "Muestro los $limite más recientes."
+  fi
+else
+  echo "Nuevos, $etiqueta: ${nuevos:-0}"
+  if [[ "${nuevos:-0}" == "0" ]]; then
+    echo "Nadie se registró en este periodo."
+    exit 0
+  fi
+fi
+
+echo
+compose exec -T postgres psql -X -U hoy -d hoy -v ON_ERROR_STOP=1 -P pager=off \
+  -v tz="$tz" -v dias="$dias" -c \
+  "SELECT u.id,
+          u.email,
+          to_char(u.created_at AT TIME ZONE :'tz', 'YYYY-MM-DD HH24:MI') AS registro,
+          COALESCE(NULLIF(concat_ws(', ',
+            CASE WHEN u.password_hash IS NOT NULL THEN 'correo' END,
+            string_agg(DISTINCT i.provider, ', ' ORDER BY i.provider)
+          ), ''), '—') AS acceso
+     FROM users u
+     LEFT JOIN user_identities i ON i.user_id = u.id
+    WHERE $filtro
+    GROUP BY u.id
+    ORDER BY max(u.created_at) DESC
+    LIMIT $limite;"

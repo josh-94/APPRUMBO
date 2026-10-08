@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# Baja lo último de GitHub y reconstruye las APIs y el resto del stack.
+#   publicar
+set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+require_linux
+
+case "${1:-}" in
+  -h|--help|ayuda)
+    echo "Uso: rumbo publicar"
+    echo "Baja la rama actual con fast-forward y reconstruye api, worker, web"
+    echo "y, si hay túnel, cloudflared. Postgres y Redis siguen si no cambiaron."
+    exit 0
+    ;;
+  "") ;;
+  *)
+    echo "Uso: rumbo publicar" >&2
+    exit 1
+    ;;
+esac
+
+require_env
+ensure_docker
+cd "$ROOT"
+
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "No encuentro el repositorio git en $ROOT." >&2
+  exit 1
+fi
+
+branch="$(git rev-parse --abbrev-ref HEAD)"
+if [[ "$branch" == "HEAD" ]]; then
+  echo "El repo está en detached HEAD. Haz checkout de la rama de producción." >&2
+  exit 1
+fi
+
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "Hay cambios locales en el servidor. No bajo código para no pisarlos." >&2
+  git status --short >&2
+  exit 1
+fi
+
+echo "Rumbo · publicar"
+echo "Rama: $branch"
+echo "Bajando de GitHub…"
+git fetch --prune origin
+
+upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+if [[ -z "$upstream" ]]; then
+  upstream="origin/$branch"
+fi
+if ! git rev-parse --verify --quiet "$upstream" >/dev/null; then
+  echo "No existe $upstream. Revisa el remote y la rama." >&2
+  exit 1
+fi
+
+incoming="$(git log --oneline "HEAD..$upstream" || true)"
+if [[ -n "$incoming" ]]; then
+  echo "Entran estos commits:"
+  echo "$incoming"
+else
+  echo "Sin commits nuevos. Igual reconstruyo y reinicio los contenedores."
+fi
+
+git merge --ff-only "$upstream"
+echo "Quedó en: $(git log -1 --oneline)"
+echo
+
+profiles=()
+if tunnel_configurado; then
+  profiles=(--profile tunnel)
+  echo "Reconstruyendo api, worker, web y el túnel. En la placa puede tardar unos minutos."
+else
+  echo "Reconstruyendo api, worker y web. En la placa puede tardar unos minutos."
+fi
+
+if [[ ${#profiles[@]} -gt 0 ]]; then
+  compose "${profiles[@]}" up -d --build
+else
+  compose up -d --build
+fi
+
+echo
+echo "Esperando la API…"
+listo=0
+for ((i = 1; i <= 30; i++)); do
+  id="$(compose ps -q api || true)"
+  if [[ -n "$id" ]]; then
+    estado="$(docker_cli inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$id" 2>/dev/null || true)"
+    if [[ "$estado" == "healthy" ]]; then
+      listo=1
+      break
+    fi
+  fi
+  sleep 2
+done
+
+if [[ "$listo" -eq 1 ]]; then
+  echo "API lista."
+else
+  echo "La API no llegó a healthy. Últimas líneas del log:" >&2
+  compose logs --tail 40 api >&2 || true
+  exit 1
+fi
+
+echo
+compose ps --format 'table {{.Service}}\t{{.Status}}\t{{.Ports}}'

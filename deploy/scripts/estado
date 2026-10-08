@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+# CPU, vatios y RAM del servidor, más el estado de los contenedores.
+#   estado
+set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+require_linux
+
+case "${1:-}" in
+  -h|--help|ayuda)
+    echo "Uso: rumbo estado"
+    echo "Mide un segundo de CPU, lee RAM y, si el kernel lo expone, los vatios del procesador."
+    exit 0
+    ;;
+  "") ;;
+  *)
+    echo "Uso: rumbo estado" >&2
+    exit 1
+    ;;
+esac
+
+USE_SUDO_POWER=0
+
+cat_sys() {
+  local f="$1"
+  if [[ -r "$f" ]]; then
+    cat "$f"
+    return 0
+  fi
+  if [[ "$USE_SUDO_POWER" == "1" ]]; then
+    sudo cat "$f"
+    return 0
+  fi
+  sudo -n cat "$f" 2>/dev/null
+}
+
+preparar_potencia() {
+  local namef archivo
+  while IFS= read -r namef; do
+    [[ -n "$namef" ]] || continue
+    archivo="${namef%/name}/energy_uj"
+    if [[ -e "$archivo" && ! -r "$archivo" ]]; then
+      echo "Para leer los vatios hace falta sudo."
+      sudo -v
+      USE_SUDO_POWER=1
+      return 0
+    fi
+  done < <(find /sys/class/powercap -name name 2>/dev/null || true)
+}
+
+# Imprime las rutas energy_uj de los dominios package, una por línea.
+rapl_archivos() {
+  local namef nombre
+  while IFS= read -r namef; do
+    [[ -n "$namef" ]] || continue
+    nombre="$(cat_sys "$namef" 2>/dev/null || true)"
+    nombre="${nombre//$'\n'/}"
+    case "$nombre" in
+      package-*|pkg|pkg-*)
+        echo "${namef%/name}/energy_uj"
+        ;;
+    esac
+  done < <(find /sys/class/powercap -name name 2>/dev/null || true)
+}
+
+suma_uj() {
+  local f val total="0"
+  for f in "$@"; do
+    val="$(cat_sys "$f" 2>/dev/null || true)"
+    val="${val//$'\n'/}"
+    [[ "$val" =~ ^[0-9]+$ ]] || return 1
+    total="$(awk -v a="$total" -v b="$val" 'BEGIN { printf "%.0f", a + b }')"
+  done
+  printf '%s' "$total"
+}
+
+muestra_cpu() {
+  awk '/^cpu / { print $2+$3+$4+$5+$6+$7+$8+$9, $5+$6 }' /proc/stat
+}
+
+fmt_kb() {
+  awk -v kb="$1" 'BEGIN {
+    if (kb >= 1048576) printf "%.1f GiB", kb / 1048576
+    else if (kb >= 1024) printf "%.0f MiB", kb / 1024
+    else printf "%d KiB", kb
+  }'
+}
+
+cpu_modelo() {
+  local m=""
+  m="$(awk -F: '/^model name/ { gsub(/^[ \t]+/, "", $2); print $2; exit }' /proc/cpuinfo)"
+  if [[ -z "$m" && -r /proc/device-tree/model ]]; then
+    m="$(tr -d '\0' < /proc/device-tree/model)"
+  fi
+  printf '%s' "$m"
+}
+
+hwmon_vatios() {
+  local f dir nombre uw mejor="" mejor_prio=9 prio
+  for f in /sys/class/hwmon/hwmon*/power*_average /sys/class/hwmon/hwmon*/power*_input; do
+    [[ -e "$f" ]] || continue
+    dir="$(dirname "$f")"
+    nombre="$(cat "$dir/name" 2>/dev/null || echo sensor)"
+    uw="$(cat_sys "$f" 2>/dev/null || true)"
+    uw="${uw//$'\n'/}"
+    [[ "$uw" =~ ^[0-9]+$ ]] || continue
+    awk -v u="$uw" 'BEGIN { exit !(u > 0) }' || continue
+    prio=5
+    case "$nombre" in
+      *ppt*|*package*|*rapl*|*zenpower*|*fam15h*) prio=1 ;;
+    esac
+    if [[ -z "$mejor" || "$prio" -lt "$mejor_prio" ]]; then
+      mejor="$(awk -v u="$uw" -v n="$nombre" 'BEGIN { printf "%.1f|%s", u / 1000000, n }')"
+      mejor_prio="$prio"
+    fi
+  done
+  [[ -n "$mejor" ]] || return 1
+  printf '%s\n' "$mejor"
+}
+
+preparar_potencia
+
+mapfile -t rapl < <(rapl_archivos || true)
+e1=""
+if [[ ${#rapl[@]} -gt 0 ]]; then
+  e1="$(suma_uj "${rapl[@]}" || true)"
+fi
+read -r cpu_total1 cpu_idle1 <<< "$(muestra_cpu)"
+t1="$(date +%s%N)"
+
+echo "Midiendo 1 segundo…"
+sleep 1
+
+e2=""
+if [[ ${#rapl[@]} -gt 0 && -n "$e1" ]]; then
+  e2="$(suma_uj "${rapl[@]}" || true)"
+fi
+read -r cpu_total2 cpu_idle2 <<< "$(muestra_cpu)"
+t2="$(date +%s%N)"
+
+cpu_pct="$(awk -v a="$cpu_total1" -v b="$cpu_total2" -v c="$cpu_idle1" -v d="$cpu_idle2" 'BEGIN {
+  dt = b - a
+  if (dt <= 0) { printf "0.0"; exit }
+  printf "%.1f", (dt - (d - c)) / dt * 100
+}')"
+
+vatios=""
+fuente=""
+if [[ -n "$e1" && -n "$e2" ]]; then
+  vatios="$(awk -v a="$e1" -v b="$e2" -v t1="$t1" -v t2="$t2" 'BEGIN {
+    dt = (t2 - t1) / 1000000000
+    if (dt <= 0) exit
+    d = b - a
+    if (d < 0) exit
+    printf "%.1f", d / 1000000 / dt
+  }')"
+  if [[ -n "$vatios" ]]; then
+    fuente="CPU package (RAPL). No incluye disco, ventiladores ni la fuente."
+  fi
+fi
+if [[ -z "$vatios" ]]; then
+  hwmon="$(hwmon_vatios || true)"
+  if [[ -n "$hwmon" ]]; then
+    vatios="${hwmon%%|*}"
+    fuente="sensor ${hwmon#*|}"
+  fi
+fi
+
+mem_total="$(awk '/^MemTotal:/ { print $2 }' /proc/meminfo)"
+mem_avail="$(awk '/^MemAvailable:/ { print $2 }' /proc/meminfo)"
+swap_total="$(awk '/^SwapTotal:/ { print $2 }' /proc/meminfo)"
+swap_free="$(awk '/^SwapFree:/ { print $2 }' /proc/meminfo)"
+mem_used="$((mem_total - mem_avail))"
+mem_pct="$(awk -v u="$mem_used" -v t="$mem_total" 'BEGIN { if (t <= 0) printf "0"; else printf "%.0f", u / t * 100 }')"
+load="$(awk '{ print $1, $2, $3 }' /proc/loadavg)"
+nucleos="$(nproc)"
+modelo="$(cpu_modelo)"
+host="$(hostname)"
+encendido="$(uptime -p 2>/dev/null || uptime)"
+
+echo
+echo "$host · $encendido"
+if [[ -n "$modelo" ]]; then
+  echo "$modelo"
+fi
+echo
+printf 'CPU        %s %%    %s núcleos · carga %s\n' "$cpu_pct" "$nucleos" "$load"
+printf 'RAM        %s / %s usados (%s %%) · %s disponibles\n' \
+  "$(fmt_kb "$mem_used")" "$(fmt_kb "$mem_total")" "$mem_pct" "$(fmt_kb "$mem_avail")"
+if [[ "${swap_total:-0}" -gt 0 ]]; then
+  swap_used="$((swap_total - swap_free))"
+  printf 'Swap       %s / %s usados\n' "$(fmt_kb "$swap_used")" "$(fmt_kb "$swap_total")"
+fi
+if [[ -n "$vatios" ]]; then
+  printf 'Potencia   %s W    %s\n' "$vatios" "$fuente"
+else
+  echo "Potencia   sin sensor en este equipo (el kernel no expone RAPL ni un medidor de la placa)."
+fi
+
+echo
+echo "Contenedores"
+if [[ ! -f "$ROOT/deploy/.env" ]]; then
+  echo "Sin deploy/.env, no miro el stack."
+  exit 0
+fi
+if ! compose ps --format 'table {{.Service}}\t{{.Status}}\t{{.Ports}}'; then
+  echo "No pude hablar con Docker." >&2
+  exit 1
+fi

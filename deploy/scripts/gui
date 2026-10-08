@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Apaga o prende la interfaz gráfica del servidor.
+#   gui            estado
+#   gui off        apaga ahora y en el próximo arranque
+#   gui on         prende ahora y en el próximo arranque
+set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+require_linux
+
+gui_status() {
+  local def activo
+  def="$(systemctl get-default 2>/dev/null || echo desconocido)"
+  if systemctl is-active --quiet graphical.target; then
+    activo="prendida"
+  else
+    activo="apagada"
+  fi
+  echo "Interfaz gráfica: $activo"
+  echo "Al arrancar: $def"
+}
+
+gui_set() {
+  local modo="$1"
+  local target
+  if [[ "$modo" == "on" ]]; then
+    target="graphical.target"
+  else
+    target="multi-user.target"
+  fi
+
+  if ! command -v systemctl >/dev/null 2>&1; then
+    echo "Este servidor no usa systemd." >&2
+    exit 1
+  fi
+
+  if [[ "$modo" == "on" ]]; then
+    if ! systemctl list-unit-files --type=service --no-legend 2>/dev/null \
+      | grep -Eq '^(gdm|gdm3|sddm|lightdm|lxdm|greetd)\.service'; then
+      echo "No hay un escritorio instalado (gdm, sddm, lightdm u otro)." >&2
+      exit 1
+    fi
+  fi
+
+  if [[ "$modo" == "off" && -n "${DISPLAY:-${WAYLAND_DISPLAY:-}}" ]]; then
+    echo "Estás dentro de la sesión gráfica. Si la apagas, esta pantalla se cierra."
+    echo "Entra por SSH y ejecuta: rumbo gui off"
+    if [[ ! -t 0 ]]; then
+      exit 1
+    fi
+    local resp
+    read -r -p "¿Apagarla igual? [s/N] " resp
+    case "$resp" in
+      s|S|si|sí) ;;
+      *) echo "Cancelado."; exit 1 ;;
+    esac
+  fi
+
+  echo "Paso la interfaz a $target (ahora y en el próximo arranque)."
+  sudo systemctl set-default "$target"
+  sudo systemctl isolate "$target"
+  echo
+  gui_status
+}
+
+case "${1:-}" in
+  on|prender|encender) gui_set on ;;
+  off|apagar) gui_set off ;;
+  estado|status|"") gui_status ;;
+  -h|--help|ayuda)
+    echo "Uso: rumbo gui [on|off]"
+    echo "  sin argumentos   dice si la interfaz está prendida"
+    echo "  off              la apaga y deja el arranque en consola"
+    echo "  on               la prende y deja el arranque con escritorio"
+    ;;
+  *)
+    echo "Uso: rumbo gui [on|off]" >&2
+    exit 1
+    ;;
+esac

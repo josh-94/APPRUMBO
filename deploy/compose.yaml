@@ -1,4 +1,5 @@
 # RUMBO en la placa. El uso está en el README.
+# Consola, por SSH: deploy/scripts/rumbo  (gui, publicar, usuarios, estado)
 # Copiar deploy/.env.example a deploy/.env y cambiar contraseñas.
 # Llaves de notificaciones: docker compose --env-file deploy/.env -f deploy/compose.yaml run --rm --no-deps api vapid
 # Túnel de Cloudflare: mi.apprumbo.online y apprumbo.online -> http://web:80

@@ -1,5 +1,6 @@
 .env
 deploy/.env
+hoy-python.tar
 apps/web/node_modules
 apps/web/dist
 apps/web/dev-dist

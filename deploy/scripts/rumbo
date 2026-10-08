@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Atajo de consola para el servidor de Rumbo.
+#   rumbo gui off
+#   rumbo publicar
+#   rumbo usuarios
+#   rumbo estado
+set -euo pipefail
+
+dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cmd="${1:-ayuda}"
+if [[ "$#" -gt 0 ]]; then
+  shift
+fi
+
+case "$cmd" in
+  gui|publicar|usuarios|estado)
+    exec "$dir/$cmd" "$@"
+    ;;
+  ayuda|help|-h|--help)
+    cat <<'EOF'
+Comandos de consola, en el servidor por SSH:
+
+  rumbo gui              dice si la interfaz gráfica está prendida
+  rumbo gui off          la apaga ahora y en el próximo arranque
+  rumbo gui on           la vuelve a prender
+
+  rumbo publicar         baja GitHub y reconstruye las APIs y Docker
+
+  rumbo usuarios         registros de los últimos 7 días
+  rumbo usuarios hoy     los de hoy
+  rumbo usuarios 30      últimos 30 días
+  rumbo usuarios todos   los más recientes
+
+  rumbo estado           CPU, vatios y RAM
+
+La primera vez, en el servidor y desde la carpeta del repo:
+
+  chmod +x deploy/scripts/rumbo deploy/scripts/gui deploy/scripts/publicar deploy/scripts/usuarios deploy/scripts/estado
+  sudo ln -sf "$(pwd)/deploy/scripts/rumbo" /usr/local/bin/rumbo
+
+El primer cambio hay que bajarlo a mano (git pull). Después basta con rumbo publicar.
+EOF
+    ;;
+  *)
+    echo "No conozco '$cmd'. Prueba: rumbo ayuda" >&2
+    exit 1
+    ;;
+esac
