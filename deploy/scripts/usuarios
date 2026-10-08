@@ -39,7 +39,7 @@ tz="$(app_timezone)"
 
 case "$modo" in
   hoy)
-    filtro="(u.created_at AT TIME ZONE :'tz')::date = (now() AT TIME ZONE :'tz')::date"
+    filtro="(u.created_at AT TIME ZONE '$tz')::date = (now() AT TIME ZONE '$tz')::date"
     etiqueta="hoy ($tz)"
     limite="200"
     ;;
@@ -49,15 +49,23 @@ case "$modo" in
     limite="200"
     ;;
   *)
-    filtro="u.created_at >= now() - (:'dias' || ' days')::interval"
+    filtro="u.created_at >= now() - make_interval(days => $dias)"
     etiqueta="últimos $dias días ($tz)"
     limite="200"
     ;;
 esac
 
-resumen="$(compose exec -T postgres psql -X -U hoy -d hoy -v ON_ERROR_STOP=1 -tA -v tz="$tz" -v dias="$dias" -c \
-  "SELECT (SELECT count(*) FROM users), (SELECT count(*) FROM users u WHERE $filtro);")"
+if ! resumen="$(compose exec -T postgres psql -X -U hoy -d hoy -v ON_ERROR_STOP=1 -tA -c \
+  "SELECT (SELECT count(*) FROM users), (SELECT count(*) FROM users u WHERE $filtro);")"; then
+  echo "No pude consultar Postgres." >&2
+  exit 1
+fi
 resumen="${resumen//$'\r'/}"
+resumen="${resumen//$'\n'/}"
+if [[ ! "$resumen" =~ ^[0-9]+\|[0-9]+$ ]]; then
+  echo "Postgres no devolvió el conteo." >&2
+  exit 1
+fi
 IFS='|' read -r total nuevos <<< "$resumen"
 
 echo "Usuarios registrados: ${total:-0}"
@@ -78,11 +86,10 @@ else
 fi
 
 echo
-compose exec -T postgres psql -X -U hoy -d hoy -v ON_ERROR_STOP=1 -P pager=off \
-  -v tz="$tz" -v dias="$dias" -c \
+compose exec -T postgres psql -X -U hoy -d hoy -v ON_ERROR_STOP=1 -P pager=off -c \
   "SELECT u.id,
           u.email,
-          to_char(u.created_at AT TIME ZONE :'tz', 'YYYY-MM-DD HH24:MI') AS registro,
+          to_char(u.created_at AT TIME ZONE '$tz', 'YYYY-MM-DD HH24:MI') AS registro,
           COALESCE(NULLIF(concat_ws(', ',
             CASE WHEN u.password_hash IS NOT NULL THEN 'correo' END,
             string_agg(DISTINCT i.provider, ', ' ORDER BY i.provider)

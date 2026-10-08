@@ -6,7 +6,9 @@
 #   rumbo estado
 set -euo pipefail
 
-dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# readlink sigue el enlace de /usr/local/bin/rumbo hasta deploy/scripts.
+script="$(readlink -f "${BASH_SOURCE[0]}")"
+dir="$(cd "$(dirname "$script")" && pwd)"
 cmd="${1:-ayuda}"
 if [[ "$#" -gt 0 ]]; then
   shift
