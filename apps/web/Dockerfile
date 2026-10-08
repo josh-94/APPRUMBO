@@ -9,7 +9,7 @@ COPY docs/marca/tokens.css ./docs/marca/tokens.css
 WORKDIR /repo/apps/web
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM nginx:1.31-alpine
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 COPY apps/web/landing /usr/share/nginx/landing
