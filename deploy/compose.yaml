@@ -1,7 +1,8 @@
 # RUMBO en la placa. El uso está en el README.
 # Copiar deploy/.env.example a deploy/.env y cambiar contraseñas.
 # Llaves de notificaciones: docker compose --env-file deploy/.env -f deploy/compose.yaml run --rm --no-deps api vapid
-# Túnel de Cloudflare: hostname app.codewithjosh.codes -> http://web:80
+# Túnel de Cloudflare: mi.apprumbo.online y apprumbo.online -> http://web:80
+# www.apprumbo.online redirige al apex. app.codewithjosh.codes ya no se publica.
 # Arranque local: docker compose --env-file deploy/.env -f deploy/compose.yaml --profile local up --build
 # Arranque con túnel: docker compose --env-file deploy/.env -f deploy/compose.yaml --profile tunnel up -d
 

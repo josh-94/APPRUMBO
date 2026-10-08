@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112.6" ry="112.6" fill="#2A3932"/>
+  <defs>
+    <linearGradient id="rumbo-aleta-icono" x1="0" y1="239" x2="0" y2="429" gradientUnits="userSpaceOnUse" gradientTransform="translate(10.8 8.9) scale(0.9635)">
+      <stop offset="0" stop-color="#0A8559"/>
+      <stop offset="1" stop-color="#0CC97D"/>
+    </linearGradient>
+  </defs>
+  <g stroke-linejoin="round" transform="translate(10.8 8.9) scale(0.9635)">
+    <path d="M 347 128 L 372 261 L 172 308 L 136 237 Z" fill="#17F296" stroke="#17F296" stroke-width="72"/>
+    <path d="M 377 279 L 259 389 L 257 282 Z" fill="url(#rumbo-aleta-icono)" stroke="url(#rumbo-aleta-icono)" stroke-width="63"/>
+  </g>
+</svg>
