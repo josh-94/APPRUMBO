@@ -33,6 +33,21 @@ cat_sys() {
   sudo -n cat "$f" 2>/dev/null
 }
 
+# /sys/class/powercap/intel-rapl:0 es un enlace. find no entra ahí;
+# el glob sí, que es como Mission Center abre el contador.
+powercap_nombres() {
+  local f
+  for f in \
+    /sys/class/powercap/*/name \
+    /sys/class/powercap/*/*/name \
+    /sys/devices/virtual/powercap/*/name \
+    /sys/devices/virtual/powercap/*/*/name
+  do
+    [[ -f "$f" ]] || continue
+    printf '%s\n' "$f"
+  done
+}
+
 preparar_potencia() {
   local namef archivo
   while IFS= read -r namef; do
@@ -44,22 +59,26 @@ preparar_potencia() {
       USE_SUDO_POWER=1
       return 0
     fi
-  done < <(find /sys/class/powercap -name name 2>/dev/null || true)
+  done < <(powercap_nombres)
 }
 
 # Imprime las rutas energy_uj de los dominios package, una por línea.
 rapl_archivos() {
-  local namef nombre
+  local namef nombre real
+  local -A seen=()
   while IFS= read -r namef; do
     [[ -n "$namef" ]] || continue
     nombre="$(cat_sys "$namef" 2>/dev/null || true)"
-    nombre="${nombre//$'\n'/}"
+    nombre="${nombre//[[:space:]]/}"
     case "$nombre" in
-      package-*|pkg|pkg-*)
-        echo "${namef%/name}/energy_uj"
-        ;;
+      package-*|pkg|pkg-*) ;;
+      *) continue ;;
     esac
-  done < <(find /sys/class/powercap -name name 2>/dev/null || true)
+    real="$(readlink -f "${namef%/name}/energy_uj" 2>/dev/null || true)"
+    [[ -n "$real" && -z "${seen[$real]:-}" ]] || continue
+    seen["$real"]=1
+    printf '%s\n' "$real"
+  done < <(powercap_nombres)
 }
 
 suma_uj() {
