@@ -167,6 +167,7 @@ export function App() {
           <a href="/privacidad">Privacidad</a>
           <a href="/condiciones">Condiciones</a>
         </p>
+        <p className="login-copy">© 2026 Rumbo</p>
       </div>
     )
   }

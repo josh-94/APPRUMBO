@@ -368,6 +368,7 @@ details p { padding: 0 0 16px; color: var(--slate); max-width: 46rem; }
   padding: 36px 0 48px;
 }
 .site-footer p { margin-top: 12px; color: var(--slate); }
+.site-footer .legal { grid-column: 1 / -1; margin: 8px 0 0; font-size: 0.85rem; }
 .site-footer h2 {
   margin-bottom: 10px;
   font-family: Inter, sans-serif;

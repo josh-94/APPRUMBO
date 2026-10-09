@@ -100,6 +100,7 @@ export function Settings({ pushReady, onLogout }: { pushReady: boolean; onLogout
       <button type="button" className="ghost" onClick={onLogout}>
         Salir
       </button>
+      <p className="hint">© 2026 Rumbo</p>
     </Shell>
   )
 }
