@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api'
+import { hideOnOpen, setHideOnOpen } from '../components/HideMoney'
 import { Shell } from '../components/Shell'
 
 function iosDevice() {
@@ -25,6 +26,7 @@ function keyBytes(value: string) {
 export function Settings({ pushReady, onLogout }: { pushReady: boolean; onLogout: () => void }) {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [hideBalance, setHideBalance] = useState(hideOnOpen)
 
   async function download() {
     setError('')
@@ -74,6 +76,22 @@ export function Settings({ pushReady, onLogout }: { pushReady: boolean; onLogout
 
   return (
     <Shell title="Cuenta" tabs>
+      <section className="panel">
+        <h2>Saldo</h2>
+        <label className="checkline">
+          <input
+            type="checkbox"
+            checked={hideBalance}
+            onChange={(event) => {
+              const next = event.target.checked
+              setHideBalance(next)
+              setHideOnOpen(next)
+            }}
+          />
+          Ocultar el saldo al abrir
+        </label>
+        <p className="hint">El ojo de Tu mes lo muestra solo en esta visita.</p>
+      </section>
       <section className="panel">
         <h2>En el teléfono</h2>
         {iosDevice() ? (

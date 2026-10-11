@@ -286,6 +286,8 @@ button, input, textarea, select { font: inherit; color: inherit; }
 }
 .panel h2 { margin: 0 0 8px; font-size: 1rem; }
 .panel p { margin: 0 0 12px; color: var(--muted); }
+.panel .checkline { margin: 0 0 8px; color: var(--ink); }
+.panel .checkline input { width: auto; }
 
 .login { display: grid; align-content: center; gap: 12px; min-height: 100dvh; }
 .login-brand { display: flex; align-items: center; gap: 12px; }
@@ -372,6 +374,24 @@ button, input, textarea, select { font: inherit; color: inherit; }
   padding: 18px;
   margin: 8px 0 16px;
 }
+.summary-top, .headline-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.summary-top .label { margin: 0; }
+.headline-row { margin-bottom: 12px; }
+.headline-row .headline { flex: 1; }
+.eye {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  margin: -6px -6px 0 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
 .summary .label {
   color: var(--rumbo-color-secondary);
   letter-spacing: 0.08em;
@@ -393,6 +413,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
   box-shadow: var(--rumbo-shadow-sm);
 }
 .money-row.ingreso strong { color: var(--rumbo-color-primary); }
+button.plan-row { width: 100%; border: 0; text-align: left; cursor: pointer; color: inherit; }
 .habit button { border: 0; background: transparent; cursor: pointer; font-weight: 700; color: var(--accent); }
 .dots { display: flex; gap: 4px; margin-top: 4px; }
 .dots span { width: 8px; height: 8px; border-radius: 99px; background: var(--line); }

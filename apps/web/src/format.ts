@@ -1,3 +1,21 @@
+export function parseCents(raw: string) {
+  const cleaned = raw.trim().replace(',', '.')
+  if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return 0
+  const [whole, frac = ''] = cleaned.split('.')
+  return Number(whole) * 100 + Number((frac + '00').slice(0, 2))
+}
+
+export function centsToInput(cents: number) {
+  if (!cents) return ''
+  return (cents / 100).toFixed(2)
+}
+
+export function dolares(cents: number) {
+  const abs = Math.abs(cents) / 100
+  const formatted = new Intl.NumberFormat('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(abs)
+  return `$ ${formatted}`
+}
+
 export function soles(cents: number) {
   const sign = cents < 0 ? '−' : ''
   const abs = Math.abs(cents) / 100

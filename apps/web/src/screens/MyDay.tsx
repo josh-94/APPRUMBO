@@ -2,6 +2,7 @@ import type { Habit, MonthMoney, Task } from '../types'
 import { displayName, soles, weekChips } from '../format'
 import { Shell } from '../components/Shell'
 import { TaskRow } from '../components/TaskRow'
+import { EyeButton, useHideMoney } from '../components/HideMoney'
 
 type Props = {
   email: string
@@ -35,6 +36,7 @@ export function MyDay({
   const open = tasks?.filter((task) => task.status === 'open') ?? []
   const chips = weekChips()
   const name = displayName(email)
+  const { hidden, toggle } = useHideMoney()
 
   return (
     <Shell tabs>
@@ -52,8 +54,11 @@ export function MyDay({
         <button type="button" className="quick-card" onClick={onCreateHabit}><i>o</i>Hábitos</button>
       </div>
       <section className="summary">
-        <p className="label">Tu mes</p>
-        <strong>{moneyLine(money)}</strong>
+        <div className="summary-top">
+          <p className="label">Tu mes</p>
+          <EyeButton hidden={hidden} onToggle={toggle} />
+        </div>
+        <strong>{moneyLine(money, hidden)}</strong>
         <p>{money && money.incomeCents > 0 ? 'Ingresos menos gastos de este mes.' : 'Anota un ingreso para ver cuánto te queda.'}</p>
       </section>
       <div className="week-row">
@@ -107,8 +112,9 @@ function today() {
   return `${date.getFullYear()}-${month}-${day}`
 }
 
-function moneyLine(money: MonthMoney | null) {
+function moneyLine(money: MonthMoney | null, hidden: boolean) {
   if (!money) return '…'
+  if (hidden && (money.spentCents > 0 || money.incomeCents > 0)) return 'S/ ••••'
   if (money.incomeCents > 0 && money.remainingCents !== null) return `Te quedan ${soles(money.remainingCents)}`
   if (money.spentCents > 0) return `Llevas ${soles(money.spentCents)} gastados`
   return 'Aún sin movimientos'

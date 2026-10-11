@@ -187,7 +187,8 @@ func (s *Store) DeleteList(ctx context.Context, userID, id int64) error {
 func (s *Store) Tasks(ctx context.Context, userID int64, doneSince time.Time) ([]task.Task, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT t.id, t.list_id, t.title, t.notes, t.due_at, t.remind_at, t.status, t.pinned, t.position,
-		       t.repeat_weekdays, t.completed_at, t.created_at, t.updated_at
+		       t.repeat_weekdays, t.completed_at, t.created_at, t.updated_at,
+		       COALESCE(t.pay_kind, ''), COALESCE(t.pay_ref, 0)
 		FROM tasks t
 		JOIN lists l ON l.id = t.list_id
 		WHERE l.user_id = $1 AND (t.status = 'open' OR t.completed_at >= $2)
@@ -216,7 +217,8 @@ func (s *Store) CreateTask(ctx context.Context, userID int64, item task.Task) (t
 		FROM lists l
 		WHERE l.id = $1 AND l.user_id = $8
 		RETURNING id, list_id, title, notes, due_at, remind_at, status, pinned, position,
-		          repeat_weekdays, completed_at, created_at, updated_at`,
+		          repeat_weekdays, completed_at, created_at, updated_at,
+		          COALESCE(pay_kind, ''), COALESCE(pay_ref, 0)`,
 		item.ListID, item.Title, item.Notes, item.DueAt, item.RemindAt, item.Pinned, item.RepeatMask, userID)
 	got, err := scanTask(row)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -242,7 +244,8 @@ func (s *Store) UpdateTask(ctx context.Context, userID int64, item task.Task) (t
 		  AND list_id IN (SELECT id FROM lists WHERE user_id = $11)
 		  AND $2 IN (SELECT id FROM lists WHERE user_id = $11)
 		RETURNING id, list_id, title, notes, due_at, remind_at, status, pinned, position,
-		          repeat_weekdays, completed_at, created_at, updated_at`,
+		          repeat_weekdays, completed_at, created_at, updated_at,
+		          COALESCE(pay_kind, ''), COALESCE(pay_ref, 0)`,
 		item.ID, item.ListID, item.Title, item.Notes, item.DueAt, item.RemindAt,
 		item.Status, item.Pinned, item.RepeatMask, item.CompletedAt, userID)
 	got, err := scanTask(row)
@@ -393,7 +396,7 @@ func scanTask(row scanner) (task.Task, error) {
 	err := row.Scan(
 		&item.ID, &item.ListID, &item.Title, &item.Notes, &item.DueAt, &item.RemindAt,
 		&item.Status, &item.Pinned, &item.Position, &mask, &item.CompletedAt,
-		&item.CreatedAt, &item.UpdatedAt,
+		&item.CreatedAt, &item.UpdatedAt, &item.PayKind, &item.PayRef,
 	)
 	item.RepeatMask = int(mask)
 	return item, err

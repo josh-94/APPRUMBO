@@ -5,6 +5,7 @@ import { atLocalDate, todayKey } from './format'
 import type { Habit, MonthMoney, Task, TaskInput, TaskList } from './types'
 import { TaskSheet } from './components/TaskSheet'
 import { HabitSheet, MoneySheet } from './components/CaptureSheets'
+import { PayConfirm } from './components/PlanSheets'
 import { MyDay } from './screens/MyDay'
 import { Tiempo } from './screens/Tiempo'
 import { Plata } from './screens/Plata'
@@ -31,6 +32,7 @@ export function App() {
   const [sheet, setSheet] = useState<Sheet>(null)
   const [habitOpen, setHabitOpen] = useState(false)
   const [moneyOpen, setMoneyOpen] = useState(false)
+  const [payTask, setPayTask] = useState<Task | null>(null)
   const [accountEmail, setAccountEmail] = useState('')
   const [habits, setHabits] = useState<Habit[]>([])
   const [money, setMoney] = useState<MonthMoney | null>(null)
@@ -101,6 +103,10 @@ export function App() {
   }
 
   async function done(task: Task) {
+    if (task.payKind && task.payRef) {
+      setPayTask(task)
+      return
+    }
     await api.done(task.id)
     reloadTasks()
   }
@@ -268,6 +274,17 @@ export function App() {
           onClose={() => setHabitOpen(false)}
           onSave={async (name, nGoal) => {
             await api.createHabit(name, nGoal)
+            loadLife()
+          }}
+        />
+      )}
+      {payTask && (
+        <PayConfirm
+          task={payTask}
+          onClose={() => setPayTask(null)}
+          onSaved={() => {
+            setPayTask(null)
+            reloadTasks()
             loadLife()
           }}
         />

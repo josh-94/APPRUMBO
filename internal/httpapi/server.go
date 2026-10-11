@@ -67,6 +67,18 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/money/month", s.protected(s.moneyMonth))
 	mux.HandleFunc("POST /api/movements", s.protected(s.createMovement))
 	mux.HandleFunc("POST /api/categories", s.protected(s.createCategory))
+	mux.HandleFunc("GET /api/money/plan", s.protected(s.moneyPlan))
+	mux.HandleFunc("PUT /api/money/fx", s.protected(s.setFx))
+	mux.HandleFunc("POST /api/money/confirm", s.protected(s.confirmPay))
+	mux.HandleFunc("POST /api/accounts", s.protected(s.saveAccount))
+	mux.HandleFunc("PATCH /api/accounts/{id}", s.protected(s.saveAccount))
+	mux.HandleFunc("DELETE /api/accounts/{id}", s.protected(s.deleteAccount))
+	mux.HandleFunc("POST /api/debts", s.protected(s.saveDebt))
+	mux.HandleFunc("PATCH /api/debts/{id}", s.protected(s.saveDebt))
+	mux.HandleFunc("DELETE /api/debts/{id}", s.protected(s.deleteDebt))
+	mux.HandleFunc("POST /api/bills", s.protected(s.saveBill))
+	mux.HandleFunc("PATCH /api/bills/{id}", s.protected(s.saveBill))
+	mux.HandleFunc("DELETE /api/bills/{id}", s.protected(s.deleteBill))
 	mux.HandleFunc("GET /api/export", s.protected(s.exportData))
 	return mux
 }
@@ -295,6 +307,10 @@ func (s *Server) taskByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) tasks(w http.ResponseWriter, r *http.Request) {
+	if err := s.Store.EnsurePayTasks(r.Context(), currentUser(r), s.today(), s.Loc); err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudieron preparar los pagos")
+		return
+	}
 	since := schedule.StartOfDay(time.Now(), s.Loc).AddDate(0, 0, -14)
 	all, err := s.Store.Tasks(r.Context(), currentUser(r), since)
 	if err != nil {
@@ -579,6 +595,8 @@ func (s *Server) toTask(item task.Task) taskDTO {
 		CompletedAt:    item.CompletedAt,
 		Section:        string(schedule.SectionFor(item.DueAt, time.Now(), s.Loc)),
 		DueDay:         dueDay,
+		PayKind:        item.PayKind,
+		PayRef:         item.PayRef,
 	}
 }
 
@@ -638,6 +656,8 @@ type taskDTO struct {
 	CompletedAt    *time.Time `json:"completedAt"`
 	Section        string     `json:"section"`
 	DueDay         *string    `json:"dueDay"`
+	PayKind        string     `json:"payKind,omitempty"`
+	PayRef         int64      `json:"payRef,omitempty"`
 }
 
 func toList(list store.List) listDTO {

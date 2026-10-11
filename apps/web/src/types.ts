@@ -14,6 +14,8 @@ export type Task = {
   completedAt: string | null
   section: Section
   dueDay: string | null
+  payKind?: string
+  payRef?: number
 }
 
 export type TaskInput = {
@@ -47,6 +49,30 @@ export type Movement = {
   accountName: string
   category: string
   note: string
+}
+
+export type PayAccount = { id: number; name: string; payday: number; paydayCents: number }
+export type Debt = {
+  id: number
+  kind: 'tarjeta' | 'prestamo'
+  name: string
+  balancePen: number
+  balanceUsd: number
+  cuotaPen: number
+  cuotaUsd: number
+  dueDay: number
+  currency: 'pen' | 'usd'
+}
+export type Bill = { id: number; name: string; amountCents: number; dueDay: number; categoryId: number; category: string }
+export type MoneyPlan = {
+  fxHundredths: number
+  accounts: PayAccount[]
+  debts: Debt[]
+  bills: Bill[]
+  debtPen: number
+  debtUsd: number
+  debtTotalPen: number
+  cuotaTotalPen: number
 }
 
 export type MonthMoney = {

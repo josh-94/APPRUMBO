@@ -27,6 +27,8 @@ type Task struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	WantRemind  bool
+	PayKind     string
+	PayRef      int64
 }
 
 type ValidationError struct{ Message string }
