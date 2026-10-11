@@ -280,6 +280,11 @@ export function App() {
             await api.createMovement(input)
             loadLife()
           }}
+          onCreateCategory={async (name, kind) => {
+            const category = await api.createCategory(name, kind)
+            loadLife()
+            return category
+          }}
         />
       )}
       {sheet && lists && (

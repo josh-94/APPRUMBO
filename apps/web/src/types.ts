@@ -46,6 +46,7 @@ export type Movement = {
   occurredOn: string
   accountName: string
   category: string
+  note: string
 }
 
 export type MonthMoney = {

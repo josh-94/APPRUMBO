@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -41,6 +42,7 @@ type Movement struct {
 	OccurredOn  string `json:"occurredOn"`
 	AccountName string `json:"accountName"`
 	Category    string `json:"category"`
+	Note        string `json:"note"`
 }
 
 type MonthSummary struct {
@@ -230,7 +232,7 @@ func (s *Store) categories(ctx context.Context, userID int64) ([]Category, error
 func (s *Store) movements(ctx context.Context, userID int64, from, to time.Time) ([]Movement, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT m.id, m.account_id, COALESCE(m.category_id, 0), m.kind, m.amount_cents,
-		       to_char(m.occurred_on, 'YYYY-MM-DD'), a.name, COALESCE(c.name, '')
+		       to_char(m.occurred_on, 'YYYY-MM-DD'), a.name, COALESCE(c.name, ''), COALESCE(m.note, '')
 		FROM movements m
 		JOIN accounts a ON a.id = m.account_id
 		LEFT JOIN categories c ON c.id = m.category_id
@@ -243,7 +245,7 @@ func (s *Store) movements(ctx context.Context, userID int64, from, to time.Time)
 	var out []Movement
 	for rows.Next() {
 		var item Movement
-		if err := rows.Scan(&item.ID, &item.AccountID, &item.CategoryID, &item.Kind, &item.AmountCents, &item.OccurredOn, &item.AccountName, &item.Category); err != nil {
+		if err := rows.Scan(&item.ID, &item.AccountID, &item.CategoryID, &item.Kind, &item.AmountCents, &item.OccurredOn, &item.AccountName, &item.Category, &item.Note); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -258,6 +260,11 @@ func (s *Store) CreateMovement(ctx context.Context, userID int64, item Movement,
 	if item.AmountCents <= 0 || (item.Kind != "gasto" && item.Kind != "ingreso") {
 		return Movement{}, ErrBadMoney
 	}
+	note, err := cleanLabel(item.Note, 80)
+	if err != nil {
+		return Movement{}, err
+	}
+	item.Note = note
 	var accountOwner int64
 	if err := s.pool.QueryRow(ctx, `SELECT user_id FROM accounts WHERE id = $1`, item.AccountID).Scan(&accountOwner); err != nil || accountOwner != userID {
 		return Movement{}, ErrNotFound
@@ -269,16 +276,66 @@ func (s *Store) CreateMovement(ctx context.Context, userID int64, item Movement,
 			return Movement{}, ErrBadMoney
 		}
 	}
-	err := s.pool.QueryRow(ctx, `
-		INSERT INTO movements (user_id, account_id, category_id, kind, amount_cents, occurred_on)
-		VALUES ($1, $2, NULLIF($3, 0), $4, $5, $6)
+	err = s.pool.QueryRow(ctx, `
+		INSERT INTO movements (user_id, account_id, category_id, kind, amount_cents, occurred_on, note)
+		VALUES ($1, $2, NULLIF($3, 0), $4, $5, $6, $7)
 		RETURNING id`,
-		userID, item.AccountID, item.CategoryID, item.Kind, item.AmountCents, day).Scan(&item.ID)
+		userID, item.AccountID, item.CategoryID, item.Kind, item.AmountCents, day, item.Note).Scan(&item.ID)
 	if err != nil {
 		return Movement{}, err
 	}
 	item.OccurredOn = day.Format("2006-01-02")
 	return item, nil
+}
+
+func (s *Store) CreateCategory(ctx context.Context, userID int64, name, kind string) (Category, error) {
+	if kind != "gasto" && kind != "ingreso" {
+		return Category{}, ErrBadMoney
+	}
+	label, err := cleanLabel(name, 40)
+	if err != nil || label == "" {
+		return Category{}, ErrBadMoney
+	}
+	existing, err := s.categoryByName(ctx, userID, kind, label)
+	if err == nil {
+		return existing, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return Category{}, err
+	}
+	var position int
+	if err := s.pool.QueryRow(ctx, `
+		SELECT COALESCE(MAX(position), -1) + 1 FROM categories
+		WHERE user_id = $1 AND kind = $2`, userID, kind).Scan(&position); err != nil {
+		return Category{}, err
+	}
+	var item Category
+	err = s.pool.QueryRow(ctx, `
+		INSERT INTO categories (user_id, name, kind, position)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, name, kind, position`,
+		userID, label, kind, position).Scan(&item.ID, &item.Name, &item.Kind, &item.Position)
+	if isUnique(err) {
+		return s.categoryByName(ctx, userID, kind, label)
+	}
+	return item, err
+}
+
+func (s *Store) categoryByName(ctx context.Context, userID int64, kind, name string) (Category, error) {
+	var item Category
+	err := s.pool.QueryRow(ctx, `
+		SELECT id, name, kind, position FROM categories
+		WHERE user_id = $1 AND kind = $2 AND lower(name) = lower($3)`,
+		userID, kind, name).Scan(&item.ID, &item.Name, &item.Kind, &item.Position)
+	return item, err
+}
+
+func cleanLabel(raw string, max int) (string, error) {
+	label := strings.Join(strings.Fields(raw), " ")
+	if len([]rune(label)) > max {
+		return "", ErrBadMoney
+	}
+	return label, nil
 }
 
 func (s *Store) ExportBundle(ctx context.Context, userID int64, today time.Time) (map[string]any, error) {

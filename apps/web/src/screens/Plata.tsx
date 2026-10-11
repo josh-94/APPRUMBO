@@ -14,8 +14,8 @@ export function Plata({ money, onCreate }: { money: MonthMoney | null; onCreate:
       {money?.movements.map((item) => (
         <div key={item.id} className={item.kind === 'ingreso' ? 'money-row ingreso' : 'money-row'}>
           <div>
-            <strong>{item.category || (item.kind === 'ingreso' ? 'Ingreso' : 'Gasto')}</strong>
-            <p className="meta">{item.occurredOn}</p>
+            <strong>{item.note || item.category || (item.kind === 'ingreso' ? 'Ingreso' : 'Gasto')}</strong>
+            <p className="meta">{item.note && item.category ? `${item.category} · ${item.occurredOn}` : item.occurredOn}</p>
           </div>
           <strong>{item.kind === 'ingreso' ? `+ ${soles(item.amountCents)}` : `− ${soles(item.amountCents)}`}</strong>
         </div>

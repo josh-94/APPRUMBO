@@ -1,4 +1,4 @@
-import type { Habit, MonthMoney, Movement, Task, TaskInput, TaskList } from './types'
+import type { Habit, MoneyCategory, MonthMoney, Movement, Task, TaskInput, TaskList } from './types'
 
 let onUnauthorized = () => {}
 
@@ -64,7 +64,9 @@ export const api = {
       ? request<void>(`/api/habits/${id}/checks`, { method: 'POST', body: JSON.stringify({ day }) })
       : request<void>(`/api/habits/${id}/checks?day=${day}`, { method: 'DELETE' }),
   month: () => request<MonthMoney>('/api/money/month'),
-  createMovement: (body: { kind: 'gasto' | 'ingreso'; amountCents: number; accountId: number; categoryId: number; day: string }) =>
+  createMovement: (body: { kind: 'gasto' | 'ingreso'; amountCents: number; accountId: number; categoryId: number; day: string; note: string }) =>
     request<Movement>('/api/movements', { method: 'POST', body: JSON.stringify(body) }),
+  createCategory: (name: string, kind: 'gasto' | 'ingreso') =>
+    request<MoneyCategory>('/api/categories', { method: 'POST', body: JSON.stringify({ name, kind }) }),
   exportData: () => request<Record<string, unknown>>('/api/export'),
 }

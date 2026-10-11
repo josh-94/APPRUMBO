@@ -130,6 +130,7 @@ func (s *Server) createMovement(w http.ResponseWriter, r *http.Request) {
 		AccountID   int64  `json:"accountId"`
 		CategoryID  int64  `json:"categoryId"`
 		Day         string `json:"day"`
+		Note        string `json:"note"`
 	}
 	if err := readJSON(w, r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "JSON inválido")
@@ -144,11 +145,16 @@ func (s *Server) createMovement(w http.ResponseWriter, r *http.Request) {
 		}
 		day = parsed
 	}
+	if len([]rune(strings.Join(strings.Fields(body.Note), " "))) > 80 {
+		writeError(w, http.StatusUnprocessableEntity, "El detalle cabe en 80 letras.")
+		return
+	}
 	item, err := s.Store.CreateMovement(r.Context(), currentUser(r), store.Movement{
 		Kind:        body.Kind,
 		AmountCents: body.AmountCents,
 		AccountID:   body.AccountID,
 		CategoryID:  body.CategoryID,
+		Note:        body.Note,
 	}, day)
 	if errors.Is(err, store.ErrBadMoney) {
 		writeError(w, http.StatusUnprocessableEntity, "Ese monto no parece correcto. Usa solo números, por ejemplo 25.50.")
@@ -160,6 +166,27 @@ func (s *Server) createMovement(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudo anotar")
+		return
+	}
+	writeJSON(w, http.StatusCreated, item)
+}
+
+func (s *Server) createCategory(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name string `json:"name"`
+		Kind string `json:"kind"`
+	}
+	if err := readJSON(w, r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "JSON inválido")
+		return
+	}
+	item, err := s.Store.CreateCategory(r.Context(), currentUser(r), body.Name, body.Kind)
+	if errors.Is(err, store.ErrBadMoney) {
+		writeError(w, http.StatusUnprocessableEntity, "Ponle un nombre de hasta 40 letras.")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudo crear la categoría")
 		return
 	}
 	writeJSON(w, http.StatusCreated, item)

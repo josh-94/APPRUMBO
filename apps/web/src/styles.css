@@ -415,6 +415,18 @@ button, input, textarea, select { font: inherit; color: inherit; }
   background: white;
 }
 .chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 16px; }
+.chip-add { display: flex; gap: 8px; flex: 1 0 100%; }
+.chip-add input {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.sheet .field { margin: 0 0 4px; }
+.sheet .field-label { margin: 0 0 10px; }
 .sheet .chips .pill,
 .sheet .switch-row .pill {
   min-height: 44px;
