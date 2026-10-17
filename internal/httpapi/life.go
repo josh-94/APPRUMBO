@@ -136,14 +136,9 @@ func (s *Server) createMovement(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "JSON inválido")
 		return
 	}
-	day := s.today()
-	if body.Day != "" {
-		parsed, err := time.ParseInLocation("2006-01-02", body.Day, s.Loc)
-		if err != nil {
-			writeError(w, http.StatusUnprocessableEntity, "Ese día no parece correcto")
-			return
-		}
-		day = parsed
+	day, ok := s.movementDay(w, body.Day)
+	if !ok {
+		return
 	}
 	if len([]rune(strings.Join(strings.Fields(body.Note), " "))) > 80 {
 		writeError(w, http.StatusUnprocessableEntity, "El detalle cabe en 80 letras.")
@@ -169,6 +164,83 @@ func (s *Server) createMovement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, item)
+}
+
+func (s *Server) updateMovement(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Kind        string `json:"kind"`
+		AmountCents int64  `json:"amountCents"`
+		AccountID   int64  `json:"accountId"`
+		CategoryID  int64  `json:"categoryId"`
+		Day         string `json:"day"`
+		Note        string `json:"note"`
+	}
+	if err := readJSON(w, r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "JSON inválido")
+		return
+	}
+	day, ok := s.movementDay(w, body.Day)
+	if !ok {
+		return
+	}
+	item, err := s.Store.UpdateMovement(r.Context(), currentUser(r), store.Movement{
+		ID:          id,
+		Kind:        body.Kind,
+		AmountCents: body.AmountCents,
+		AccountID:   body.AccountID,
+		CategoryID:  body.CategoryID,
+		Note:        body.Note,
+	}, day)
+	if errors.Is(err, store.ErrBadMoney) {
+		writeError(w, http.StatusUnprocessableEntity, "Ese monto no parece correcto. Usa solo números, por ejemplo 25.50.")
+		return
+	}
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "No está")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudo guardar")
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
+}
+
+func (s *Server) deleteMovement(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	err := s.Store.DeleteMovement(r.Context(), currentUser(r), id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "No está")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudo borrar")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) movementDay(w http.ResponseWriter, raw string) (time.Time, bool) {
+	if raw == "" {
+		return s.today(), true
+	}
+	day, err := time.ParseInLocation("2006-01-02", raw, s.Loc)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, "Ese día no parece correcto")
+		return time.Time{}, false
+	}
+	if day.After(s.today()) {
+		writeError(w, http.StatusUnprocessableEntity, "No se puede anotar un día que no llegó")
+		return time.Time{}, false
+	}
+	return day, true
 }
 
 func (s *Server) createCategory(w http.ResponseWriter, r *http.Request) {

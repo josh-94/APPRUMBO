@@ -288,6 +288,52 @@ func (s *Store) CreateMovement(ctx context.Context, userID int64, item Movement,
 	return item, nil
 }
 
+func (s *Store) UpdateMovement(ctx context.Context, userID int64, item Movement, day time.Time) (Movement, error) {
+	if item.ID == 0 || item.AmountCents <= 0 || (item.Kind != "gasto" && item.Kind != "ingreso") {
+		return Movement{}, ErrBadMoney
+	}
+	note, err := cleanLabel(item.Note, 80)
+	if err != nil {
+		return Movement{}, err
+	}
+	item.Note = note
+	var accountOwner int64
+	if err := s.pool.QueryRow(ctx, `SELECT user_id FROM accounts WHERE id = $1`, item.AccountID).Scan(&accountOwner); err != nil || accountOwner != userID {
+		return Movement{}, ErrNotFound
+	}
+	if item.CategoryID != 0 {
+		var catOwner int64
+		var kind string
+		if err := s.pool.QueryRow(ctx, `SELECT user_id, kind FROM categories WHERE id = $1`, item.CategoryID).Scan(&catOwner, &kind); err != nil || catOwner != userID || kind != item.Kind {
+			return Movement{}, ErrBadMoney
+		}
+	}
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE movements
+		SET account_id = $3, category_id = NULLIF($4, 0), kind = $5, amount_cents = $6, occurred_on = $7, note = $8
+		WHERE id = $1 AND user_id = $2`,
+		item.ID, userID, item.AccountID, item.CategoryID, item.Kind, item.AmountCents, day, item.Note)
+	if err != nil {
+		return Movement{}, err
+	}
+	if tag.RowsAffected() == 0 {
+		return Movement{}, ErrNotFound
+	}
+	item.OccurredOn = day.Format("2006-01-02")
+	return item, nil
+}
+
+func (s *Store) DeleteMovement(ctx context.Context, userID, id int64) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM movements WHERE id = $1 AND user_id = $2`, id, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) CreateCategory(ctx context.Context, userID int64, name, kind string) (Category, error) {
 	if kind != "gasto" && kind != "ingreso" {
 		return Category{}, ErrBadMoney

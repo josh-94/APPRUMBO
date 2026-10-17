@@ -1,18 +1,24 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import { MoneySheet } from '../components/CaptureSheets'
 import { AccountSheet, BillSheet, DebtSheet } from '../components/PlanSheets'
 import { EyeButton, useHideMoney } from '../components/HideMoney'
 import { Shell } from '../components/Shell'
 import { dolares, soles } from '../format'
-import type { Bill, Debt, MoneyPlan, MonthMoney, PayAccount } from '../types'
+import type { Bill, Debt, MoneyPlan, MonthMoney, Movement, PayAccount } from '../types'
 
-export function Plata({ money, onCreate }: { money: MonthMoney | null; onCreate: () => void }) {
+export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; onChanged: () => void; refresh: number }) {
+  const current = currentMonthKey()
   const { hidden, toggle } = useHideMoney()
+  const [month, setMonth] = useState(current)
+  const [money, setMoney] = useState<MonthMoney | null>(null)
+  const [editing, setEditing] = useState<Movement | null>(null)
   const [plan, setPlan] = useState<MoneyPlan | null>(null)
   const [fx, setFx] = useState('')
   const [account, setAccount] = useState<PayAccount | null | undefined>(undefined)
   const [debt, setDebt] = useState<Debt | null | undefined>(undefined)
   const [bill, setBill] = useState<Bill | null | undefined>(undefined)
+  const viewingNow = month === current
 
   function reload() {
     api.plan().then((next) => {
@@ -24,6 +30,10 @@ export function Plata({ money, onCreate }: { money: MonthMoney | null; onCreate:
   useEffect(() => {
     reload()
   }, [])
+
+  useEffect(() => {
+    api.month(month).then(setMoney).catch(() => setMoney(null))
+  }, [month, refresh])
 
   async function saveFx() {
     const hundredths = Math.round(Number(fx.replace(',', '.')) * 100)
@@ -38,23 +48,27 @@ export function Plata({ money, onCreate }: { money: MonthMoney | null; onCreate:
 
   return (
     <Shell tabs>
-      <p className="kicker">Este mes</p>
+      <div className="month-nav">
+        <button type="button" className="month-step" aria-label="Mes anterior" onClick={() => setMonth(shiftMonth(month, -1))}>‹</button>
+        <p className="kicker">{monthTitle(month, current)}</p>
+        <button type="button" className="month-step" aria-label="Mes siguiente" disabled={viewingNow} onClick={() => setMonth(shiftMonth(month, 1))}>›</button>
+      </div>
       <div className="headline-row">
-        <h1 className="headline">{headline(money, hidden)}</h1>
+        <h1 className="headline">{headline(money, hidden, viewingNow)}</h1>
         <EyeButton hidden={hidden} onToggle={toggle} />
       </div>
-      <button type="button" className="primary" onClick={onCreate}>Anotar gasto</button>
+      <button type="button" className="primary" onClick={() => { setMonth(current); onCreate() }}>Anotar gasto</button>
       {money && money.movements.length === 0 && (
-        <p className="empty">Aún no registras nada este mes. Empieza con lo último que gastaste.</p>
+        <p className="empty">{viewingNow ? 'Aún no registras nada este mes. Empieza con lo último que gastaste.' : 'En este mes no anotaste nada.'}</p>
       )}
       {money?.movements.map((item) => (
-        <div key={item.id} className={item.kind === 'ingreso' ? 'money-row ingreso' : 'money-row'}>
+        <button key={item.id} type="button" className={item.kind === 'ingreso' ? 'money-row ingreso' : 'money-row'} onClick={() => setEditing(item)}>
           <div>
             <strong>{item.note || item.category || (item.kind === 'ingreso' ? 'Ingreso' : 'Gasto')}</strong>
             <p className="meta">{item.note && item.category ? `${item.category} · ${item.occurredOn}` : item.occurredOn}</p>
           </div>
           <strong>{movementAmount(item.kind, item.amountCents, hidden)}</strong>
-        </div>
+        </button>
       ))}
 
       <h2 className="section-label">Debo</h2>
@@ -111,16 +125,57 @@ export function Plata({ money, onCreate }: { money: MonthMoney | null; onCreate:
       {account !== undefined && <AccountSheet account={account} onClose={() => setAccount(undefined)} onSaved={reload} />}
       {debt !== undefined && <DebtSheet debt={debt} onClose={() => setDebt(undefined)} onSaved={reload} />}
       {bill !== undefined && <BillSheet bill={bill} categories={money?.categories ?? []} onClose={() => setBill(undefined)} onSaved={reload} />}
+      {editing && money && (
+        <MoneySheet
+          money={money}
+          movement={editing}
+          onClose={() => setEditing(null)}
+          onSave={async (input) => {
+            await api.updateMovement(editing.id, input)
+            setEditing(null)
+            onChanged()
+          }}
+          onDelete={async () => {
+            await api.deleteMovement(editing.id)
+            setEditing(null)
+            onChanged()
+          }}
+          onCreateCategory={async (name, kind) => {
+            const category = await api.createCategory(name, kind)
+            onChanged()
+            return category
+          }}
+        />
+      )}
     </Shell>
   )
 }
 
-function headline(money: MonthMoney | null, hidden: boolean) {
+function currentMonthKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function shiftMonth(key: string, delta: number) {
+  const [year, month] = key.split('-').map(Number)
+  const date = new Date(year, month - 1 + delta, 1)
+  return currentMonthKey(date)
+}
+
+function monthTitle(key: string, current: string) {
+  if (key === current) return 'Este mes'
+  const [year, month] = key.split('-').map(Number)
+  const text = new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1))
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+function headline(money: MonthMoney | null, hidden: boolean, viewingNow: boolean) {
   if (!money) return 'Cargando'
   if (hidden && (money.spentCents > 0 || money.incomeCents > 0)) return 'S/ ••••'
-  if (money.incomeCents > 0 && money.remainingCents !== null) return `Te quedan ${soles(money.remainingCents)}`
-  if (money.spentCents > 0) return `Llevas ${soles(money.spentCents)} gastados`
-  return 'Aún sin movimientos'
+  if (money.incomeCents > 0 && money.remainingCents !== null) {
+    return viewingNow ? `Te quedan ${soles(money.remainingCents)}` : `Te quedaron ${soles(money.remainingCents)}`
+  }
+  if (money.spentCents > 0) return viewingNow ? `Llevas ${soles(money.spentCents)} gastados` : `Gastaste ${soles(money.spentCents)}`
+  return viewingNow ? 'Aún sin movimientos' : 'Sin movimientos'
 }
 
 function movementAmount(kind: 'gasto' | 'ingreso', cents: number, hidden: boolean) {

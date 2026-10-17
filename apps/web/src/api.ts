@@ -63,9 +63,12 @@ export const api = {
     on
       ? request<void>(`/api/habits/${id}/checks`, { method: 'POST', body: JSON.stringify({ day }) })
       : request<void>(`/api/habits/${id}/checks?day=${day}`, { method: 'DELETE' }),
-  month: () => request<MonthMoney>('/api/money/month'),
+  month: (month?: string) => request<MonthMoney>(month ? `/api/money/month?month=${month}` : '/api/money/month'),
   createMovement: (body: { kind: 'gasto' | 'ingreso'; amountCents: number; accountId: number; categoryId: number; day: string; note: string }) =>
     request<Movement>('/api/movements', { method: 'POST', body: JSON.stringify(body) }),
+  updateMovement: (id: number, body: { kind: 'gasto' | 'ingreso'; amountCents: number; accountId: number; categoryId: number; day: string; note: string }) =>
+    request<Movement>(`/api/movements/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteMovement: (id: number) => request<void>(`/api/movements/${id}`, { method: 'DELETE' }),
   createCategory: (name: string, kind: 'gasto' | 'ingreso') =>
     request<MoneyCategory>('/api/categories', { method: 'POST', body: JSON.stringify({ name, kind }) }),
   plan: () => request<MoneyPlan>('/api/money/plan'),

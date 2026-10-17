@@ -66,6 +66,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/habits/{id}/checks", s.protected(s.habitCheck))
 	mux.HandleFunc("GET /api/money/month", s.protected(s.moneyMonth))
 	mux.HandleFunc("POST /api/movements", s.protected(s.createMovement))
+	mux.HandleFunc("PATCH /api/movements/{id}", s.protected(s.updateMovement))
+	mux.HandleFunc("DELETE /api/movements/{id}", s.protected(s.deleteMovement))
 	mux.HandleFunc("POST /api/categories", s.protected(s.createCategory))
 	mux.HandleFunc("GET /api/money/plan", s.protected(s.moneyPlan))
 	mux.HandleFunc("PUT /api/money/fx", s.protected(s.setFx))

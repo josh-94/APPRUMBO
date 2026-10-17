@@ -267,6 +267,9 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .ghost { width: 100%; margin-top: 8px; background: transparent; }
 .danger { color: var(--danger); border-color: transparent; background: transparent; cursor: pointer; }
 .ghost.danger { border: 1px solid #f0d2cc; }
+.confirm-delete { margin-top: 8px; }
+.confirm-delete p { margin: 8px 0 0; text-align: center; font-weight: 700; }
+.confirm-delete .ghost { margin-top: 8px; }
 
 .moment { padding-top: 24px; }
 .moment-title { font-size: 2.6rem; margin: 12px 0; }
@@ -413,7 +416,21 @@ button, input, textarea, select { font: inherit; color: inherit; }
   box-shadow: var(--rumbo-shadow-sm);
 }
 .money-row.ingreso strong { color: var(--rumbo-color-primary); }
-button.plan-row { width: 100%; border: 0; text-align: left; cursor: pointer; color: inherit; }
+button.plan-row, button.money-row { width: 100%; border: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; }
+.month-nav { display: flex; align-items: center; gap: 8px; }
+.month-nav .kicker { flex: 1; margin: 0; }
+.month-step {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--card);
+  color: inherit;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.month-step:disabled { opacity: 0.35; cursor: default; }
 .habit button { border: 0; background: transparent; cursor: pointer; font-weight: 700; color: var(--accent); }
 .dots { display: flex; gap: 4px; margin-top: 4px; }
 .dots span { width: 8px; height: 8px; border-radius: 99px; background: var(--line); }

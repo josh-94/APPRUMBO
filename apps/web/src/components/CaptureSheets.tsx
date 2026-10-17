@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import type { MoneyCategory, MonthMoney } from '../types'
-import { todayKey } from '../format'
+import type { MoneyCategory, MonthMoney, Movement } from '../types'
+import { centsToInput, todayKey } from '../format'
 
 export function HabitSheet({ onClose, onSave }: { onClose: () => void; onSave: (name: string, nGoal: number) => Promise<void> }) {
   const [name, setName] = useState('')
@@ -41,25 +41,29 @@ export function HabitSheet({ onClose, onSave }: { onClose: () => void; onSave: (
   )
 }
 
-export function MoneySheet({ money, onClose, onSave, onCreateCategory }: {
+export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreateCategory }: {
   money: MonthMoney
+  movement?: Movement | null
   onClose: () => void
   onSave: (input: { kind: 'gasto' | 'ingreso'; amountCents: number; accountId: number; categoryId: number; day: string; note: string }) => Promise<void>
+  onDelete?: () => Promise<void>
   onCreateCategory: (name: string, kind: 'gasto' | 'ingreso') => Promise<MoneyCategory>
 }) {
-  const [kind, setKind] = useState<'gasto' | 'ingreso'>('gasto')
-  const [amount, setAmount] = useState('')
-  const [note, setNote] = useState('')
-  const [categoryId, setCategoryId] = useState(0)
+  const [kind, setKind] = useState<'gasto' | 'ingreso'>(movement?.kind ?? 'gasto')
+  const [amount, setAmount] = useState(movement ? centsToInput(movement.amountCents) : '')
+  const [note, setNote] = useState(movement?.note ?? '')
+  const [day, setDay] = useState(movement?.occurredOn || todayKey())
+  const [categoryId, setCategoryId] = useState(movement?.categoryId ?? 0)
   const [created, setCreated] = useState<MoneyCategory[]>([])
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const [error, setError] = useState('')
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const categories = [...money.categories, ...created].filter((item, index, all) => item.kind === kind && all.findIndex((other) => other.id === item.id) === index)
   const explicit = categoryId && categories.some((item) => item.id === categoryId) ? categoryId : 0
   const otros = categories.find((item) => item.name === 'Otros')
   const selected = explicit || (kind === 'gasto' && note.trim() && otros ? otros.id : categories[0]?.id)
-  const accountId = money.accounts[0]?.id
+  const accountId = movement?.accountId || money.accounts[0]?.id
 
   function chooseKind(next: 'gasto' | 'ingreso') {
     setKind(next)
@@ -95,7 +99,7 @@ export function MoneySheet({ money, onClose, onSave, onCreateCategory }: {
       return
     }
     try {
-      await onSave({ kind, amountCents: cents, accountId, categoryId: selected, day: todayKey(), note: note.trim() })
+      await onSave({ kind, amountCents: cents, accountId, categoryId: selected, day, note: note.trim() })
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo anotar')
@@ -106,7 +110,7 @@ export function MoneySheet({ money, onClose, onSave, onCreateCategory }: {
     <div className="sheet-backdrop" onClick={onClose}>
       <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void submit(event)}>
         <div className="sheet-handle" />
-        <h2>{kind === 'gasto' ? 'Anotar gasto' : 'Anotar ingreso'}</h2>
+        <h2>{movement ? (kind === 'gasto' ? 'Editar gasto' : 'Editar ingreso') : (kind === 'gasto' ? 'Anotar gasto' : 'Anotar ingreso')}</h2>
         <div className="switch-row">
           <button type="button" className={kind === 'gasto' ? 'pill on' : 'pill quiet'} onClick={() => chooseKind('gasto')}>Gasto</button>
           <button type="button" className={kind === 'ingreso' ? 'pill on' : 'pill quiet'} onClick={() => chooseKind('ingreso')}>Ingreso</button>
@@ -128,6 +132,12 @@ export function MoneySheet({ money, onClose, onSave, onCreateCategory }: {
             onChange={(event) => setNote(event.target.value)}
           />
         </label>
+        {movement && (
+          <label className="field">
+            Día
+            <input type="date" required max={todayKey()} value={day} onChange={(event) => setDay(event.target.value)} />
+          </label>
+        )}
         <p className="field-label">Opcional. Si se repite, guárdalo como categoría.</p>
         <div className="chips">
           {categories.map((item) => (
@@ -163,7 +173,21 @@ export function MoneySheet({ money, onClose, onSave, onCreateCategory }: {
           )}
         </div>
         {error && <p className="error">{error}</p>}
-        <button type="submit" className="primary">Listo</button>
+        <button type="submit" className="primary">{movement ? 'Guardar' : 'Listo'}</button>
+        {movement && onDelete && !confirmingDelete && (
+          <button type="button" className="ghost danger" onClick={() => setConfirmingDelete(true)}>
+            Borrar
+          </button>
+        )}
+        {movement && onDelete && confirmingDelete && (
+          <div className="confirm-delete">
+            <p>¿Borrar este {kind === 'gasto' ? 'gasto' : 'ingreso'}?</p>
+            <button type="button" className="ghost" onClick={() => setConfirmingDelete(false)}>Cancelar</button>
+            <button type="button" className="ghost danger" onClick={() => void onDelete().catch((err) => setError(err instanceof Error ? err.message : 'No se pudo borrar'))}>
+              Sí, borrar
+            </button>
+          </div>
+        )}
       </form>
     </div>
   )

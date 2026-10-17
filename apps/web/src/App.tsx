@@ -36,11 +36,13 @@ export function App() {
   const [accountEmail, setAccountEmail] = useState('')
   const [habits, setHabits] = useState<Habit[]>([])
   const [money, setMoney] = useState<MonthMoney | null>(null)
+  const [moneyTick, setMoneyTick] = useState(0)
   const [sort, setSort] = useState<'time' | 'manual'>('time')
   const location = useLocation()
   const openTask = useCallback((task: Task) => setSheet({ mode: 'edit', task }), [])
 
   const loadLife = useCallback(() => {
+    setMoneyTick((n) => n + 1)
     api.habits().then((data) => setHabits(data.habits)).catch(() => setHabits([]))
     api.month().then(setMoney).catch(() => setMoney(null))
   }, [])
@@ -221,7 +223,7 @@ export function App() {
             />
           }
         />
-        <Route path="/plata" element={<Plata money={money} onCreate={() => setMoneyOpen(true)} />} />
+        <Route path="/plata" element={<Plata onCreate={() => setMoneyOpen(true)} onChanged={loadLife} refresh={moneyTick} />} />
         <Route path="/listas" element={<ListsHome lists={lists} onReloadLists={loadLists} />} />
         <Route
           path="/listas/:id"
