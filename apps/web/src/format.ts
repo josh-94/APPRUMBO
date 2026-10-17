@@ -16,6 +16,43 @@ export function dolares(cents: number) {
   return `$ ${formatted}`
 }
 
+export const currencies = [
+  { code: 'PEN', name: 'Sol', symbol: 'S/' },
+  { code: 'USD', name: 'Dólar', symbol: '$' },
+  { code: 'ARS', name: 'Peso argentino', symbol: 'ARS' },
+  { code: 'BOB', name: 'Boliviano', symbol: 'Bs' },
+  { code: 'BRL', name: 'Real', symbol: 'R$' },
+  { code: 'BZD', name: 'Dólar beliceño', symbol: 'BZD' },
+  { code: 'CLP', name: 'Peso chileno', symbol: 'CLP' },
+  { code: 'COP', name: 'Peso colombiano', symbol: 'COP' },
+  { code: 'CRC', name: 'Colón costarricense', symbol: '₡' },
+  { code: 'CUP', name: 'Peso cubano', symbol: 'CUP' },
+  { code: 'DOP', name: 'Peso dominicano', symbol: 'RD$' },
+  { code: 'GTQ', name: 'Quetzal', symbol: 'Q' },
+  { code: 'GYD', name: 'Dólar guyanés', symbol: 'GYD' },
+  { code: 'HNL', name: 'Lempira', symbol: 'L' },
+  { code: 'HTG', name: 'Gourde', symbol: 'G' },
+  { code: 'JMD', name: 'Dólar jamaiquino', symbol: 'JMD' },
+  { code: 'MXN', name: 'Peso mexicano', symbol: 'MXN' },
+  { code: 'NIO', name: 'Córdoba', symbol: 'C$' },
+  { code: 'PAB', name: 'Balboa', symbol: 'B/.' },
+  { code: 'PYG', name: 'Guaraní', symbol: '₲' },
+  { code: 'SRD', name: 'Dólar surinamés', symbol: 'SRD' },
+  { code: 'TTD', name: 'Dólar de Trinidad', symbol: 'TTD' },
+  { code: 'UYU', name: 'Peso uruguayo', symbol: 'UYU' },
+  { code: 'VES', name: 'Bolívar', symbol: 'Bs' },
+]
+
+export function currencySymbol(code: string) {
+  return currencies.find((item) => item.code === code)?.symbol ?? (code || 'S/')
+}
+
+export function money(cents: number, code = 'PEN') {
+  const sign = cents < 0 ? '−' : ''
+  const formatted = new Intl.NumberFormat('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(cents) / 100)
+  return `${sign}${currencySymbol(code)} ${formatted}`
+}
+
 export function soles(cents: number) {
   const sign = cents < 0 ? '−' : ''
   const abs = Math.abs(cents) / 100

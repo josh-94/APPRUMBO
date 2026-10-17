@@ -1,24 +1,42 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../api'
-import { centsToInput, dolares, parseCents, soles } from '../format'
+import { centsToInput, currencies, dolares, parseCents, soles } from '../format'
 import type { Bill, Debt, MoneyCategory, MoneyPlan, PayAccount, Task } from '../types'
 
+function currencyLabel(code: string) {
+  return currencies.find((item) => item.code === code)?.name ?? code
+}
+
+const latinCurrencies = currencies
+  .filter((item) => item.code !== 'PEN' && item.code !== 'USD')
+  .sort((a, b) => a.name.localeCompare(b.name, 'es'))
+
 export function AccountSheet({ account, onClose, onSaved }: { account: PayAccount | null; onClose: () => void; onSaved: () => void }) {
+  const saved = account?.currency || 'PEN'
+  const listed = currencies.some((item) => item.code === saved)
   const [name, setName] = useState(account?.name ?? '')
   const [payday, setPayday] = useState(account?.payday ? String(account.payday) : '')
   const [amount, setAmount] = useState(centsToInput(account?.paydayCents ?? 0))
+  const [currency, setCurrency] = useState(listed ? saved : 'custom')
+  const [custom, setCustom] = useState(listed ? '' : saved)
   const [error, setError] = useState('')
 
   async function save(event: FormEvent) {
     event.preventDefault()
     const day = Number(payday)
     const cents = parseCents(amount)
+    const typed = custom.trim()
+    const code = currency === 'custom' ? (/^[A-Za-z]+$/.test(typed) ? typed.toUpperCase() : typed) : currency
+    if (currency === 'custom' && !code) {
+      setError('Escribe la moneda, por ejemplo EUR.')
+      return
+    }
     if ((payday !== '' || amount !== '') && (!day || day > 31 || !cents)) {
       setError('El sueldo necesita un día del mes y un monto.')
       return
     }
     try {
-      await api.saveAccount({ id: account?.id, name: name.trim(), payday: day || 0, paydayCents: cents })
+      await api.saveAccount({ id: account?.id, name: name.trim(), payday: day || 0, paydayCents: cents, currency: code })
       onSaved()
       onClose()
     } catch (err) {
@@ -32,6 +50,25 @@ export function AccountSheet({ account, onClose, onSaved }: { account: PayAccoun
         <div className="sheet-handle" />
         <h2>{account ? 'Cuenta' : 'Nueva cuenta'}</h2>
         <label className="field">Nombre<input value={name} required maxLength={80} onChange={(event) => setName(event.target.value)} /></label>
+        <label className="field">
+          Moneda
+          <select value={currency} onChange={(event) => setCurrency(event.target.value)}>
+            <optgroup label="Soles y dólares">
+              <option value="PEN">Sol (S/)</option>
+              <option value="USD">Dólar ($)</option>
+            </optgroup>
+            <optgroup label="Latinoamérica">
+              {latinCurrencies.map((item) => <option key={item.code} value={item.code}>{item.name} ({item.symbol})</option>)}
+            </optgroup>
+            <option value="custom">Personalizar</option>
+          </select>
+        </label>
+        {currency === 'custom' && (
+          <label className="field">
+            Tu moneda
+            <input value={custom} required maxLength={6} placeholder="EUR" onChange={(event) => setCustom(event.target.value)} />
+          </label>
+        )}
         <label className="field">Día en que llega el sueldo<input inputMode="numeric" placeholder="28" value={payday} onChange={(event) => setPayday(event.target.value)} /></label>
         <label className="field">Monto<input inputMode="decimal" placeholder="0.00" value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
         <p className="field-label">Si no es un sueldo, deja el día y el monto vacíos.</p>
@@ -231,6 +268,7 @@ export function PayConfirm({ task, onClose, onSaved }: { task: Task; onClose: ()
   }
 
   const debt = plan?.debts.find((item) => item.id === task.payRef && item.kind === task.payKind)
+  const payAccount = plan?.accounts.find((item) => item.id === task.payRef)
   const title = task.payKind === 'sueldo' ? 'Confirmar sueldo' : task.payKind === 'mes' ? 'Confirmar pago' : 'Confirmar cuota'
 
   return (
@@ -240,6 +278,7 @@ export function PayConfirm({ task, onClose, onSaved }: { task: Task; onClose: ()
         <h2>{title}</h2>
         <p className="field-label">{task.notes}</p>
         <label className="field">{task.payKind === 'sueldo' ? 'Te llega' : 'Sale'}<input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
+        {task.payKind === 'sueldo' && payAccount && <p className="field-label">Moneda: {currencyLabel(payAccount.currency)}</p>}
         {debt && debt.kind === 'tarjeta' && (
           <>
             <p className="field-label">La tarjeta sigue moviéndose. Corrige lo que quedaría debiendo.</p>

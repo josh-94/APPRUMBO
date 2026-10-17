@@ -6,7 +6,7 @@ import { CategorySheet, MoneySheet } from '../components/CaptureSheets'
 import { AccountSheet, BillSheet, DebtSheet } from '../components/PlanSheets'
 import { EyeButton, useHideMoney } from '../components/HideMoney'
 import { Shell } from '../components/Shell'
-import { dolares, soles } from '../format'
+import { currencySymbol, dolares, money, soles } from '../format'
 import type { Bill, Debt, MoneyCategory, MoneyPlan, MonthMoney, Movement, PayAccount } from '../types'
 
 export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; onChanged: () => void; refresh: number }) {
@@ -173,7 +173,7 @@ export function CuentasPage() {
             <strong>{item.name}</strong>
             <p className="meta">{item.payday ? `Sueldo el ${item.payday}` : 'Sin sueldo programado'}</p>
           </div>
-          <strong>{item.paydayCents ? mask(hidden, soles(item.paydayCents)) : ''}</strong>
+          <strong>{item.paydayCents ? (hidden ? `${currencySymbol(item.currency)} ••••` : money(item.paydayCents, item.currency)) : ''}</strong>
         </button>
       ))}
       <button type="button" className="ghost" onClick={() => setAccount(null)}>Agregar cuenta</button>

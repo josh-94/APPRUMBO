@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -17,6 +18,7 @@ type PayAccount struct {
 	Name        string `json:"name"`
 	Payday      int    `json:"payday"`
 	PaydayCents int64  `json:"paydayCents"`
+	Currency    string `json:"currency"`
 }
 
 type Debt struct {
@@ -130,16 +132,20 @@ func (s *Store) SaveAccount(ctx context.Context, userID int64, item PayAccount) 
 		return PayAccount{}, ErrBadMoney
 	}
 	item.Name = name
+	item.Currency, err = cleanCurrency(item.Currency)
+	if err != nil {
+		return PayAccount{}, err
+	}
 	if item.ID == 0 {
 		err = s.pool.QueryRow(ctx, `
-			INSERT INTO accounts (user_id, name, payday, payday_cents)
-			VALUES ($1, $2, NULLIF($3, 0), NULLIF($4, 0))
-			RETURNING id`, userID, item.Name, item.Payday, item.PaydayCents).Scan(&item.ID)
+			INSERT INTO accounts (user_id, name, payday, payday_cents, currency)
+			VALUES ($1, $2, NULLIF($3, 0), NULLIF($4, 0), $5)
+			RETURNING id`, userID, item.Name, item.Payday, item.PaydayCents, item.Currency).Scan(&item.ID)
 		return item, err
 	}
 	tag, err := s.pool.Exec(ctx, `
-		UPDATE accounts SET name = $3, payday = NULLIF($4, 0), payday_cents = NULLIF($5, 0)
-		WHERE id = $1 AND user_id = $2`, item.ID, userID, item.Name, item.Payday, item.PaydayCents)
+		UPDATE accounts SET name = $3, payday = NULLIF($4, 0), payday_cents = NULLIF($5, 0), currency = $6
+		WHERE id = $1 AND user_id = $2`, item.ID, userID, item.Name, item.Payday, item.PaydayCents, item.Currency)
 	if err != nil {
 		return PayAccount{}, err
 	}
@@ -147,6 +153,17 @@ func (s *Store) SaveAccount(ctx context.Context, userID int64, item PayAccount) 
 		return PayAccount{}, ErrNotFound
 	}
 	return item, nil
+}
+
+func cleanCurrency(raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "PEN", nil
+	}
+	if strings.Contains(value, " ") || len([]rune(value)) > 6 {
+		return "", ErrBadMoney
+	}
+	return value, nil
 }
 
 func (s *Store) DeleteAccount(ctx context.Context, userID, id int64) error {
@@ -477,7 +494,7 @@ func (s *Store) ConfirmPay(ctx context.Context, userID int64, in ConfirmPay, day
 
 func (s *Store) payAccounts(ctx context.Context, userID int64) ([]PayAccount, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, name, COALESCE(payday, 0), COALESCE(payday_cents, 0)
+		SELECT id, name, COALESCE(payday, 0), COALESCE(payday_cents, 0), currency
 		FROM accounts WHERE user_id = $1 ORDER BY id`, userID)
 	if err != nil {
 		return nil, err
@@ -486,7 +503,7 @@ func (s *Store) payAccounts(ctx context.Context, userID int64) ([]PayAccount, er
 	var out []PayAccount
 	for rows.Next() {
 		var item PayAccount
-		if err := rows.Scan(&item.ID, &item.Name, &item.Payday, &item.PaydayCents); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Payday, &item.PaydayCents, &item.Currency); err != nil {
 			return nil, err
 		}
 		out = append(out, item)

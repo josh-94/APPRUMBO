@@ -51,7 +51,7 @@ export type Movement = {
   note: string
 }
 
-export type PayAccount = { id: number; name: string; payday: number; paydayCents: number }
+export type PayAccount = { id: number; name: string; payday: number; paydayCents: number; currency: string }
 export type Debt = {
   id: number
   kind: 'tarjeta' | 'prestamo'
