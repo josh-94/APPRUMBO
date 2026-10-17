@@ -58,9 +58,9 @@ export function Shell({ title, eyebrow, back, action, tabs, children }: Props) {
       <main className={tabs ? 'main with-tabs' : 'main'}>{children}</main>
       {tabs && (
         <nav className="tabs">
-          <Tab to="/dia" label="Hoy" icon={icons.hoy} />
-          <Tab to="/tiempo" label="Tiempo" icon={icons.tiempo} />
-          <Tab to="/plata" label="Plata" icon={icons.plata} />
+          <Tab to="/dia" label="Inicio" icon={icons.hoy} />
+          <Tab to="/tiempo" label="Planificar" icon={icons.tiempo} />
+          <Tab to="/plata" label="Finanzas" icon={icons.plata} />
           <Tab to="/cuenta" label="Cuenta" icon={icons.cuenta} />
         </nav>
       )}
@@ -70,13 +70,9 @@ export function Shell({ title, eyebrow, back, action, tabs, children }: Props) {
 
 function Tab({ to, label, icon }: { to: string; label: string; icon: ReactNode }) {
   return (
-    <NavLink to={to} className={({ isActive }) => (isActive ? 'tab active' : 'tab')} aria-label={label}>
-      {({ isActive }) => (
-        <>
-          {icon}
-          {isActive ? <span>{label}</span> : null}
-        </>
-      )}
+    <NavLink to={to} className={({ isActive }) => (isActive ? 'tab active' : 'tab')}>
+      {icon}
+      <span>{label}</span>
     </NavLink>
   )
 }

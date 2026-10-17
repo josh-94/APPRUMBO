@@ -61,15 +61,24 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
       {money && money.movements.length === 0 && (
         <p className="empty">{viewingNow ? 'Aún no registras nada este mes. Empieza con lo último que gastaste.' : 'En este mes no anotaste nada.'}</p>
       )}
-      {money?.movements.map((item) => (
-        <button key={item.id} type="button" className={item.kind === 'ingreso' ? 'money-row ingreso' : 'money-row'} onClick={() => setEditing(item)}>
-          <div>
-            <strong>{item.note || item.category || (item.kind === 'ingreso' ? 'Ingreso' : 'Gasto')}</strong>
-            <p className="meta">{item.note && item.category ? `${item.category} · ${item.occurredOn}` : item.occurredOn}</p>
-          </div>
-          <strong>{movementAmount(item.kind, item.amountCents, hidden)}</strong>
-        </button>
-      ))}
+      {money && money.movements.length > 0 && (
+        <div className="ledger">
+          {money.movements.map((item) => {
+            const title = item.note || item.category || (item.kind === 'ingreso' ? 'Ingreso' : 'Gasto')
+            return (
+              <button key={item.id} type="button" className={item.kind === 'ingreso' ? 'move ingreso' : 'move gasto'} onClick={() => setEditing(item)}>
+                <span className="move-mark" aria-hidden="true">{title.trim().charAt(0).toUpperCase()}</span>
+                <span className="move-copy">
+                  <strong>{title}</strong>
+                  <span className="meta">{movementDate(item.occurredOn)}</span>
+                </span>
+                <strong className="move-amount">{movementAmount(item.kind, item.amountCents, hidden)}</strong>
+                <span className="move-chevron" aria-hidden="true">›</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       <h2 className="section-label">Debo</h2>
       <section className="summary">
@@ -178,9 +187,18 @@ function headline(money: MonthMoney | null, hidden: boolean, viewingNow: boolean
   return viewingNow ? 'Aún sin movimientos' : 'Sin movimientos'
 }
 
+const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+function movementDate(day: string) {
+  const [, month, date] = day.split('-').map(Number)
+  if (!month || !date) return day
+  return `${date} ${monthNames[month - 1]}`
+}
+
 function movementAmount(kind: 'gasto' | 'ingreso', cents: number, hidden: boolean) {
-  if (hidden) return kind === 'ingreso' ? '+ S/ ••••' : '− S/ ••••'
-  return kind === 'ingreso' ? `+ ${soles(cents)}` : `− ${soles(cents)}`
+  if (hidden) return 'S/ ••••'
+  const number = soles(cents).replace(/^S\/\s*/, '')
+  return kind === 'gasto' ? `S/ -${number}` : `S/ ${number}`
 }
 
 function mask(hidden: boolean, text: string) {
