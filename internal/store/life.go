@@ -31,6 +31,8 @@ type Category struct {
 	Name     string `json:"name"`
 	Kind     string `json:"kind"`
 	Position int    `json:"position"`
+	Icon     string `json:"icon"`
+	Tint     string `json:"tint"`
 }
 
 type Movement struct {
@@ -209,7 +211,7 @@ func (s *Store) accounts(ctx context.Context, userID int64) ([]Account, error) {
 
 func (s *Store) categories(ctx context.Context, userID int64) ([]Category, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, name, kind, position FROM categories
+		SELECT id, name, kind, position, icon, tint FROM categories
 		WHERE user_id = $1 ORDER BY position, id`, userID)
 	if err != nil {
 		return nil, err
@@ -218,7 +220,7 @@ func (s *Store) categories(ctx context.Context, userID int64) ([]Category, error
 	var out []Category
 	for rows.Next() {
 		var item Category
-		if err := rows.Scan(&item.ID, &item.Name, &item.Kind, &item.Position); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Kind, &item.Position, &item.Icon, &item.Tint); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -334,13 +336,17 @@ func (s *Store) DeleteMovement(ctx context.Context, userID, id int64) error {
 	return nil
 }
 
-func (s *Store) CreateCategory(ctx context.Context, userID int64, name, kind string) (Category, error) {
+func (s *Store) CreateCategory(ctx context.Context, userID int64, name, kind, icon, tint string) (Category, error) {
 	if kind != "gasto" && kind != "ingreso" {
 		return Category{}, ErrBadMoney
 	}
 	label, err := cleanLabel(name, 40)
 	if err != nil || label == "" {
 		return Category{}, ErrBadMoney
+	}
+	icon, tint, err = categoryLook(kind, icon, tint)
+	if err != nil {
+		return Category{}, err
 	}
 	existing, err := s.categoryByName(ctx, userID, kind, label)
 	if err == nil {
@@ -357,10 +363,10 @@ func (s *Store) CreateCategory(ctx context.Context, userID int64, name, kind str
 	}
 	var item Category
 	err = s.pool.QueryRow(ctx, `
-		INSERT INTO categories (user_id, name, kind, position)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, name, kind, position`,
-		userID, label, kind, position).Scan(&item.ID, &item.Name, &item.Kind, &item.Position)
+		INSERT INTO categories (user_id, name, kind, position, icon, tint)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, name, kind, position, icon, tint`,
+		userID, label, kind, position, icon, tint).Scan(&item.ID, &item.Name, &item.Kind, &item.Position, &item.Icon, &item.Tint)
 	if isUnique(err) {
 		return s.categoryByName(ctx, userID, kind, label)
 	}
@@ -370,10 +376,33 @@ func (s *Store) CreateCategory(ctx context.Context, userID int64, name, kind str
 func (s *Store) categoryByName(ctx context.Context, userID int64, kind, name string) (Category, error) {
 	var item Category
 	err := s.pool.QueryRow(ctx, `
-		SELECT id, name, kind, position FROM categories
+		SELECT id, name, kind, position, icon, tint FROM categories
 		WHERE user_id = $1 AND kind = $2 AND lower(name) = lower($3)`,
-		userID, kind, name).Scan(&item.ID, &item.Name, &item.Kind, &item.Position)
+		userID, kind, name).Scan(&item.ID, &item.Name, &item.Kind, &item.Position, &item.Icon, &item.Tint)
 	return item, err
+}
+
+func categoryLook(kind, icon, tint string) (string, string, error) {
+	icon = strings.TrimSpace(icon)
+	if len([]rune(icon)) > 8 {
+		return "", "", ErrBadMoney
+	}
+	if icon == "" {
+		if kind == "ingreso" {
+			icon = "💰"
+		} else {
+			icon = "✨"
+		}
+	}
+	switch tint {
+	case "", "bruma", "ciruela", "azul":
+		if tint == "" {
+			tint = "bruma"
+		}
+	default:
+		return "", "", ErrBadMoney
+	}
+	return icon, tint, nil
 }
 
 func cleanLabel(raw string, max int) (string, error) {

@@ -38,7 +38,7 @@ export type Habit = {
 }
 
 export type MoneyAccount = { id: number; name: string }
-export type MoneyCategory = { id: number; name: string; kind: 'gasto' | 'ingreso'; position: number }
+export type MoneyCategory = { id: number; name: string; kind: 'gasto' | 'ingreso'; position: number; icon: string; tint: string }
 export type Movement = {
   id: number
   accountId: number

@@ -106,14 +106,14 @@ func seedMoney(ctx context.Context, tx pgx.Tx, userID int64) error {
 		return err
 	}
 	_, err := tx.Exec(ctx, `
-		INSERT INTO categories (user_id, name, kind, position) VALUES
-		($1, 'Almuerzo', 'gasto', 0),
-		($1, 'Comida', 'gasto', 1),
-		($1, 'Transporte', 'gasto', 2),
-		($1, 'Casa', 'gasto', 3),
-		($1, 'Salidas', 'gasto', 4),
-		($1, 'Otros', 'gasto', 5),
-		($1, 'Ingreso', 'ingreso', 6)`, userID)
+		INSERT INTO categories (user_id, name, kind, position, icon, tint) VALUES
+		($1, 'Almuerzo', 'gasto', 0, '🍽', 'bruma'),
+		($1, 'Comida', 'gasto', 1, '🍔', 'ciruela'),
+		($1, 'Transporte', 'gasto', 2, '🚌', 'azul'),
+		($1, 'Casa', 'gasto', 3, '🏠', 'bruma'),
+		($1, 'Salidas', 'gasto', 4, '🎉', 'ciruela'),
+		($1, 'Otros', 'gasto', 5, '✨', 'azul'),
+		($1, 'Ingreso', 'ingreso', 6, '💰', 'bruma')`, userID)
 	return err
 }
 

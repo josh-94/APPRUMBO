@@ -69,8 +69,8 @@ export const api = {
   updateMovement: (id: number, body: { kind: 'gasto' | 'ingreso'; amountCents: number; accountId: number; categoryId: number; day: string; note: string }) =>
     request<Movement>(`/api/movements/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteMovement: (id: number) => request<void>(`/api/movements/${id}`, { method: 'DELETE' }),
-  createCategory: (name: string, kind: 'gasto' | 'ingreso') =>
-    request<MoneyCategory>('/api/categories', { method: 'POST', body: JSON.stringify({ name, kind }) }),
+  createCategory: (name: string, kind: 'gasto' | 'ingreso', look?: { icon: string; tint: string }) =>
+    request<MoneyCategory>('/api/categories', { method: 'POST', body: JSON.stringify({ name, kind, icon: look?.icon ?? '', tint: look?.tint ?? '' }) }),
   plan: () => request<MoneyPlan>('/api/money/plan'),
   setFx: (fxHundredths: number) => request<void>('/api/money/fx', { method: 'PUT', body: JSON.stringify({ fxHundredths }) }),
   saveAccount: (body: Partial<PayAccount> & { name: string }) =>

@@ -247,12 +247,14 @@ func (s *Server) createCategory(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Name string `json:"name"`
 		Kind string `json:"kind"`
+		Icon string `json:"icon"`
+		Tint string `json:"tint"`
 	}
 	if err := readJSON(w, r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "JSON inválido")
 		return
 	}
-	item, err := s.Store.CreateCategory(r.Context(), currentUser(r), body.Name, body.Kind)
+	item, err := s.Store.CreateCategory(r.Context(), currentUser(r), body.Name, body.Kind, body.Icon, body.Tint)
 	if errors.Is(err, store.ErrBadMoney) {
 		writeError(w, http.StatusUnprocessableEntity, "Ponle un nombre de hasta 40 letras.")
 		return

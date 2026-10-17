@@ -8,7 +8,7 @@ import { HabitSheet, MoneySheet } from './components/CaptureSheets'
 import { PayConfirm } from './components/PlanSheets'
 import { MyDay } from './screens/MyDay'
 import { Tiempo } from './screens/Tiempo'
-import { Plata } from './screens/Plata'
+import { CuentasPage, DeudasPage, PagosPage, Plata } from './screens/Plata'
 import { ListDetail, ListsHome } from './screens/Lists'
 import { Moment } from './screens/Moment'
 import { Settings } from './screens/Settings'
@@ -224,6 +224,9 @@ export function App() {
           }
         />
         <Route path="/plata" element={<Plata onCreate={() => setMoneyOpen(true)} onChanged={loadLife} refresh={moneyTick} />} />
+        <Route path="/plata/deudas" element={<DeudasPage />} />
+        <Route path="/plata/cuentas" element={<CuentasPage />} />
+        <Route path="/plata/pagos" element={<PagosPage />} />
         <Route path="/listas" element={<ListsHome lists={lists} onReloadLists={loadLists} />} />
         <Route
           path="/listas/:id"

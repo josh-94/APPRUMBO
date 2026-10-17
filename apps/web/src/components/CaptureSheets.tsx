@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import type { MoneyCategory, MonthMoney, Movement } from '../types'
+import { categoryIcon, categoryIcons, categoryTints } from '../categories'
 import { centsToInput, todayKey } from '../format'
 
 export function HabitSheet({ onClose, onSave }: { onClose: () => void; onSave: (name: string, nGoal: number) => Promise<void> }) {
@@ -147,7 +148,7 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
               className={item.id === selected ? 'pill on' : 'pill quiet'}
               onClick={() => setCategoryId(item.id)}
             >
-              {item.name}
+              {categoryIcon(item.icon)} {item.name}
             </button>
           ))}
           <button type="button" className={adding ? 'pill on' : 'pill quiet'} onClick={() => setAdding((open) => !open)}>
@@ -188,6 +189,57 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
             </button>
           </div>
         )}
+      </form>
+    </div>
+  )
+}
+
+export function CategorySheet({ onClose, onSave }: {
+  onClose: () => void
+  onSave: (name: string, icon: string, tint: string) => Promise<void>
+}) {
+  const [name, setName] = useState('')
+  const [icon, setIcon] = useState(categoryIcons[0])
+  const [tint, setTint] = useState<string>(categoryTints[0].id)
+  const [error, setError] = useState('')
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    try {
+      await onSave(name.trim(), icon, tint)
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear la categoría')
+    }
+  }
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void submit(event)}>
+        <div className="sheet-handle" />
+        <h2>Añadir categoría</h2>
+        <label className="field">
+          Nombre
+          <input value={name} required maxLength={40} placeholder="Gimnasio, mascotas…" autoFocus onChange={(event) => setName(event.target.value)} />
+        </label>
+        <p className="field-label">Elige un ícono</p>
+        <div className="icon-pick">
+          {categoryIcons.map((item) => (
+            <button key={item} type="button" className={item === icon ? `tint ${tint} on` : 'tint bruma'} onClick={() => setIcon(item)}>
+              {item}
+            </button>
+          ))}
+        </div>
+        <p className="field-label">Elige un color</p>
+        <div className="chips">
+          {categoryTints.map((item) => (
+            <button key={item.id} type="button" className={item.id === tint ? 'pill on' : 'pill quiet'} onClick={() => setTint(item.id)}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+        {error && <p className="error">{error}</p>}
+        <button type="submit" className="primary">Guardar</button>
       </form>
     </div>
   )
