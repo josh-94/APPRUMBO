@@ -51,7 +51,18 @@ export type Movement = {
   note: string
 }
 
-export type PayAccount = { id: number; name: string; payday: number; paydayCents: number; currency: string }
+export type PayEvery = '' | 'semana' | 'quincena' | 'mes'
+export type PayAccount = {
+  id: number
+  name: string
+  payEvery: PayEvery
+  payday: number
+  paydayCents: number
+  payday2: number
+  payday2Cents: number
+  currency: string
+  balanceCents: number
+}
 export type Debt = {
   id: number
   kind: 'tarjeta' | 'prestamo'
@@ -73,6 +84,18 @@ export type MoneyPlan = {
   debtUsd: number
   debtTotalPen: number
   cuotaTotalPen: number
+}
+
+export type MoneyDraft = {
+  kind: 'gasto' | 'ingreso'
+  amountCents: number
+  categoryId: number
+  category: string
+  note: string
+  day: string
+  confidence: 'alta' | 'baja'
+  question: string
+  transcript?: string
 }
 
 export type MonthMoney = {

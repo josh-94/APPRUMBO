@@ -15,17 +15,21 @@ flowchart LR
   pg[Postgres]
   redis[Redis]
   worker[Worker_push]
+  ollama[Ollama]
+  whisper[Whisper]
   browser --> cf --> web
   web -->|estaticos| browser
   web -->|/api| api
   api --> pg
   api --> redis
   api -->|avisos| redis
+  api -->|texto_o_foto| ollama
+  api -->|audio| whisper
   worker --> redis
   worker --> pg
 ```
 
-nginx está en [apps/web/nginx.conf](../apps/web/nginx.conf). Los archivos de la app y de la landing salen de disco. Lo que empieza por `/api/` se reenvía a `api:8080`. `www.apprumbo.online` redirige al apex en Cloudflare; el túnel no lo publica.
+nginx está en [apps/web/nginx.conf](../apps/web/nginx.conf). Los archivos de la app y de la landing salen de disco. Lo que empieza por `/api/` se reenvía a `api:8080`, acepta hasta 8 MB y espera 90 segundos: es el margen de la foto y de la respuesta del modelo. `www.apprumbo.online` redirige al apex en Cloudflare; el túnel no lo publica.
 
 ## Qué corre en la placa
 
@@ -39,8 +43,13 @@ Producción es el perfil `tunnel` de [deploy/compose.yaml](../deploy/compose.yam
 | `worker` | Lee esa cola y manda el push. | 64 MiB |
 | `web` | nginx. Estáticos y proxy hacia la API. | 64 MiB |
 | `cloudflared` | Túnel. El token vive en `deploy/.env`, que no está en git. | 128 MiB |
+| `ollama` | Modelo Qwen2.5-VL 3B. Lee el texto y la foto del chat de gastos. Un solo modelo, y se descarga a los 10 minutos. | 3.5 GiB |
+| `ollama-pull` | Baja ese modelo la primera vez y sale. No se queda encendido. | 128 MiB |
+| `whisper` | Whisper small. Transcribe la voz en español y convierte el audio del teléfono a wav. | 768 MiB |
 
 Redis no guarda la sesión de cada visita: la cookie viaja con el navegador y la API la verifica sola.
+
+Ollama y Whisper no publican puertos y no salen por el túnel. Solo la API les habla, dentro de la red de Docker. Los pesos quedan en los volúmenes `ollamadata` y `whispermodels`. El primer arranque los descarga; hasta que termina, el chat dice que el modelo se está preparando. El borrador no se guarda solo: la persona lo confirma y ahí la API anota el movimiento.
 
 El reloj de la app sale de `APP_TIMEZONE` en `deploy/.env`. El ejemplo del repo dice `America/Bogota`. Lima marca la misma hora (UTC−5, sin horario de verano).
 

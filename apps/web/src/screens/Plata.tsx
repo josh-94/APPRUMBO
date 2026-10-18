@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { categoryIcon, categoryTint } from '../categories'
 import { CategorySheet, MoneySheet } from '../components/CaptureSheets'
+import { MoneyChat } from '../components/MoneyChat'
 import { AccountSheet, BillSheet, DebtSheet } from '../components/PlanSheets'
 import { EyeButton, useHideMoney } from '../components/HideMoney'
 import { Shell } from '../components/Shell'
@@ -16,6 +17,8 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
   const [money, setMoney] = useState<MonthMoney | null>(null)
   const [editing, setEditing] = useState<Movement | null>(null)
   const [adding, setAdding] = useState(false)
+  const [chat, setChat] = useState(false)
+  const [offlineNote, setOfflineNote] = useState(false)
   const viewingNow = month === current
   const rows = spendRows(money)
   const tallest = Math.max(...rows.map((row) => row.cents), 1)
@@ -50,6 +53,20 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
           <span className="spend-name">Añadir categoría</span>
         </button>
       </div>
+      {offlineNote && <p className="hint">Hace falta conexión. Anótalo a mano.</p>}
+      <button type="button" className="spend-fab chat" aria-label="Contar un gasto" onClick={() => {
+        if (!navigator.onLine || !money) {
+          setOfflineNote(!navigator.onLine)
+          onCreate()
+          return
+        }
+        setOfflineNote(false)
+        setChat(true)
+      }}>
+        <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.75">
+          <path d="M5 6h14v9H8l-3 3V6Z" />
+        </svg>
+      </button>
       <button type="button" className="spend-fab" aria-label="Anotar gasto" onClick={() => { setMonth(current); onCreate() }}>
         <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
           <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
@@ -77,13 +94,13 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
         </div>
       )}
       <nav className="plan-links">
-        <Link className="plan-link deudas" to="/plata/deudas">
-          <i aria-hidden="true"><CardIcon /></i>
-          Deudas
-        </Link>
         <Link className="plan-link cuentas" to="/plata/cuentas">
           <i aria-hidden="true"><WalletIcon /></i>
           Cuentas
+        </Link>
+        <Link className="plan-link deudas" to="/plata/deudas">
+          <i aria-hidden="true"><CardIcon /></i>
+          Deudas
         </Link>
         <Link className="plan-link pagos" to="/plata/pagos">
           <i aria-hidden="true"><CalendarIcon /></i>
@@ -96,6 +113,18 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
           onSave={async (name, icon, tint) => {
             await api.createCategory(name, 'gasto', { icon, tint })
             onChanged()
+          }}
+        />
+      )}
+      {chat && money && (
+        <MoneyChat
+          money={money}
+          onClose={() => setChat(false)}
+          onSaved={onChanged}
+          onOffline={() => {
+            setChat(false)
+            setOfflineNote(true)
+            onCreate()
           }}
         />
       )}
@@ -161,6 +190,7 @@ export function DeudasPage() {
 }
 
 export function CuentasPage() {
+  const navigate = useNavigate()
   const { hidden, toggle } = useHideMoney()
   const { plan, reload } = usePlan()
   const [account, setAccount] = useState<PayAccount | null | undefined>(undefined)
@@ -168,17 +198,92 @@ export function CuentasPage() {
   return (
     <Shell title="Cuentas" back="/plata" action={<EyeButton hidden={hidden} onToggle={toggle} />}>
       {plan?.accounts.map((item) => (
-        <button key={item.id} type="button" className="money-row plan-row" onClick={() => setAccount(item)}>
-          <div>
-            <strong>{item.name}</strong>
-            <p className="meta">{item.payday ? `Sueldo el ${item.payday}` : 'Sin sueldo programado'}</p>
-          </div>
-          <strong>{item.paydayCents ? (hidden ? `${currencySymbol(item.currency)} ••••` : money(item.paydayCents, item.currency)) : ''}</strong>
-        </button>
+        <article key={item.id} className="account-card">
+          <button type="button" className="account-open" onClick={() => navigate(`/plata/cuentas/${item.id}`)}>
+            <p className="account-name">{item.name}</p>
+            <strong>{hidden ? `${currencySymbol(item.currency)} ••••` : money(item.balanceCents, item.currency)}</strong>
+          </button>
+          <button type="button" className="account-edit" aria-label={`Editar ${item.name}`} onClick={() => setAccount(item)}>
+            <PencilIcon />
+          </button>
+        </article>
       ))}
       <button type="button" className="ghost" onClick={() => setAccount(null)}>Agregar cuenta</button>
       {account !== undefined && <AccountSheet account={account} onClose={() => setAccount(undefined)} onSaved={reload} />}
     </Shell>
+  )
+}
+
+export function AccountHistory() {
+  const { id } = useParams()
+  const accountId = Number(id)
+  const current = currentMonthKey()
+  const { hidden, toggle } = useHideMoney()
+  const { plan, reload } = usePlan()
+  const [month, setMonth] = useState(current)
+  const [money, setMoney] = useState<MonthMoney | null>(null)
+  const [editing, setEditing] = useState<Movement | null>(null)
+  const account = plan?.accounts.find((item) => item.id === accountId)
+  const moves = (money?.movements ?? []).filter((item) => item.accountId === accountId)
+
+  useEffect(() => {
+    api.month(month).then(setMoney).catch(() => setMoney(null))
+  }, [month, plan])
+
+  return (
+    <Shell title={account?.name ?? 'Cuenta'} back="/plata/cuentas" action={<EyeButton hidden={hidden} onToggle={toggle} />}>
+      <div className="month-nav">
+        <button type="button" className="month-step" aria-label="Mes anterior" onClick={() => setMonth(shiftMonth(month, -1))}>‹</button>
+        <p className="kicker">{monthTitle(month, current)}</p>
+        <button type="button" className="month-step" aria-label="Mes siguiente" disabled={month === current} onClick={() => setMonth(shiftMonth(month, 1))}>›</button>
+      </div>
+      {money && moves.length === 0 && <p className="empty">Esta cuenta no tiene movimientos en este mes.</p>}
+      {moves.length > 0 && (
+        <div className="ledger">
+          {moves.map((item) => {
+            const title = item.note || item.category || (item.kind === 'ingreso' ? 'Ingreso' : 'Gasto')
+            return (
+              <button key={item.id} type="button" className={item.kind === 'ingreso' ? 'move ingreso' : 'move gasto'} onClick={() => setEditing(item)}>
+                <span className="move-mark" aria-hidden="true">{title.trim().charAt(0).toUpperCase()}</span>
+                <span className="move-copy">
+                  <strong>{title}</strong>
+                  <span className="meta">{item.kind === 'ingreso' ? 'Ingreso' : 'Gasto'} · {movementDate(item.occurredOn)}</span>
+                </span>
+                <strong className="move-amount">{movementAmount(item.kind, item.amountCents, hidden)}</strong>
+                <span className="move-chevron" aria-hidden="true">›</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {editing && money && (
+        <MoneySheet
+          money={money}
+          movement={editing}
+          onClose={() => setEditing(null)}
+          onSave={async (input) => {
+            await api.updateMovement(editing.id, input)
+            setEditing(null)
+            reload()
+          }}
+          onDelete={async () => {
+            await api.deleteMovement(editing.id)
+            setEditing(null)
+            reload()
+          }}
+          onCreateCategory={async (name, kind) => api.createCategory(name, kind)}
+        />
+      )}
+    </Shell>
+  )
+}
+
+function PencilIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+      <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="m13.5 6.5 3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
   )
 }
 

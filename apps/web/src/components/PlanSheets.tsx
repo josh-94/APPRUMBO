@@ -1,7 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../api'
-import { centsToInput, currencies, dolares, parseCents, soles } from '../format'
-import type { Bill, Debt, MoneyCategory, MoneyPlan, PayAccount, Task } from '../types'
+import { centsToInput, currencies, dolares, money, parseCents, soles } from '../format'
+import type { Bill, Debt, MoneyCategory, MoneyPlan, PayAccount, PayEvery, Task } from '../types'
+
+const weekdays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+const payChoices: { id: Exclude<PayEvery, ''>; label: string }[] = [
+  { id: 'semana', label: 'Cada semana' },
+  { id: 'quincena', label: 'Cada quincena' },
+  { id: 'mes', label: 'Cada mes' },
+]
 
 function currencyLabel(code: string) {
   return currencies.find((item) => item.code === code)?.name ?? code
@@ -15,28 +22,56 @@ export function AccountSheet({ account, onClose, onSaved }: { account: PayAccoun
   const saved = account?.currency || 'PEN'
   const listed = currencies.some((item) => item.code === saved)
   const [name, setName] = useState(account?.name ?? '')
+  const [every, setEvery] = useState<PayEvery>(account?.payEvery || (account?.payday ? 'mes' : ''))
   const [payday, setPayday] = useState(account?.payday ? String(account.payday) : '')
   const [amount, setAmount] = useState(centsToInput(account?.paydayCents ?? 0))
+  const [payday2, setPayday2] = useState(account?.payday2 ? String(account.payday2) : '')
+  const [amount2, setAmount2] = useState(centsToInput(account?.payday2Cents ?? 0))
   const [currency, setCurrency] = useState(listed ? saved : 'custom')
   const [custom, setCustom] = useState(listed ? '' : saved)
   const [error, setError] = useState('')
 
+  function chooseEvery(next: PayEvery) {
+    setEvery((current) => current === next ? '' : next)
+    setError('')
+  }
+
   async function save(event: FormEvent) {
     event.preventDefault()
-    const day = Number(payday)
-    const cents = parseCents(amount)
     const typed = custom.trim()
     const code = currency === 'custom' ? (/^[A-Za-z]+$/.test(typed) ? typed.toUpperCase() : typed) : currency
     if (currency === 'custom' && !code) {
       setError('Escribe la moneda, por ejemplo EUR.')
       return
     }
-    if ((payday !== '' || amount !== '') && (!day || day > 31 || !cents)) {
-      setError('El sueldo necesita un día del mes y un monto.')
-      return
+    const day = Number(payday)
+    const cents = parseCents(amount)
+    const day2 = Number(payday2)
+    const cents2 = parseCents(amount2)
+    let pay = { payEvery: '' as PayEvery, payday: 0, paydayCents: 0, payday2: 0, payday2Cents: 0 }
+    if (every === 'semana') {
+      if (day < 1 || day > 7 || !cents) {
+        setError('El sueldo semanal necesita un día y un monto.')
+        return
+      }
+      pay = { payEvery: 'semana', payday: day, paydayCents: cents, payday2: 0, payday2Cents: 0 }
+    }
+    if (every === 'mes') {
+      if (!day || day > 31 || !cents) {
+        setError('El sueldo mensual necesita un día del mes y un monto.')
+        return
+      }
+      pay = { payEvery: 'mes', payday: day, paydayCents: cents, payday2: 0, payday2Cents: 0 }
+    }
+    if (every === 'quincena') {
+      if (!day || day > 31 || !day2 || day2 > 31 || day === day2 || !cents || !cents2) {
+        setError('Cada quincena necesita su día y su monto.')
+        return
+      }
+      pay = { payEvery: 'quincena', payday: day, paydayCents: cents, payday2: day2, payday2Cents: cents2 }
     }
     try {
-      await api.saveAccount({ id: account?.id, name: name.trim(), payday: day || 0, paydayCents: cents, currency: code })
+      await api.saveAccount({ id: account?.id, name: name.trim(), currency: code, ...pay })
       onSaved()
       onClose()
     } catch (err) {
@@ -49,6 +84,7 @@ export function AccountSheet({ account, onClose, onSaved }: { account: PayAccoun
       <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void save(event)}>
         <div className="sheet-handle" />
         <h2>{account ? 'Cuenta' : 'Nueva cuenta'}</h2>
+        {account && <p className="field-label">Saldo {money(account.balanceCents, account.currency || 'PEN')}</p>}
         <label className="field">Nombre<input value={name} required maxLength={80} onChange={(event) => setName(event.target.value)} /></label>
         <label className="field">
           Moneda
@@ -69,9 +105,38 @@ export function AccountSheet({ account, onClose, onSaved }: { account: PayAccoun
             <input value={custom} required maxLength={6} placeholder="EUR" onChange={(event) => setCustom(event.target.value)} />
           </label>
         )}
-        <label className="field">Día en que llega el sueldo<input inputMode="numeric" placeholder="28" value={payday} onChange={(event) => setPayday(event.target.value)} /></label>
-        <label className="field">Monto<input inputMode="decimal" placeholder="0.00" value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
-        <p className="field-label">Si no es un sueldo, deja el día y el monto vacíos.</p>
+        <p className="field-label">Cada cuánto llega el sueldo</p>
+        <div className="chips">
+          {payChoices.map((item) => (
+            <button key={item.id} type="button" className={every === item.id ? 'pill on' : 'pill quiet'} onClick={() => chooseEvery(item.id)}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+        {every === 'semana' && (
+          <label className="field">
+            Día de la semana
+            <select value={payday} onChange={(event) => setPayday(event.target.value)}>
+              <option value="">Elige</option>
+              {weekdays.map((label, index) => <option key={label} value={index + 1}>{label}</option>)}
+            </select>
+          </label>
+        )}
+        {every === 'mes' && (
+          <label className="field">Día del mes<input inputMode="numeric" placeholder="28" value={payday} onChange={(event) => setPayday(event.target.value)} /></label>
+        )}
+        {every === 'quincena' && (
+          <>
+            <label className="field">Día de la primera quincena<input inputMode="numeric" placeholder="15" value={payday} onChange={(event) => setPayday(event.target.value)} /></label>
+            <label className="field">Monto de la primera<input inputMode="decimal" placeholder="0.00" value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
+            <label className="field">Día de la segunda quincena<input inputMode="numeric" placeholder="30" value={payday2} onChange={(event) => setPayday2(event.target.value)} /></label>
+            <label className="field">Monto de la segunda<input inputMode="decimal" placeholder="0.00" value={amount2} onChange={(event) => setAmount2(event.target.value)} /></label>
+          </>
+        )}
+        {(every === 'semana' || every === 'mes') && (
+          <label className="field">Cuánto entra<input inputMode="decimal" placeholder="0.00" value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
+        )}
+        <p className="field-label">Si no llega un sueldo, deja las opciones sin elegir.</p>
         {error && <p className="error">{error}</p>}
         <button type="submit" className="primary">Guardar</button>
         {account && (
@@ -228,7 +293,7 @@ export function PayConfirm({ task, onClose, onSaved }: { task: Task; onClose: ()
       const fx = next.fxHundredths
       if (task.payKind === 'sueldo') {
         const account = next.accounts.find((item) => item.id === task.payRef)
-        setAmount(centsToInput(account?.paydayCents ?? 0))
+        setAmount(centsToInput(salaryCents(account, task.dueAt)))
       }
       if (task.payKind === 'mes') {
         const bill = next.bills.find((item) => item.id === task.payRef)
@@ -298,6 +363,13 @@ export function PayConfirm({ task, onClose, onSaved }: { task: Task; onClose: ()
       </form>
     </div>
   )
+}
+
+function salaryCents(account: PayAccount | undefined, dueAt: string | null) {
+  if (!account) return 0
+  const day = Number(dueAt?.slice(0, 10).split('-')[2])
+  if (account.payEvery === 'quincena' && day === account.payday2) return account.payday2Cents
+  return account.paydayCents
 }
 
 function hiddenDebt(debt: Debt) {

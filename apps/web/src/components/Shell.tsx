@@ -40,10 +40,12 @@ export function Shell({ title, eyebrow, back, action, tabs, children }: Props) {
   return (
     <div className="app">
       <header className="top">
-        <div className="top-row">
+        <div className={back ? 'top-row has-back' : 'top-row'}>
           {back ? (
             <NavLink className="icon-btn" to={back} aria-label="Volver">
-              ←
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M15 6 9 12l6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </NavLink>
           ) : tabs ? (
             <img className="app-mark" src="/logo.svg" alt="Rumbo" width="32" height="32" />

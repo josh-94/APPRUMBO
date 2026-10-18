@@ -1,4 +1,4 @@
-import type { Bill, Debt, Habit, MoneyCategory, MoneyPlan, MonthMoney, Movement, PayAccount, Task, TaskInput, TaskList } from './types'
+import type { Bill, Debt, Habit, MoneyCategory, MoneyDraft, MoneyPlan, MonthMoney, Movement, PayAccount, Task, TaskInput, TaskList } from './types'
 
 let onUnauthorized = () => {}
 
@@ -8,7 +8,7 @@ export function setUnauthorized(fn: () => void) {
 
 async function request<T>(path: string, options: RequestInit = {}, redirectOnAuth = true): Promise<T> {
   const headers = new Headers(options.headers)
-  if (options.body && !headers.has('Content-Type')) {
+  if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
   const response = await fetch(path, { ...options, headers, credentials: 'include' })
@@ -64,6 +64,14 @@ export const api = {
       ? request<void>(`/api/habits/${id}/checks`, { method: 'POST', body: JSON.stringify({ day }) })
       : request<void>(`/api/habits/${id}/checks?day=${day}`, { method: 'DELETE' }),
   month: (month?: string) => request<MonthMoney>(month ? `/api/money/month?month=${month}` : '/api/money/month'),
+  draftMoney: (body: { text?: string; audio?: Blob; image?: Blob; previous?: MoneyDraft }) => {
+    const form = new FormData()
+    if (body.text) form.set('text', body.text)
+    if (body.audio) form.set('audio', body.audio, audioFilename(body.audio))
+    if (body.image) form.set('image', body.image, 'foto.jpg')
+    if (body.previous) form.set('previous', JSON.stringify(body.previous))
+    return request<MoneyDraft>('/api/money/draft', { method: 'POST', body: form })
+  },
   createMovement: (body: { kind: 'gasto' | 'ingreso'; amountCents: number; accountId: number; categoryId: number; day: string; note: string }) =>
     request<Movement>('/api/movements', { method: 'POST', body: JSON.stringify(body) }),
   updateMovement: (id: number, body: { kind: 'gasto' | 'ingreso'; amountCents: number; accountId: number; categoryId: number; day: string; note: string }) =>
@@ -85,4 +93,12 @@ export const api = {
   confirmPay: (body: { kind: string; id: number; amountCents: number; balancePen: number; balanceUsd: number }) =>
     request<void>('/api/money/confirm', { method: 'POST', body: JSON.stringify(body) }),
   exportData: () => request<Record<string, unknown>>('/api/export'),
+}
+
+function audioFilename(blob: Blob) {
+  if (blob.type.includes('mp4') || blob.type.includes('aac') || blob.type.includes('m4a')) return 'audio.mp4'
+  if (blob.type.includes('mpeg') || blob.type.includes('mp3')) return 'audio.mp3'
+  if (blob.type.includes('wav')) return 'audio.wav'
+  if (blob.type.includes('ogg')) return 'audio.ogg'
+  return 'audio.webm'
 }

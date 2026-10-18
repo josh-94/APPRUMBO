@@ -209,6 +209,10 @@ func (s *Store) accounts(ctx context.Context, userID int64) ([]Account, error) {
 	return out, rows.Err()
 }
 
+func (s *Store) Categories(ctx context.Context, userID int64) ([]Category, error) {
+	return s.categories(ctx, userID)
+}
+
 func (s *Store) categories(ctx context.Context, userID int64) ([]Category, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, name, kind, position, icon, tint FROM categories

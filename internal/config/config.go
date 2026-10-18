@@ -19,6 +19,9 @@ type Config struct {
 	GoogleID       string
 	GoogleSecret   string
 	GoogleRedirect string
+	OllamaURL      string
+	OllamaModel    string
+	WhisperURL     string
 }
 
 func Load() (Config, error) {
@@ -34,6 +37,9 @@ func Load() (Config, error) {
 		GoogleID:       os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleSecret:   os.Getenv("GOOGLE_CLIENT_SECRET"),
 		GoogleRedirect: os.Getenv("GOOGLE_REDIRECT_URL"),
+		OllamaURL:      env("OLLAMA_URL", "http://ollama:11434"),
+		OllamaModel:    env("OLLAMA_MODEL", "qwen2.5vl:3b"),
+		WhisperURL:     env("WHISPER_URL", "http://whisper:8080"),
 	}
 	if cfg.DatabaseURL == "" || cfg.RedisURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL y REDIS_URL son obligatorias")

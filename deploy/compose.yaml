@@ -42,6 +42,10 @@ services:
       context: ..
       dockerfile: apps/api/Dockerfile
     env_file: .env
+    environment:
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5vl:3b}
+      WHISPER_URL: ${WHISPER_URL:-http://whisper:8080}
     mem_limit: 128m
     restart: unless-stopped
     depends_on:
@@ -104,5 +108,57 @@ services:
     depends_on:
       - web
 
+  # Sin puertos publicados: solo la API les habla, dentro de la red de Docker.
+  ollama:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_KEEP_ALIVE: 10m
+    volumes:
+      - ollamadata:/root/.ollama
+    mem_limit: 3584m
+    restart: unless-stopped
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5vl:3b}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        i=0
+        until ollama list >/dev/null 2>&1; do
+          i=$$((i+1))
+          if [ "$$i" -gt 90 ]; then echo "ollama no respondió"; exit 1; fi
+          sleep 2
+        done
+        ollama pull "$$OLLAMA_MODEL"
+    mem_limit: 128m
+    restart: on-failure
+    depends_on:
+      - ollama
+
+  whisper:
+    image: ghcr.io/ggml-org/whisper.cpp:main
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ ! -s /models/ggml-small.bin ]; then
+          if [ -f /app/models/download-ggml-model.sh ]; then
+            bash /app/models/download-ggml-model.sh small /models
+          else
+            download-ggml-model.sh small /models
+          fi
+        fi
+        exec whisper-server --host 0.0.0.0 --port 8080 --convert -l es -m /models/ggml-small.bin -t 4
+    volumes:
+      - whispermodels:/models
+    mem_limit: 768m
+    restart: unless-stopped
+
 volumes:
   pgdata:
+  ollamadata:
+  whispermodels:

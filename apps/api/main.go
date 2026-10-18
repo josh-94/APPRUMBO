@@ -58,8 +58,8 @@ func main() {
 	go notify.RunScheduler(ctx, db, redisClient, cfg.Location)
 
 	api := &httpapi.Server{
-		Store:         db,
-		Redis:         redisClient,
+		Store:          db,
+		Redis:          redisClient,
 		Loc:            cfg.Location,
 		SessionSecret:  cfg.SessionSecret,
 		CookieSecure:   cfg.CookieSecure,
@@ -67,6 +67,9 @@ func main() {
 		GoogleID:       cfg.GoogleID,
 		GoogleSecret:   cfg.GoogleSecret,
 		GoogleRedirect: cfg.GoogleRedirect,
+		OllamaURL:      cfg.OllamaURL,
+		OllamaModel:    cfg.OllamaModel,
+		WhisperURL:     cfg.WhisperURL,
 	}
 	server := &http.Server{
 		Addr:              cfg.Addr,

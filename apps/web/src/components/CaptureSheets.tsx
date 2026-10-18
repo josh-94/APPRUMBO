@@ -55,6 +55,7 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
   const [note, setNote] = useState(movement?.note ?? '')
   const [day, setDay] = useState(movement?.occurredOn || todayKey())
   const [categoryId, setCategoryId] = useState(movement?.categoryId ?? 0)
+  const [accountId, setAccountId] = useState(movement?.accountId || money.accounts[0]?.id || 0)
   const [created, setCreated] = useState<MoneyCategory[]>([])
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
@@ -64,7 +65,6 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
   const explicit = categoryId && categories.some((item) => item.id === categoryId) ? categoryId : 0
   const otros = categories.find((item) => item.name === 'Otros')
   const selected = explicit || (kind === 'gasto' && note.trim() && otros ? otros.id : categories[0]?.id)
-  const accountId = movement?.accountId || money.accounts[0]?.id
 
   function chooseKind(next: 'gasto' | 'ingreso') {
     setKind(next)
@@ -139,6 +139,19 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
             <input type="date" required max={todayKey()} value={day} onChange={(event) => setDay(event.target.value)} />
           </label>
         )}
+        <p className="field-label">{kind === 'gasto' ? '¿De qué cuenta sale?' : '¿En qué cuenta entra?'}</p>
+        <div className="chips">
+          {money.accounts.map((account) => (
+            <button
+              key={account.id}
+              type="button"
+              className={account.id === accountId ? 'pill on' : 'pill quiet'}
+              onClick={() => setAccountId(account.id)}
+            >
+              {account.name}
+            </button>
+          ))}
+        </div>
         <p className="field-label">Opcional. Si se repite, guárdalo como categoría.</p>
         <div className="chips">
           {categories.map((item) => (

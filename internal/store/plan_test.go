@@ -44,3 +44,39 @@ func TestNextPayDate(t *testing.T) {
 		t.Fatalf("already paid: got %s show=%v", due, show)
 	}
 }
+
+func TestNextSalaryDate(t *testing.T) {
+	loc := time.FixedZone("Lima", -5*60*60)
+	day := func(y int, m time.Month, d int) time.Time {
+		return time.Date(y, m, d, 15, 0, 0, 0, loc)
+	}
+	paid := func(y int, m time.Month, d int) *time.Time {
+		value := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+		return &value
+	}
+
+	due, show := NextSalaryDate("semana", 1, 0, day(2026, time.October, 17), nil, loc)
+	if !show || due.Day() != 12 || due.Month() != time.October {
+		t.Fatalf("week unpaid: got %s show=%v", due, show)
+	}
+
+	due, show = NextSalaryDate("semana", 1, 0, day(2026, time.October, 17), paid(2026, time.October, 12), loc)
+	if !show || due.Day() != 19 {
+		t.Fatalf("week paid: got %s show=%v", due, show)
+	}
+
+	due, show = NextSalaryDate("quincena", 15, 30, day(2026, time.October, 17), nil, loc)
+	if !show || due.Day() != 15 {
+		t.Fatalf("quincena overdue: got %s show=%v", due, show)
+	}
+
+	due, show = NextSalaryDate("quincena", 15, 30, day(2026, time.October, 17), paid(2026, time.October, 15), loc)
+	if show || due.Day() != 30 {
+		t.Fatalf("quincena next: got %s show=%v", due, show)
+	}
+
+	due, show = NextSalaryDate("quincena", 15, 30, day(2026, time.October, 24), paid(2026, time.October, 15), loc)
+	if !show || due.Day() != 30 {
+		t.Fatalf("quincena soon: got %s show=%v", due, show)
+	}
+}

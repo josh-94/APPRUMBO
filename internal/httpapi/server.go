@@ -33,6 +33,9 @@ type Server struct {
 	GoogleID       string
 	GoogleSecret   string
 	GoogleRedirect string
+	OllamaURL      string
+	OllamaModel    string
+	WhisperURL     string
 }
 
 func (s *Server) Handler() http.Handler {
@@ -65,6 +68,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/habits/{id}/checks", s.protected(s.habitCheck))
 	mux.HandleFunc("DELETE /api/habits/{id}/checks", s.protected(s.habitCheck))
 	mux.HandleFunc("GET /api/money/month", s.protected(s.moneyMonth))
+	mux.HandleFunc("POST /api/money/draft", s.protected(s.moneyDraft))
 	mux.HandleFunc("POST /api/movements", s.protected(s.createMovement))
 	mux.HandleFunc("PATCH /api/movements/{id}", s.protected(s.updateMovement))
 	mux.HandleFunc("DELETE /api/movements/{id}", s.protected(s.deleteMovement))

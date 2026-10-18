@@ -14,11 +14,15 @@ import (
 const DefaultFxHundredths = 340
 
 type PayAccount struct {
-	ID          int64  `json:"id"`
-	Name        string `json:"name"`
-	Payday      int    `json:"payday"`
-	PaydayCents int64  `json:"paydayCents"`
-	Currency    string `json:"currency"`
+	ID           int64  `json:"id"`
+	Name         string `json:"name"`
+	PayEvery     string `json:"payEvery"`
+	Payday       int    `json:"payday"`
+	PaydayCents  int64  `json:"paydayCents"`
+	Payday2      int    `json:"payday2"`
+	Payday2Cents int64  `json:"payday2Cents"`
+	Currency     string `json:"currency"`
+	BalanceCents int64  `json:"balanceCents"`
 }
 
 type Debt struct {
@@ -125,11 +129,14 @@ func (s *Store) SetFx(ctx context.Context, userID int64, hundredths int) error {
 
 func (s *Store) SaveAccount(ctx context.Context, userID int64, item PayAccount) (PayAccount, error) {
 	name, err := cleanLabel(item.Name, 80)
-	if err != nil || name == "" || item.Payday < 0 || item.Payday > 31 || item.PaydayCents < 0 {
+	if err != nil || name == "" {
 		return PayAccount{}, ErrBadMoney
 	}
-	if (item.Payday == 0) != (item.PaydayCents == 0) {
-		return PayAccount{}, ErrBadMoney
+	if item.PayEvery == "" && item.Payday > 0 && item.PaydayCents > 0 {
+		item.PayEvery = "mes"
+	}
+	if err = normalizePay(&item); err != nil {
+		return PayAccount{}, err
 	}
 	item.Name = name
 	item.Currency, err = cleanCurrency(item.Currency)
@@ -138,14 +145,15 @@ func (s *Store) SaveAccount(ctx context.Context, userID int64, item PayAccount) 
 	}
 	if item.ID == 0 {
 		err = s.pool.QueryRow(ctx, `
-			INSERT INTO accounts (user_id, name, payday, payday_cents, currency)
-			VALUES ($1, $2, NULLIF($3, 0), NULLIF($4, 0), $5)
-			RETURNING id`, userID, item.Name, item.Payday, item.PaydayCents, item.Currency).Scan(&item.ID)
+			INSERT INTO accounts (user_id, name, pay_every, payday, payday_cents, payday2, payday2_cents, currency)
+			VALUES ($1, $2, $3, NULLIF($4, 0), NULLIF($5, 0), NULLIF($6, 0), NULLIF($7, 0), $8)
+			RETURNING id`, userID, item.Name, item.PayEvery, item.Payday, item.PaydayCents, item.Payday2, item.Payday2Cents, item.Currency).Scan(&item.ID)
 		return item, err
 	}
 	tag, err := s.pool.Exec(ctx, `
-		UPDATE accounts SET name = $3, payday = NULLIF($4, 0), payday_cents = NULLIF($5, 0), currency = $6
-		WHERE id = $1 AND user_id = $2`, item.ID, userID, item.Name, item.Payday, item.PaydayCents, item.Currency)
+		UPDATE accounts SET name = $3, pay_every = $4, payday = NULLIF($5, 0), payday_cents = NULLIF($6, 0),
+			payday2 = NULLIF($7, 0), payday2_cents = NULLIF($8, 0), currency = $9
+		WHERE id = $1 AND user_id = $2`, item.ID, userID, item.Name, item.PayEvery, item.Payday, item.PaydayCents, item.Payday2, item.Payday2Cents, item.Currency)
 	if err != nil {
 		return PayAccount{}, err
 	}
@@ -306,14 +314,17 @@ func (s *Store) EnsurePayTasks(ctx context.Context, userID int64, today time.Tim
 		return err
 	}
 	for _, account := range accounts {
-		if account.Payday == 0 || account.PaydayCents == 0 {
+		if account.PayEvery == "" || account.Payday == 0 || account.PaydayCents == 0 {
+			continue
+		}
+		if account.PayEvery == "quincena" && (account.Payday2 == 0 || account.Payday2Cents == 0) {
 			continue
 		}
 		last, err := s.lastPaid(ctx, `SELECT last_payday FROM accounts WHERE id = $1 AND user_id = $2`, account.ID, userID)
 		if err != nil {
 			return err
 		}
-		due, show := NextPayDate(account.Payday, today, last, loc)
+		due, show := NextSalaryDate(account.PayEvery, account.Payday, account.Payday2, today, last, loc)
 		if !show {
 			continue
 		}
@@ -494,8 +505,14 @@ func (s *Store) ConfirmPay(ctx context.Context, userID int64, in ConfirmPay, day
 
 func (s *Store) payAccounts(ctx context.Context, userID int64) ([]PayAccount, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, name, COALESCE(payday, 0), COALESCE(payday_cents, 0), currency
-		FROM accounts WHERE user_id = $1 ORDER BY id`, userID)
+		SELECT a.id, a.name, COALESCE(a.pay_every, ''), COALESCE(a.payday, 0), COALESCE(a.payday_cents, 0),
+		       COALESCE(a.payday2, 0), COALESCE(a.payday2_cents, 0), a.currency,
+		       COALESCE(SUM(CASE WHEN m.kind = 'ingreso' THEN m.amount_cents ELSE -m.amount_cents END), 0)
+		FROM accounts a
+		LEFT JOIN movements m ON m.account_id = a.id AND m.user_id = a.user_id
+		WHERE a.user_id = $1
+		GROUP BY a.id
+		ORDER BY a.id`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -503,7 +520,7 @@ func (s *Store) payAccounts(ctx context.Context, userID int64) ([]PayAccount, er
 	var out []PayAccount
 	for rows.Next() {
 		var item PayAccount
-		if err := rows.Scan(&item.ID, &item.Name, &item.Payday, &item.PaydayCents, &item.Currency); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.PayEvery, &item.Payday, &item.PaydayCents, &item.Payday2, &item.Payday2Cents, &item.Currency, &item.BalanceCents); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -610,6 +627,78 @@ func gastoCategory(ctx context.Context, tx pgx.Tx, userID int64) (int64, error) 
 		return 0, nil
 	}
 	return id, err
+}
+
+func normalizePay(item *PayAccount) error {
+	switch item.PayEvery {
+	case "":
+		item.Payday, item.PaydayCents, item.Payday2, item.Payday2Cents = 0, 0, 0, 0
+		return nil
+	case "semana":
+		if item.Payday < 1 || item.Payday > 7 || item.PaydayCents <= 0 {
+			return ErrBadMoney
+		}
+		item.Payday2, item.Payday2Cents = 0, 0
+	case "mes":
+		if item.Payday < 1 || item.Payday > 31 || item.PaydayCents <= 0 {
+			return ErrBadMoney
+		}
+		item.Payday2, item.Payday2Cents = 0, 0
+	case "quincena":
+		if item.Payday < 1 || item.Payday > 31 || item.Payday2 < 1 || item.Payday2 > 31 || item.Payday == item.Payday2 {
+			return ErrBadMoney
+		}
+		if item.PaydayCents <= 0 || item.Payday2Cents <= 0 {
+			return ErrBadMoney
+		}
+	default:
+		return ErrBadMoney
+	}
+	return nil
+}
+
+// NextSalaryDate elige el próximo sueldo según cada semana, cada quincena o cada mes.
+func NextSalaryDate(every string, day, day2 int, today time.Time, last *time.Time, loc *time.Location) (time.Time, bool) {
+	switch every {
+	case "semana":
+		return nextWeekPay(day, today, last, loc)
+	case "quincena":
+		return nextQuincena(day, day2, today, last, loc)
+	default:
+		return NextPayDate(day, today, last, loc)
+	}
+}
+
+func nextWeekPay(weekday int, today time.Time, last *time.Time, loc *time.Location) (time.Time, bool) {
+	today = schedule.StartOfDay(today, loc)
+	if weekday < 1 {
+		weekday = 1
+	}
+	if weekday > 7 {
+		weekday = 7
+	}
+	target := time.Weekday(weekday % 7)
+	delta := int(target) - int(today.Weekday())
+	due := time.Date(today.Year(), today.Month(), today.Day(), 9, 0, 0, 0, loc).AddDate(0, 0, delta)
+	if confirmedThrough(last, due, loc) {
+		due = due.AddDate(0, 0, 7)
+	}
+	return due, showPay(today, due, loc)
+}
+
+func nextQuincena(day, day2 int, today time.Time, last *time.Time, loc *time.Location) (time.Time, bool) {
+	first, showFirst := NextPayDate(day, today, last, loc)
+	second, showSecond := NextPayDate(day2, today, last, loc)
+	if showFirst && (!showSecond || first.Before(second)) {
+		return first, true
+	}
+	if showSecond {
+		return second, true
+	}
+	if first.Before(second) {
+		return first, false
+	}
+	return second, false
 }
 
 func confirmedThrough(last *time.Time, due time.Time, loc *time.Location) bool {
