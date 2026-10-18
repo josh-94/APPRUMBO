@@ -12,7 +12,7 @@ import (
 
 const defaultGroqBaseURL = "https://api.groq.com/openai/v1"
 
-// LLMConfig drives money/capture drafts: Groq first when keyed, else Ollama.
+// LLMConfig drives money/capture drafts: Groq first when keyed, else Ollama (gemma3:1b).
 type LLMConfig struct {
 	GroqAPIKey      string
 	GroqModel       string

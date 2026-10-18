@@ -15,14 +15,16 @@ flowchart LR
   pg[Postgres]
   redis[Redis]
   worker[Worker_push]
-  ollama[Ollama]
+  groq[Groq]
+  ollama[Ollama_gemma3]
   browser --> cf --> web
   web -->|estaticos| browser
   web -->|/api| api
   api --> pg
   api --> redis
   api -->|avisos| redis
-  api -->|texto| ollama
+  api -->|texto_primero| groq
+  api -.->|fallback| ollama
   worker --> redis
   worker --> pg
 ```
@@ -37,18 +39,18 @@ Producción es el perfil `tunnel` de [deploy/compose.yaml](../deploy/compose.yam
 | --- | --- | --- |
 | `postgres` | Datos. Postgres 16. Volumen `pgdata`. | 512 MiB |
 | `redis` | Cola de avisos. 64 MB; si se llena, bota lo más viejo. | 96 MiB |
-| `api` | API en Go. Sesión en una cookie firmada. Publica los recordatorios en Redis. | 128 MiB |
+| `api` | API en Go. Sesión en una cookie firmada. Publica los recordatorios en Redis. Llama a Groq y, si hace falta, a Ollama. | 128 MiB |
 | `worker` | Lee esa cola y manda el push. | 64 MiB |
 | `web` | nginx. Estáticos y proxy hacia la API. | 64 MiB |
 | `cloudflared` | Túnel. El token vive en `deploy/.env`, que no está en git. | 128 MiB |
-| `ollama` | Un solo modelo de texto (`qwen2.5:3b` por defecto). `MAX_LOADED_MODELS=1`, `KEEP_ALIVE=60m`. Sin visión ni audio. | 3.5 GiB |
-| `ollama-pull` | Baja ese modelo la primera vez, lo calienta y sale. No se queda encendido. | 128 MiB |
+| `ollama` | Fallback local: `gemma3:1b`. `MAX_LOADED_MODELS=1`, `KEEP_ALIVE=-1`. Sin visión ni audio. | 2 GiB |
+| `ollama-pull` | Baja Gemma la primera vez, lo calienta y sale. No se queda encendido. | 128 MiB |
 
 Redis no guarda la sesión de cada visita: la cookie viaja con el navegador y la API la verifica sola.
 
-Ollama no publica puertos y no sale por el túnel. Solo la API le habla, dentro de la red de Docker. Los pesos quedan en el volumen `ollamadata`. El primer arranque los descarga y deja el modelo en RAM; hasta que termina, el chat dice que el modelo se está preparando. La API manda `num_thread` (`OLLAMA_NUM_THREAD`, por defecto 4) y contextos cortos.
+Los borradores de gasto/captura que necesitan modelo van primero a **Groq** (`GROQ_API_KEY` + `GROQ_MODEL`, por defecto `llama-3.1-8b-instant`). Si Groq falla (red, 429, 5xx) o no hay key, caen a **Ollama** con `gemma3:1b`. Muchas correcciones cortas se resuelven en local sin llamar a ningún modelo.
 
-Los borradores de gasto/captura que necesitan modelo usan **Groq** si hay `GROQ_API_KEY` en `deploy/.env`; si falla o no hay key, caen a Ollama. Muchas correcciones cortas se resuelven en local sin llamar a ningún modelo. El chat de gastos y la captura aceptan solo texto; si llega audio o imagen, la API responde 422. El borrador no se guarda solo: la persona lo confirma y ahí la API anota el movimiento.
+Ollama no publica puertos y no sale por el túnel. Solo la API le habla, dentro de la red de Docker. Los pesos quedan en el volumen `ollamadata`. El primer arranque los descarga y deja el modelo en RAM. La API manda `num_thread` (`OLLAMA_NUM_THREAD`, por defecto 4) y contextos cortos. El chat de gastos y la captura aceptan solo texto; si llega audio o imagen, la API responde 422. El borrador no se guarda solo: la persona lo confirma y ahí la API anota el movimiento.
 
 El reloj de la app sale de `APP_TIMEZONE` en `deploy/.env`. El ejemplo del repo dice `America/Bogota`. Lima marca la misma hora (UTC−5, sin horario de verano).
 

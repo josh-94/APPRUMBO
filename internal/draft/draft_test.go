@@ -231,7 +231,7 @@ func TestCompleteAndTranscribe(t *testing.T) {
 		_, _ = w.Write([]byte(`{"message":{"content":"{\"kind\":\"gasto\"}"}}`))
 	}))
 	defer ollama.Close()
-	got, err := Complete(context.Background(), ollama.URL, "qwen2.5:3b", "sistema", "almuerzo", nil, 4)
+	got, err := Complete(context.Background(), ollama.URL, "gemma3:1b", "sistema", "almuerzo", nil, 4)
 	if err != nil || !strings.Contains(got, "gasto") {
 		t.Fatalf("%q %v", got, err)
 	}
@@ -239,6 +239,7 @@ func TestCompleteAndTranscribe(t *testing.T) {
 	money := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, _ := io.ReadAll(r.Body)
 		var req struct {
+			Model   string `json:"model"`
 			Options struct {
 				NumCtx     int `json:"num_ctx"`
 				NumPredict int `json:"num_predict"`
@@ -248,15 +249,15 @@ func TestCompleteAndTranscribe(t *testing.T) {
 		if err := json.Unmarshal(raw, &req); err != nil {
 			t.Error(err)
 		}
-		if req.Options.NumCtx != 512 || req.Options.NumPredict != 72 || req.Options.NumThread != 4 {
-			t.Errorf("money options %+v", req.Options)
+		if req.Model != "gemma3:1b" || req.Options.NumCtx != 512 || req.Options.NumPredict != 72 || req.Options.NumThread != 4 {
+			t.Errorf("money model=%s options %+v", req.Model, req.Options)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"message":{"content":"{\"kind\":\"gasto\"}"}}`))
 	}))
 	defer money.Close()
 	if _, err := CompleteMoney(context.Background(), LLMConfig{
-		OllamaURL: money.URL, OllamaModel: "qwen2.5:3b", OllamaNumThread: 4,
+		OllamaURL: money.URL, OllamaModel: "gemma3:1b", OllamaNumThread: 4,
 	}, "s", "u"); err != nil {
 		t.Fatalf("CompleteMoney %v", err)
 	}
@@ -291,10 +292,17 @@ func TestCompleteAndTranscribe(t *testing.T) {
 	defer ollamaFallback.Close()
 	gotFallback, err := CompleteMoney(context.Background(), LLMConfig{
 		GroqAPIKey: "test-key", GroqBaseURL: groqFail.URL,
-		OllamaURL: ollamaFallback.URL, OllamaModel: "qwen2.5:3b", OllamaNumThread: 4,
+		OllamaURL: ollamaFallback.URL, OllamaModel: "gemma3:1b", OllamaNumThread: 4,
 	}, "s", "u")
 	if err != nil || !strings.Contains(gotFallback, "ollama") {
 		t.Fatalf("fallback %q %v", gotFallback, err)
+	}
+
+	gotCapture, err := CompleteCapture(context.Background(), LLMConfig{
+		GroqAPIKey: "test-key", GroqModel: "llama-3.1-8b-instant", GroqBaseURL: groqOK.URL,
+	}, "s", "u")
+	if err != nil || !strings.Contains(gotCapture, "gasto") {
+		t.Fatalf("CompleteCapture groq %q %v", gotCapture, err)
 	}
 
 	missing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

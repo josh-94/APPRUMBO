@@ -44,7 +44,7 @@ func Load() (Config, error) {
 		GoogleRedirect:  os.Getenv("GOOGLE_REDIRECT_URL"),
 		OllamaURL:       env("OLLAMA_URL", "http://ollama:11434"),
 		OllamaModel:     os.Getenv("OLLAMA_MODEL"),
-		OllamaTextModel: env("OLLAMA_TEXT_MODEL", "qwen2.5:3b"),
+		OllamaTextModel: env("OLLAMA_TEXT_MODEL", "gemma3:1b"),
 		OllamaNumThread: envInt("OLLAMA_NUM_THREAD", 4),
 		GroqAPIKey:      os.Getenv("GROQ_API_KEY"),
 		GroqModel:       env("GROQ_MODEL", "llama-3.1-8b-instant"),
