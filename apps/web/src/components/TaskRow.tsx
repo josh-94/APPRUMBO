@@ -74,9 +74,9 @@ export function TaskRow({ task, onOpen, onDone, onLater, onDelete }: Props) {
           <span className="card-title">{task.title}</span>
           <span className="meta">
             {task.pinned && <em>Fijada</em>}
-            {clock(task.dueAt)}
-            {repeatSummary(task.repeatWeekdays)}
-            {task.remindAt && 'Recordatorio'}
+            {clock(task.dueAt) ? <span>{clock(task.dueAt)}</span> : null}
+            {repeatSummary(task.repeatWeekdays) ? <span>{repeatSummary(task.repeatWeekdays)}</span> : null}
+            {task.remindAt ? <span>Recordatorio</span> : null}
           </span>
         </button>
       </article>
