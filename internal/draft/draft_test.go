@@ -164,13 +164,38 @@ func TestMatchPaySourceIgnoresSolesInAccountName(t *testing.T) {
 	sources := []PaySource{
 		{ID: 1, Name: "Ahorros Soles - BCP", Kind: "account"},
 		{ID: 9, Name: "Amex", Kind: "debt"},
+		{ID: 3, Name: "BCP Amex Gold", Kind: "debt"},
 	}
 	got, ok := MatchPaySource("agregar a mis gastos 2 soles en palta de mi tarjeta amex categoria alimentos", sources)
-	if !ok || got.ID != 9 || got.Kind != "debt" {
-		t.Fatalf("want Amex, got %+v ok=%v", got, ok)
+	if !ok || got.Kind != "debt" || (got.ID != 9 && got.ID != 3) {
+		t.Fatalf("want Amex card, got %+v ok=%v", got, ok)
 	}
 	if _, ok := MatchPaySource("gaste 2 soles en palta", sources); ok {
 		t.Fatal("soles alone must not match Ahorros Soles")
+	}
+	got, ok = MatchPaySource("cuenta de ahorros", sources)
+	if !ok || got.ID != 1 || got.Kind != "account" {
+		t.Fatalf("want savings account, got %+v ok=%v", got, ok)
+	}
+}
+
+func TestTryLocalMoneyDoesNotInheritPreviousSource(t *testing.T) {
+	today := time.Date(2026, 10, 17, 0, 0, 0, 0, time.UTC)
+	categories := []Category{{ID: 3, Name: "Comida", Kind: "gasto"}}
+	sources := []PaySource{{ID: 3, Name: "BCP Amex Gold", Kind: "debt"}, {ID: 1, Name: "Ahorros Soles - BCP", Kind: "account"}}
+	previous := &Proposal{Kind: "gasto", AmountCents: 3400, DebtID: 3, SourceName: "BCP Amex Gold", CategoryID: 3, Category: "Comida"}
+	got, ok := TryLocalMoney("anotar 20 soles en perejil gasto", categories, sources, today, previous)
+	if !ok || got.AmountCents != 2000 {
+		t.Fatalf("draft %+v ok=%v", got, ok)
+	}
+	if got.DebtID != 0 || got.AccountID != 0 || got.SourceName != "" {
+		t.Fatalf("must not inherit previous source %+v", got)
+	}
+	got, ok = TryLocalMoney("cuenta de ahorros", categories, sources, today, &Proposal{
+		Kind: "gasto", AmountCents: 2000, CategoryID: 3, Category: "Comida", Note: "perejil", Day: "2026-10-17",
+	})
+	if !ok || got.AccountID != 1 || got.SourceName != "Ahorros Soles - BCP" {
+		t.Fatalf("savings correction %+v ok=%v", got, ok)
 	}
 }
 

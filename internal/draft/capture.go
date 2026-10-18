@@ -445,15 +445,20 @@ func paySourceByID(accountID, debtID int64, sources []PaySource) (PaySource, boo
 	return PaySource{}, false
 }
 
-// Tokens that appear in account names and also in normal spend phrases ("2 soles").
-var paySourceNoise = map[string]bool{
+// Currency tokens must never match pay sources ("2 soles" ≠ "Ahorros Soles").
+var paySourceCurrencyNoise = map[string]bool{
 	"sol": true, "soles": true, "pen": true, "usd": true, "dolar": true, "dolares": true, "dólar": true, "dólares": true,
-	"ahorro": true, "ahorros": true, "cuenta": true, "tarjeta": true, "banco": true, "efectivo": true,
+}
+
+// Generic words: only useful with intent ("cuenta de ahorros"), never alone from the name.
+var paySourceGenericNoise = map[string]bool{
+	"cuenta": true, "tarjeta": true, "banco": true, "efectivo": true,
 }
 
 func MatchPaySource(text string, sources []PaySource) (PaySource, bool) {
 	lower := strings.ToLower(text)
 	preferCard := strings.Contains(lower, "tarjeta")
+	preferAccount := strings.Contains(lower, "cuenta") || strings.Contains(lower, "ahorro")
 	var best PaySource
 	bestScore := 0
 	for _, src := range sources {
@@ -468,7 +473,11 @@ func MatchPaySource(text string, sources []PaySource) (PaySource, bool) {
 		for _, part := range strings.FieldsFunc(name, func(r rune) bool {
 			return r == ' ' || r == '-' || r == '/'
 		}) {
-			if utf8.RuneCountInString(part) < 3 || paySourceNoise[part] {
+			if utf8.RuneCountInString(part) < 3 || paySourceCurrencyNoise[part] || paySourceGenericNoise[part] {
+				continue
+			}
+			// "ahorros" in the account name only counts when the user talks about the account.
+			if (part == "ahorro" || part == "ahorros") && !preferAccount {
 				continue
 			}
 			if strings.Contains(lower, part) {
@@ -478,6 +487,13 @@ func MatchPaySource(text string, sources []PaySource) (PaySource, bool) {
 				}
 			}
 		}
+		if preferAccount && src.Kind == "account" && strings.Contains(name, "ahorro") {
+			if score < 8 {
+				score = 8
+			} else {
+				score += 4
+			}
+		}
 		if score == 0 {
 			continue
 		}
@@ -485,6 +501,12 @@ func MatchPaySource(text string, sources []PaySource) (PaySource, bool) {
 			score += 4
 		}
 		if preferCard && src.Kind == "account" {
+			score -= 2
+		}
+		if preferAccount && src.Kind == "account" {
+			score += 3
+		}
+		if preferAccount && src.Kind == "debt" {
 			score -= 2
 		}
 		if score > bestScore {

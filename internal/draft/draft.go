@@ -192,11 +192,7 @@ func TryLocalMoney(text string, categories []Category, sources []PaySource, toda
 		Day:         day.Format("2006-01-02"),
 		Confidence:  "baja",
 	}
-	if previous != nil {
-		out.AccountID = previous.AccountID
-		out.DebtID = previous.DebtID
-		out.SourceName = previous.SourceName
-	}
+	// Nuevo gasto con monto: no heredar medio de pago del borrador anterior.
 	if ok {
 		out.CategoryID = cat.ID
 		out.Category = cat.Name

@@ -10,6 +10,7 @@ import {
   type ChatBubble,
 } from '../moneyChatMemory'
 import { soles, todayKey } from '../format'
+import { patchMoneyDraft } from '../patchMoneyDraft'
 import type { MoneyDraft, MonthMoney } from '../types'
 
 export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: {
@@ -71,14 +72,27 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
   }
 
   async function send(value: string) {
-    if (!navigator.onLine) {
-      onOffline()
-      return
-    }
     const label = value.trim()
     if (!label) return
     const id = nextId()
     const previous = previousDraft()
+    // Correcciones cortas (categoría / cuenta / nota) en el teléfono: sin API ni Ollama.
+    const localPatch = previous ? patchMoneyDraft(label, previous, money) : null
+    if (localPatch) {
+      const draftId = nextId()
+      setMessages((items) => trimChat([
+        ...items,
+        { id, role: 'user', text: label },
+        { id: draftId, role: 'draft', draft: localPatch, saved: false },
+      ]))
+      setText('')
+      setError('')
+      return
+    }
+    if (!navigator.onLine) {
+      onOffline()
+      return
+    }
     const memory = memoryForDraft(messages)
     setMessages((items) => trimChat([...items, { id, role: 'user', text: label }]))
     setText('')
