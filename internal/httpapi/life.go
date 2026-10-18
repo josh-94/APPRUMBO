@@ -118,6 +118,7 @@ func (s *Server) moneyMonth(w http.ResponseWriter, r *http.Request) {
 		"incomeCents":    summary.IncomeCents,
 		"remainingCents": remaining,
 		"accounts":       summary.Accounts,
+		"cards":          summary.Cards,
 		"categories":     summary.Categories,
 		"movements":      summary.Movements,
 	})
@@ -128,6 +129,7 @@ func (s *Server) createMovement(w http.ResponseWriter, r *http.Request) {
 		Kind        string `json:"kind"`
 		AmountCents int64  `json:"amountCents"`
 		AccountID   int64  `json:"accountId"`
+		DebtID      int64  `json:"debtId"`
 		CategoryID  int64  `json:"categoryId"`
 		Day         string `json:"day"`
 		Note        string `json:"note"`
@@ -148,6 +150,7 @@ func (s *Server) createMovement(w http.ResponseWriter, r *http.Request) {
 		Kind:        body.Kind,
 		AmountCents: body.AmountCents,
 		AccountID:   body.AccountID,
+		DebtID:      body.DebtID,
 		CategoryID:  body.CategoryID,
 		Note:        body.Note,
 	}, day)
@@ -175,6 +178,7 @@ func (s *Server) updateMovement(w http.ResponseWriter, r *http.Request) {
 		Kind        string `json:"kind"`
 		AmountCents int64  `json:"amountCents"`
 		AccountID   int64  `json:"accountId"`
+		DebtID      int64  `json:"debtId"`
 		CategoryID  int64  `json:"categoryId"`
 		Day         string `json:"day"`
 		Note        string `json:"note"`
@@ -192,6 +196,7 @@ func (s *Server) updateMovement(w http.ResponseWriter, r *http.Request) {
 		Kind:        body.Kind,
 		AmountCents: body.AmountCents,
 		AccountID:   body.AccountID,
+		DebtID:      body.DebtID,
 		CategoryID:  body.CategoryID,
 		Note:        body.Note,
 	}, day)

@@ -39,15 +39,26 @@ export type Habit = {
 
 export type MoneyAccount = { id: number; name: string }
 export type MoneyCategory = { id: number; name: string; kind: 'gasto' | 'ingreso'; position: number; icon: string; tint: string }
+export type MoneyCard = { id: number; name: string }
 export type Movement = {
   id: number
   accountId: number
+  debtId: number
   categoryId: number
   kind: 'gasto' | 'ingreso'
   amountCents: number
   occurredOn: string
   accountName: string
   category: string
+  note: string
+}
+export type MovementInput = {
+  kind: 'gasto' | 'ingreso'
+  amountCents: number
+  accountId?: number
+  debtId?: number
+  categoryId: number
+  day: string
   note: string
 }
 
@@ -86,6 +97,7 @@ export type DebtMove = {
   amountCents: number
   occurredOn: string
   note: string
+  source: 'card' | 'month'
 }
 export type Bill = { id: number; name: string; amountCents: number; dueDay: number; categoryId: number; category: string }
 export type MoneyPlan = {
@@ -116,6 +128,7 @@ export type MonthMoney = {
   incomeCents: number
   remainingCents: number | null
   accounts: MoneyAccount[]
+  cards: MoneyCard[]
   categories: MoneyCategory[]
   movements: Movement[]
 }

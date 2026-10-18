@@ -534,20 +534,24 @@ button, input, textarea, select { font: inherit; color: inherit; }
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--rumbo-color-expense);
-  color: white;
+  background: var(--rumbo-color-expense-soft);
+  color: var(--rumbo-color-expense);
   display: grid;
   place-items: center;
   font-weight: 700;
   flex: none;
 }
-.move.ingreso .move-mark { background: var(--rumbo-color-primary); }
+.move.ingreso .move-mark {
+  background: var(--rumbo-color-income-soft);
+  color: var(--rumbo-color-income);
+}
 .move-copy { flex: 1; min-width: 0; }
 .move-copy strong { display: block; font-weight: 700; }
 .move-copy .meta { display: block; margin: 2px 0 0; }
-.move-amount { font-weight: 700; white-space: nowrap; }
-.move.gasto .move-amount { color: var(--rumbo-color-alert); }
-.move.ingreso .move-amount { color: var(--ink); }
+.move-amount { font-weight: 700; white-space: nowrap; color: var(--ink); }
+/* Gasto: rojo pastel (más suave que Rojo Alto de alerta) */
+.move.gasto .move-amount { color: #C46B66; }
+.move.ingreso .move-amount { color: var(--rumbo-color-income); }
 .move-chevron { color: var(--muted); font-size: 22px; line-height: 1; flex: none; }
 button.plan-row, button.money-row { width: 100%; border: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; }
 .month-nav { display: flex; align-items: center; gap: 8px; }
@@ -697,13 +701,25 @@ button.plan-row, button.money-row { width: 100%; border: 0; text-align: left; cu
   border-radius: 50%;
   display: grid;
   place-items: center;
-  color: white;
   font-style: normal;
 }
-.plan-link.tarjetas i { background: var(--rumbo-color-expense); }
-.plan-link.prestamos i { background: #5B3A7A; }
-.plan-link.cuentas i { background: var(--rumbo-color-primary); }
-.plan-link.pagos i { background: var(--rumbo-color-info); }
+/* Accesos: fondo suave + ícono en color pleno (manual §5.4) */
+.plan-link.cuentas i {
+  background: var(--rumbo-color-primary-soft);
+  color: var(--rumbo-color-primary);
+}
+.plan-link.tarjetas i {
+  background: var(--rumbo-color-expense-soft);
+  color: var(--rumbo-color-expense);
+}
+.plan-link.prestamos i {
+  background: var(--rumbo-color-disabled-bg);
+  color: var(--rumbo-color-surface-strong);
+}
+.plan-link.pagos i {
+  background: var(--rumbo-color-info-soft);
+  color: var(--rumbo-color-info);
+}
 .card-list { display: grid; gap: 12px; margin: 0 0 8px; }
 .credit-card {
   position: relative;
@@ -879,7 +895,7 @@ button.plan-row, button.money-row { width: 100%; border: 0; text-align: left; cu
   transform: none;
 }
 .spend-fab.chat {
-  right: max(86px, calc((100% - 480px) / 2 + 86px));
+  bottom: calc(164px + env(safe-area-inset-bottom));
   background: var(--card);
   color: var(--ink);
   border: 1px solid var(--line);

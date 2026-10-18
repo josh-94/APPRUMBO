@@ -1,4 +1,4 @@
-import type { Bill, Debt, DebtMove, Habit, MoneyCategory, MoneyDraft, MoneyPlan, MonthMoney, Movement, PayAccount, Task, TaskInput, TaskList } from './types'
+import type { Bill, Debt, DebtMove, Habit, MoneyCategory, MoneyDraft, MoneyPlan, MonthMoney, Movement, MovementInput, PayAccount, Task, TaskInput, TaskList } from './types'
 
 let onUnauthorized = () => {}
 
@@ -72,9 +72,9 @@ export const api = {
     if (body.previous) form.set('previous', JSON.stringify(body.previous))
     return request<MoneyDraft>('/api/money/draft', { method: 'POST', body: form })
   },
-  createMovement: (body: { kind: 'gasto' | 'ingreso'; amountCents: number; accountId: number; categoryId: number; day: string; note: string }) =>
+  createMovement: (body: MovementInput) =>
     request<Movement>('/api/movements', { method: 'POST', body: JSON.stringify(body) }),
-  updateMovement: (id: number, body: { kind: 'gasto' | 'ingreso'; amountCents: number; accountId: number; categoryId: number; day: string; note: string }) =>
+  updateMovement: (id: number, body: MovementInput) =>
     request<Movement>(`/api/movements/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteMovement: (id: number) => request<void>(`/api/movements/${id}`, { method: 'DELETE' }),
   createCategory: (name: string, kind: 'gasto' | 'ingreso', look?: { icon: string; tint: string }) =>

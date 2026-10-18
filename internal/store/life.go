@@ -38,6 +38,7 @@ type Category struct {
 type Movement struct {
 	ID          int64  `json:"id"`
 	AccountID   int64  `json:"accountId"`
+	DebtID      int64  `json:"debtId"`
 	CategoryID  int64  `json:"categoryId"`
 	Kind        string `json:"kind"`
 	AmountCents int64  `json:"amountCents"`
@@ -47,10 +48,16 @@ type Movement struct {
 	Note        string `json:"note"`
 }
 
+type MoneyCard struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
 type MonthSummary struct {
 	SpentCents  int64
 	IncomeCents int64
 	Accounts    []Account
+	Cards       []MoneyCard
 	Categories  []Category
 	Movements   []Movement
 }
@@ -160,6 +167,7 @@ func (s *Store) SetHabitCheck(ctx context.Context, userID, habitID int64, day ti
 func (s *Store) Month(ctx context.Context, userID int64, from, to time.Time) (MonthSummary, error) {
 	var summary MonthSummary
 	summary.Accounts = []Account{}
+	summary.Cards = []MoneyCard{}
 	summary.Categories = []Category{}
 	summary.Movements = []Movement{}
 	if err := s.pool.QueryRow(ctx, `
@@ -175,6 +183,10 @@ func (s *Store) Month(ctx context.Context, userID int64, from, to time.Time) (Mo
 	if err != nil {
 		return summary, err
 	}
+	cards, err := s.moneyCards(ctx, userID)
+	if err != nil {
+		return summary, err
+	}
 	categories, err := s.categories(ctx, userID)
 	if err != nil {
 		return summary, err
@@ -184,6 +196,7 @@ func (s *Store) Month(ctx context.Context, userID int64, from, to time.Time) (Mo
 		return summary, err
 	}
 	summary.Accounts = accounts
+	summary.Cards = cards
 	summary.Categories = categories
 	summary.Movements = movements
 	return summary, nil
@@ -205,6 +218,26 @@ func (s *Store) accounts(ctx context.Context, userID int64) ([]Account, error) {
 	}
 	if out == nil {
 		out = []Account{}
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) moneyCards(ctx context.Context, userID int64) ([]MoneyCard, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, name FROM debts
+		WHERE user_id = $1 AND kind = 'tarjeta'
+		ORDER BY due_day, id`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []MoneyCard{}
+	for rows.Next() {
+		var item MoneyCard
+		if err := rows.Scan(&item.ID, &item.Name); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
 	}
 	return out, rows.Err()
 }
@@ -237,10 +270,12 @@ func (s *Store) categories(ctx context.Context, userID int64) ([]Category, error
 
 func (s *Store) movements(ctx context.Context, userID int64, from, to time.Time) ([]Movement, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT m.id, m.account_id, COALESCE(m.category_id, 0), m.kind, m.amount_cents,
-		       to_char(m.occurred_on, 'YYYY-MM-DD'), a.name, COALESCE(c.name, ''), COALESCE(m.note, '')
+		SELECT m.id, COALESCE(m.account_id, 0), COALESCE(m.debt_id, 0), COALESCE(m.category_id, 0), m.kind, m.amount_cents,
+		       to_char(m.occurred_on, 'YYYY-MM-DD'),
+		       COALESCE(a.name, d.name, ''), COALESCE(c.name, ''), COALESCE(m.note, '')
 		FROM movements m
-		JOIN accounts a ON a.id = m.account_id
+		LEFT JOIN accounts a ON a.id = m.account_id
+		LEFT JOIN debts d ON d.id = m.debt_id
 		LEFT JOIN categories c ON c.id = m.category_id
 		WHERE m.user_id = $1 AND m.occurred_on >= $2 AND m.occurred_on < $3
 		ORDER BY m.occurred_on DESC, m.id DESC`, userID, from, to)
@@ -251,7 +286,7 @@ func (s *Store) movements(ctx context.Context, userID int64, from, to time.Time)
 	var out []Movement
 	for rows.Next() {
 		var item Movement
-		if err := rows.Scan(&item.ID, &item.AccountID, &item.CategoryID, &item.Kind, &item.AmountCents, &item.OccurredOn, &item.AccountName, &item.Category, &item.Note); err != nil {
+		if err := rows.Scan(&item.ID, &item.AccountID, &item.DebtID, &item.CategoryID, &item.Kind, &item.AmountCents, &item.OccurredOn, &item.AccountName, &item.Category, &item.Note); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -266,36 +301,10 @@ func (s *Store) CreateMovement(ctx context.Context, userID int64, item Movement,
 	if item.AmountCents <= 0 || (item.Kind != "gasto" && item.Kind != "ingreso") {
 		return Movement{}, ErrBadMoney
 	}
-	note, err := cleanLabel(item.Note, 80)
-	if err != nil {
-		return Movement{}, err
+	if item.DebtID != 0 && item.Kind != "gasto" {
+		return Movement{}, ErrBadMoney
 	}
-	item.Note = note
-	var accountOwner int64
-	if err := s.pool.QueryRow(ctx, `SELECT user_id FROM accounts WHERE id = $1`, item.AccountID).Scan(&accountOwner); err != nil || accountOwner != userID {
-		return Movement{}, ErrNotFound
-	}
-	if item.CategoryID != 0 {
-		var catOwner int64
-		var kind string
-		if err := s.pool.QueryRow(ctx, `SELECT user_id, kind FROM categories WHERE id = $1`, item.CategoryID).Scan(&catOwner, &kind); err != nil || catOwner != userID || kind != item.Kind {
-			return Movement{}, ErrBadMoney
-		}
-	}
-	err = s.pool.QueryRow(ctx, `
-		INSERT INTO movements (user_id, account_id, category_id, kind, amount_cents, occurred_on, note)
-		VALUES ($1, $2, NULLIF($3, 0), $4, $5, $6, $7)
-		RETURNING id`,
-		userID, item.AccountID, item.CategoryID, item.Kind, item.AmountCents, day, item.Note).Scan(&item.ID)
-	if err != nil {
-		return Movement{}, err
-	}
-	item.OccurredOn = day.Format("2006-01-02")
-	return item, nil
-}
-
-func (s *Store) UpdateMovement(ctx context.Context, userID int64, item Movement, day time.Time) (Movement, error) {
-	if item.ID == 0 || item.AmountCents <= 0 || (item.Kind != "gasto" && item.Kind != "ingreso") {
+	if (item.AccountID == 0) == (item.DebtID == 0) {
 		return Movement{}, ErrBadMoney
 	}
 	note, err := cleanLabel(item.Note, 80)
@@ -303,41 +312,183 @@ func (s *Store) UpdateMovement(ctx context.Context, userID int64, item Movement,
 		return Movement{}, err
 	}
 	item.Note = note
-	var accountOwner int64
-	if err := s.pool.QueryRow(ctx, `SELECT user_id FROM accounts WHERE id = $1`, item.AccountID).Scan(&accountOwner); err != nil || accountOwner != userID {
-		return Movement{}, ErrNotFound
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Movement{}, err
+	}
+	defer tx.Rollback(ctx)
+	sourceName, err := s.lockMovementSource(ctx, tx, userID, &item)
+	if err != nil {
+		return Movement{}, err
 	}
 	if item.CategoryID != 0 {
 		var catOwner int64
 		var kind string
-		if err := s.pool.QueryRow(ctx, `SELECT user_id, kind FROM categories WHERE id = $1`, item.CategoryID).Scan(&catOwner, &kind); err != nil || catOwner != userID || kind != item.Kind {
+		if err := tx.QueryRow(ctx, `SELECT user_id, kind FROM categories WHERE id = $1`, item.CategoryID).Scan(&catOwner, &kind); err != nil || catOwner != userID || kind != item.Kind {
 			return Movement{}, ErrBadMoney
 		}
 	}
-	tag, err := s.pool.Exec(ctx, `
+	err = tx.QueryRow(ctx, `
+		INSERT INTO movements (user_id, account_id, debt_id, category_id, kind, amount_cents, occurred_on, note)
+		VALUES ($1, NULLIF($2, 0), NULLIF($3, 0), NULLIF($4, 0), $5, $6, $7, $8)
+		RETURNING id`,
+		userID, item.AccountID, item.DebtID, item.CategoryID, item.Kind, item.AmountCents, day, item.Note).Scan(&item.ID)
+	if err != nil {
+		return Movement{}, err
+	}
+	if item.DebtID != 0 {
+		if err := applyCardBalance(ctx, tx, userID, item.DebtID, item.Kind, item.AmountCents); err != nil {
+			return Movement{}, err
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return Movement{}, err
+	}
+	item.OccurredOn = day.Format("2006-01-02")
+	item.AccountName = sourceName
+	return item, nil
+}
+
+func (s *Store) UpdateMovement(ctx context.Context, userID int64, item Movement, day time.Time) (Movement, error) {
+	if item.ID == 0 || item.AmountCents <= 0 || (item.Kind != "gasto" && item.Kind != "ingreso") {
+		return Movement{}, ErrBadMoney
+	}
+	if item.DebtID != 0 && item.Kind != "gasto" {
+		return Movement{}, ErrBadMoney
+	}
+	if (item.AccountID == 0) == (item.DebtID == 0) {
+		return Movement{}, ErrBadMoney
+	}
+	note, err := cleanLabel(item.Note, 80)
+	if err != nil {
+		return Movement{}, err
+	}
+	item.Note = note
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Movement{}, err
+	}
+	defer tx.Rollback(ctx)
+	var prev Movement
+	err = tx.QueryRow(ctx, `
+		SELECT COALESCE(account_id, 0), COALESCE(debt_id, 0), kind, amount_cents
+		FROM movements WHERE id = $1 AND user_id = $2 FOR UPDATE`, item.ID, userID).Scan(&prev.AccountID, &prev.DebtID, &prev.Kind, &prev.AmountCents)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Movement{}, ErrNotFound
+	}
+	if err != nil {
+		return Movement{}, err
+	}
+	if prev.DebtID != 0 {
+		if err := applyCardBalance(ctx, tx, userID, prev.DebtID, reverseKind(prev.Kind), prev.AmountCents); err != nil {
+			return Movement{}, err
+		}
+	}
+	sourceName, err := s.lockMovementSource(ctx, tx, userID, &item)
+	if err != nil {
+		return Movement{}, err
+	}
+	if item.CategoryID != 0 {
+		var catOwner int64
+		var kind string
+		if err := tx.QueryRow(ctx, `SELECT user_id, kind FROM categories WHERE id = $1`, item.CategoryID).Scan(&catOwner, &kind); err != nil || catOwner != userID || kind != item.Kind {
+			return Movement{}, ErrBadMoney
+		}
+	}
+	tag, err := tx.Exec(ctx, `
 		UPDATE movements
-		SET account_id = $3, category_id = NULLIF($4, 0), kind = $5, amount_cents = $6, occurred_on = $7, note = $8
+		SET account_id = NULLIF($3, 0), debt_id = NULLIF($4, 0), category_id = NULLIF($5, 0),
+			kind = $6, amount_cents = $7, occurred_on = $8, note = $9
 		WHERE id = $1 AND user_id = $2`,
-		item.ID, userID, item.AccountID, item.CategoryID, item.Kind, item.AmountCents, day, item.Note)
+		item.ID, userID, item.AccountID, item.DebtID, item.CategoryID, item.Kind, item.AmountCents, day, item.Note)
 	if err != nil {
 		return Movement{}, err
 	}
 	if tag.RowsAffected() == 0 {
 		return Movement{}, ErrNotFound
 	}
+	if item.DebtID != 0 {
+		if err := applyCardBalance(ctx, tx, userID, item.DebtID, item.Kind, item.AmountCents); err != nil {
+			return Movement{}, err
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return Movement{}, err
+	}
 	item.OccurredOn = day.Format("2006-01-02")
+	item.AccountName = sourceName
 	return item, nil
 }
 
 func (s *Store) DeleteMovement(ctx context.Context, userID, id int64) error {
-	tag, err := s.pool.Exec(ctx, `DELETE FROM movements WHERE id = $1 AND user_id = $2`, id, userID)
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	var prev Movement
+	err = tx.QueryRow(ctx, `
+		SELECT COALESCE(debt_id, 0), kind, amount_cents
+		FROM movements WHERE id = $1 AND user_id = $2 FOR UPDATE`, id, userID).Scan(&prev.DebtID, &prev.Kind, &prev.AmountCents)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if prev.DebtID != 0 {
+		if err := applyCardBalance(ctx, tx, userID, prev.DebtID, reverseKind(prev.Kind), prev.AmountCents); err != nil {
+			return err
+		}
+	}
+	tag, err := tx.Exec(ctx, `DELETE FROM movements WHERE id = $1 AND user_id = $2`, id, userID)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
 		return ErrNotFound
 	}
-	return nil
+	return tx.Commit(ctx)
+}
+
+func (s *Store) lockMovementSource(ctx context.Context, tx pgx.Tx, userID int64, item *Movement) (string, error) {
+	if item.AccountID != 0 {
+		var owner int64
+		var name string
+		err := tx.QueryRow(ctx, `SELECT user_id, name FROM accounts WHERE id = $1`, item.AccountID).Scan(&owner, &name)
+		if errors.Is(err, pgx.ErrNoRows) || owner != userID {
+			return "", ErrNotFound
+		}
+		return name, err
+	}
+	var owner int64
+	var kind, name string
+	err := tx.QueryRow(ctx, `SELECT user_id, kind, name FROM debts WHERE id = $1 FOR UPDATE`, item.DebtID).Scan(&owner, &kind, &name)
+	if errors.Is(err, pgx.ErrNoRows) || owner != userID || kind != "tarjeta" {
+		if err == nil || errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrNotFound
+		}
+		return "", err
+	}
+	return name, nil
+}
+
+func applyCardBalance(ctx context.Context, tx pgx.Tx, userID, debtID int64, kind string, amount int64) error {
+	delta := amount
+	if kind == "ingreso" {
+		delta = -amount
+	}
+	_, err := tx.Exec(ctx, `
+		UPDATE debts SET balance_pen = GREATEST(0, balance_pen + $3)
+		WHERE id = $1 AND user_id = $2`, debtID, userID, delta)
+	return err
+}
+
+func reverseKind(kind string) string {
+	if kind == "gasto" {
+		return "ingreso"
+	}
+	return "gasto"
 }
 
 func (s *Store) CreateCategory(ctx context.Context, userID int64, name, kind, icon, tint string) (Category, error) {

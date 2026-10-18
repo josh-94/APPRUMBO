@@ -85,7 +85,7 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
                 <span className="move-mark" aria-hidden="true">{title.trim().charAt(0).toUpperCase()}</span>
                 <span className="move-copy">
                   <strong>{title}</strong>
-                  <span className="meta">{movementDate(item.occurredOn)}</span>
+                  <span className="meta">{item.accountName ? `${item.accountName} · ` : ''}{movementDate(item.occurredOn)}</span>
                 </span>
                 <strong className="move-amount">{movementAmount(item.kind, item.amountCents, hidden)}</strong>
                 <span className="move-chevron" aria-hidden="true">›</span>
@@ -314,9 +314,11 @@ export function TarjetaDetail() {
                   type="button"
                   className={item.kind === 'pago' ? 'move ingreso' : 'move gasto'}
                   onClick={() => {
-                    if (window.confirm('¿Borrar este movimiento?')) {
-                      void api.deleteDebtMove(card.id, item.id).then(refresh)
-                    }
+                    if (!window.confirm('¿Borrar este movimiento?')) return
+                    const done = item.source === 'month'
+                      ? api.deleteMovement(item.id)
+                      : api.deleteDebtMove(card.id, item.id)
+                    void done.then(refresh)
                   }}
                 >
                   <span className="move-mark" aria-hidden="true">{(item.note || item.kind).trim().charAt(0).toUpperCase()}</span>
@@ -577,7 +579,7 @@ function movementDate(day: string) {
 function movementAmount(kind: 'gasto' | 'ingreso', cents: number, hidden: boolean) {
   if (hidden) return 'S/ ••••'
   const number = soles(cents).replace(/^S\/\s*/, '')
-  return kind === 'gasto' ? `S/ -${number}` : `S/ ${number}`
+  return kind === 'gasto' ? `S/\u00A0\u2212${number}` : `S/\u00A0+${number}`
 }
 
 function mask(hidden: boolean, text: string) {

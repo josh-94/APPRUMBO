@@ -1,7 +1,17 @@
 import { useState, type FormEvent } from 'react'
-import type { MoneyCategory, MonthMoney, Movement } from '../types'
+import type { MoneyCategory, MonthMoney, Movement, MovementInput } from '../types'
 import { categoryIcon, categoryIcons, categoryTints } from '../categories'
 import { centsToInput, todayKey } from '../format'
+
+type MoneySource = { type: 'account'; id: number } | { type: 'debt'; id: number }
+
+function initialSource(money: MonthMoney, movement?: Movement | null): MoneySource {
+  if (movement?.debtId) return { type: 'debt', id: movement.debtId }
+  if (movement?.accountId) return { type: 'account', id: movement.accountId }
+  if (money.accounts[0]) return { type: 'account', id: money.accounts[0].id }
+  if (money.cards?.[0]) return { type: 'debt', id: money.cards[0].id }
+  return { type: 'account', id: 0 }
+}
 
 export function HabitSheet({ onClose, onSave }: { onClose: () => void; onSave: (name: string, nGoal: number) => Promise<void> }) {
   const [name, setName] = useState('')
@@ -46,16 +56,17 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
   money: MonthMoney
   movement?: Movement | null
   onClose: () => void
-  onSave: (input: { kind: 'gasto' | 'ingreso'; amountCents: number; accountId: number; categoryId: number; day: string; note: string }) => Promise<void>
+  onSave: (input: MovementInput) => Promise<void>
   onDelete?: () => Promise<void>
   onCreateCategory: (name: string, kind: 'gasto' | 'ingreso') => Promise<MoneyCategory>
 }) {
+  const cards = money.cards ?? []
   const [kind, setKind] = useState<'gasto' | 'ingreso'>(movement?.kind ?? 'gasto')
   const [amount, setAmount] = useState(movement ? centsToInput(movement.amountCents) : '')
   const [note, setNote] = useState(movement?.note ?? '')
   const [day, setDay] = useState(movement?.occurredOn || todayKey())
   const [categoryId, setCategoryId] = useState(movement?.categoryId ?? 0)
-  const [accountId, setAccountId] = useState(movement?.accountId || money.accounts[0]?.id || 0)
+  const [source, setSource] = useState<MoneySource>(() => initialSource(money, movement))
   const [created, setCreated] = useState<MoneyCategory[]>([])
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
@@ -65,6 +76,7 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
   const explicit = categoryId && categories.some((item) => item.id === categoryId) ? categoryId : 0
   const otros = categories.find((item) => item.name === 'Otros')
   const selected = explicit || (kind === 'gasto' && note.trim() && otros ? otros.id : categories[0]?.id)
+  const sourceReady = source.id > 0 && (source.type === 'account' || kind === 'gasto')
 
   function chooseKind(next: 'gasto' | 'ingreso') {
     setKind(next)
@@ -72,6 +84,9 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
     setAdding(false)
     setNewName('')
     setError('')
+    if (next === 'ingreso' && source.type === 'debt') {
+      setSource(money.accounts[0] ? { type: 'account', id: money.accounts[0].id } : { type: 'account', id: 0 })
+    }
   }
 
   async function addCategory() {
@@ -95,12 +110,20 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
   async function submit(event: FormEvent) {
     event.preventDefault()
     const cents = toCents(amount)
-    if (!cents || !selected || !accountId) {
-      setError('Ese monto no parece correcto. Usa solo números, por ejemplo 25.50.')
+    if (!cents || !selected || !sourceReady) {
+      setError(sourceReady ? 'Ese monto no parece correcto. Usa solo números, por ejemplo 25.50.' : 'Elige de dónde sale o a dónde entra el dinero.')
       return
     }
     try {
-      await onSave({ kind, amountCents: cents, accountId, categoryId: selected, day, note: note.trim() })
+      await onSave({
+        kind,
+        amountCents: cents,
+        accountId: source.type === 'account' ? source.id : 0,
+        debtId: source.type === 'debt' ? source.id : 0,
+        categoryId: selected,
+        day,
+        note: note.trim(),
+      })
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo anotar')
@@ -139,16 +162,28 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
             <input type="date" required max={todayKey()} value={day} onChange={(event) => setDay(event.target.value)} />
           </label>
         )}
-        <p className="field-label">{kind === 'gasto' ? '¿De qué cuenta sale?' : '¿En qué cuenta entra?'}</p>
+        <p className="field-label">
+          {kind === 'gasto' ? '¿De qué cuenta o tarjeta sale?' : '¿En qué cuenta entra?'}
+        </p>
         <div className="chips">
           {money.accounts.map((account) => (
             <button
-              key={account.id}
+              key={`a-${account.id}`}
               type="button"
-              className={account.id === accountId ? 'pill on' : 'pill quiet'}
-              onClick={() => setAccountId(account.id)}
+              className={source.type === 'account' && source.id === account.id ? 'pill on' : 'pill quiet'}
+              onClick={() => setSource({ type: 'account', id: account.id })}
             >
               {account.name}
+            </button>
+          ))}
+          {kind === 'gasto' && cards.map((card) => (
+            <button
+              key={`c-${card.id}`}
+              type="button"
+              className={source.type === 'debt' && source.id === card.id ? 'pill on' : 'pill quiet'}
+              onClick={() => setSource({ type: 'debt', id: card.id })}
+            >
+              {card.name}
             </button>
           ))}
         </div>

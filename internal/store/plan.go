@@ -48,6 +48,7 @@ type DebtMove struct {
 	AmountCents int64  `json:"amountCents"`
 	OccurredOn  string `json:"occurredOn"`
 	Note        string `json:"note"`
+	Source      string `json:"source"` // "card" | "month"
 }
 
 type Bill struct {
@@ -313,9 +314,18 @@ func (s *Store) DebtMoves(ctx context.Context, userID, debtID int64) ([]DebtMove
 		return nil, ErrBadMoney
 	}
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, debt_id, kind, currency, amount_cents, to_char(occurred_on, 'YYYY-MM-DD'), note
-		FROM debt_moves WHERE debt_id = $1 AND user_id = $2
-		ORDER BY occurred_on DESC, id DESC`, debtID, userID)
+		SELECT id, debt_id, kind, currency, amount_cents, day, note, source FROM (
+			SELECT id, debt_id, kind, currency, amount_cents,
+			       to_char(occurred_on, 'YYYY-MM-DD') AS day, note, 'card' AS source, occurred_on, id AS sort_id
+			FROM debt_moves WHERE debt_id = $1 AND user_id = $2
+			UNION ALL
+			SELECT id, debt_id,
+			       CASE WHEN kind = 'gasto' THEN 'consumo' ELSE 'pago' END,
+			       'pen', amount_cents,
+			       to_char(occurred_on, 'YYYY-MM-DD'), COALESCE(note, ''), 'month', occurred_on, id
+			FROM movements WHERE debt_id = $1 AND user_id = $2
+		) AS ledger
+		ORDER BY occurred_on DESC, sort_id DESC`, debtID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +333,7 @@ func (s *Store) DebtMoves(ctx context.Context, userID, debtID int64) ([]DebtMove
 	out := []DebtMove{}
 	for rows.Next() {
 		var item DebtMove
-		if err := rows.Scan(&item.ID, &item.DebtID, &item.Kind, &item.Currency, &item.AmountCents, &item.OccurredOn, &item.Note); err != nil {
+		if err := rows.Scan(&item.ID, &item.DebtID, &item.Kind, &item.Currency, &item.AmountCents, &item.OccurredOn, &item.Note, &item.Source); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
