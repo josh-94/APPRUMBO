@@ -40,34 +40,52 @@ function matchCategory(text: string, money: MonthMoney, kind: MoneyDraft['kind']
   return best
 }
 
-function matchSource(text: string, money: MonthMoney) {
+type SourceHit = { accountId: number; debtId: number; name: string; score: number }
+
+function scoreSource(
+  textLower: string,
+  name: string,
+  kind: 'account' | 'debt',
+  preferCard: boolean,
+  preferAccount: boolean,
+) {
+  const n = name.toLowerCase()
+  let score = 0
+  if (n.length >= 3 && textLower.includes(n)) score = n.length + 8
+  for (const part of n.split(/[\s\-/]+/)) {
+    if (part.length < 3 || CURRENCY_NOISE.has(part) || GENERIC_NOISE.has(part)) continue
+    if ((part === 'ahorro' || part === 'ahorros') && !preferAccount) continue
+    if (textLower.includes(part) && part.length + 2 > score) score = part.length + 2
+  }
+  if (preferAccount && kind === 'account' && n.includes('ahorro')) {
+    score = Math.max(score, 8) + (score >= 8 ? 4 : 0)
+  }
+  if (score === 0) return 0
+  if (preferCard && kind === 'debt') score += 4
+  if (preferCard && kind === 'account') score -= 2
+  if (preferAccount && kind === 'account') score += 3
+  if (preferAccount && kind === 'debt') score -= 2
+  return score
+}
+
+function matchSource(text: string, money: MonthMoney): SourceHit | null {
   const lower = text.toLowerCase()
   const preferCard = lower.includes('tarjeta')
   const preferAccount = lower.includes('cuenta') || lower.includes('ahorro')
-  let best: { accountId: number; debtId: number; name: string; score: number } | null = null
+  let best: SourceHit | null = null
 
-  function consider(name: string, accountId: number, debtId: number, kind: 'account' | 'debt') {
-    const n = name.toLowerCase()
-    let score = 0
-    if (n.length >= 3 && lower.includes(n)) score = n.length + 8
-    for (const part of n.split(/[\s\-/]+/)) {
-      if (part.length < 3 || CURRENCY_NOISE.has(part) || GENERIC_NOISE.has(part)) continue
-      if ((part === 'ahorro' || part === 'ahorros') && !preferAccount) continue
-      if (lower.includes(part) && part.length + 2 > score) score = part.length + 2
+  for (const card of money.cards ?? []) {
+    const score = scoreSource(lower, card.name, 'debt', preferCard, preferAccount)
+    if (score > 0 && (!best || score > best.score)) {
+      best = { accountId: 0, debtId: card.id, name: card.name, score }
     }
-    if (preferAccount && kind === 'account' && n.includes('ahorro')) {
-      score = Math.max(score, 8) + (score >= 8 ? 4 : 0)
-    }
-    if (score === 0) return
-    if (preferCard && kind === 'debt') score += 4
-    if (preferCard && kind === 'account') score -= 2
-    if (preferAccount && kind === 'account') score += 3
-    if (preferAccount && kind === 'debt') score -= 2
-    if (!best || score > best.score) best = { accountId, debtId, name, score }
   }
-
-  for (const card of money.cards ?? []) consider(card.name, 0, card.id, 'debt')
-  for (const account of money.accounts ?? []) consider(account.name, account.id, 0, 'account')
+  for (const account of money.accounts ?? []) {
+    const score = scoreSource(lower, account.name, 'account', preferCard, preferAccount)
+    if (score > 0 && (!best || score > best.score)) {
+      best = { accountId: account.id, debtId: 0, name: account.name, score }
+    }
+  }
   return best
 }
 
