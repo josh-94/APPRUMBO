@@ -41,10 +41,10 @@ func Load() (Config, error) {
 		GoogleSecret:    os.Getenv("GOOGLE_CLIENT_SECRET"),
 		GoogleRedirect:  os.Getenv("GOOGLE_REDIRECT_URL"),
 		OllamaURL:       env("OLLAMA_URL", "http://ollama:11434"),
-		OllamaModel:     env("OLLAMA_MODEL", "qwen2.5vl:3b"),
-		OllamaTextModel: env("OLLAMA_TEXT_MODEL", "gemma3:1b"),
+		OllamaModel:     os.Getenv("OLLAMA_MODEL"),
+		OllamaTextModel: env("OLLAMA_TEXT_MODEL", "qwen2.5:3b"),
 		OllamaNumThread: envInt("OLLAMA_NUM_THREAD", 4),
-		WhisperURL:      env("WHISPER_URL", "http://whisper:8080"),
+		WhisperURL:      os.Getenv("WHISPER_URL"),
 	}
 	if cfg.DatabaseURL == "" || cfg.RedisURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL y REDIS_URL son obligatorias")

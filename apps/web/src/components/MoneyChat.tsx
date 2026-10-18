@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { api } from '../api'
-import { shrinkImage } from '../image'
 import {
   actionLabel,
   loadMoneyChat,
@@ -23,12 +22,9 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
   const [messages, setMessages] = useState<ChatBubble[]>(() => loadMoneyChat(userKey))
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
-  const [recording, setRecording] = useState(false)
   const [saving, setSaving] = useState(0)
   const [error, setError] = useState('')
   const logRef = useRef<HTMLDivElement>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
-  const recorderRef = useRef<MediaRecorder | null>(null)
   const alive = useRef(true)
   const offlineRef = useRef(onOffline)
   const ids = useRef(nextChatId(loadMoneyChat(userKey)))
@@ -57,8 +53,6 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
     return () => {
       alive.current = false
       window.removeEventListener('offline', down)
-      const recorder = recorderRef.current
-      if (recorder && recorder.state === 'recording') recorder.stop()
     }
   }, [])
 
@@ -76,25 +70,23 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
     return undefined
   }
 
-  async function send(input: { text?: string; audio?: Blob; image?: Blob }) {
+  async function send(value: string) {
     if (!navigator.onLine) {
       onOffline()
       return
     }
-    const imageUrl = input.image ? URL.createObjectURL(input.image) : undefined
-    const label = input.text?.trim() || (input.audio ? 'Voz' : 'Foto')
+    const label = value.trim()
+    if (!label) return
     const id = nextId()
     const previous = previousDraft()
     const memory = memoryForDraft(messages)
-    setMessages((items) => trimChat([...items, { id, role: 'user', text: label, imageUrl }]))
+    setMessages((items) => trimChat([...items, { id, role: 'user', text: label }]))
     setText('')
     setBusy(true)
     setError('')
     try {
       const draft = await api.draftMoney({
-        text: input.text?.trim(),
-        audio: input.audio,
-        image: input.image,
+        text: label,
         previous,
         memory: memory || undefined,
       })
@@ -119,60 +111,8 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
   function submit(event: FormEvent) {
     event.preventDefault()
     const value = text.trim()
-    if (!value || busy || recording) return
-    void send({ text: value })
-  }
-
-  async function toggleMic() {
-    if (busy) return
-    const current = recorderRef.current
-    if (current && current.state === 'recording') {
-      current.stop()
-      return
-    }
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setError('Este navegador no puede dictar.')
-      return
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mime = recorderMime()
-      const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
-      const chunks: Blob[] = []
-      recorder.ondataavailable = (event) => {
-        if (event.data.size) chunks.push(event.data)
-      }
-      recorder.onstop = () => {
-        stream.getTracks().forEach((track) => track.stop())
-        recorderRef.current = null
-        if (!alive.current) return
-        setRecording(false)
-        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' })
-        if (blob.size) void send({ audio: blob, text: text.trim() || undefined })
-      }
-      recorderRef.current = recorder
-      recorder.start()
-      setRecording(true)
-      setError('')
-      window.setTimeout(() => {
-        if (recorder.state === 'recording') recorder.stop()
-      }, 30000)
-    } catch {
-      setError('No pude usar el micrófono.')
-    }
-  }
-
-  async function onPhoto(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file || busy) return
-    try {
-      const image = await shrinkImage(file)
-      const caption = text.trim()
-      void send({ image, text: caption || undefined })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Esa foto no se pudo leer. Prueba con otra.')
-    }
+    if (!value || busy) return
+    void send(value)
   }
 
   async function confirm(id: number, draft: MoneyDraft) {
@@ -220,13 +160,12 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
         </div>
         <div className="chat-log" ref={logRef}>
           {messages.length === 0 && (
-            <p className="hint">Escribe, dicta o manda una foto. Lo anotas cuando la tarjeta esté lista.</p>
+            <p className="hint">Escribe el gasto. Lo anotas cuando la tarjeta esté lista.</p>
           )}
           {messages.map((item) => {
             if (item.role === 'user') {
               return (
                 <div key={item.id} className="chat-user">
-                  {item.imageUrl && <img src={item.imageUrl} alt="" />}
                   <p>{item.text}</p>
                 </div>
               )
@@ -269,31 +208,16 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
             value={text}
             maxLength={2000}
             placeholder="Almuerzo 18.50"
-            disabled={busy || recording}
+            disabled={busy}
             onChange={(event) => setText(event.target.value)}
           />
-          <button type="button" className="chat-tool" aria-label="Foto" disabled={busy || recording} onClick={() => fileRef.current?.click()}>
-            <CameraIcon />
-          </button>
-          <button type="button" className={recording ? 'chat-tool on' : 'chat-tool'} aria-label={recording ? 'Detener' : 'Dictar'} aria-pressed={recording} disabled={busy} onClick={() => void toggleMic()}>
-            <MicIcon />
-          </button>
-          <button type="submit" className="chat-tool send" aria-label="Enviar" disabled={busy || recording || !text.trim()}>
+          <button type="submit" className="chat-tool send" aria-label="Enviar" disabled={busy || !text.trim()}>
             <SendIcon />
           </button>
-          <input ref={fileRef} className="chat-file" type="file" accept="image/*" onChange={(event) => void onPhoto(event)} />
         </form>
       </div>
     </div>
   )
-}
-
-function recorderMime() {
-  if (typeof MediaRecorder === 'undefined') return ''
-  if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return 'audio/webm;codecs=opus'
-  if (MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4'
-  if (MediaRecorder.isTypeSupported('audio/ogg')) return 'audio/ogg'
-  return ''
 }
 
 function draftDay(day: string) {
@@ -307,24 +231,6 @@ function CloseIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
       <path d="M6 6l12 12M18 6 6 18" />
-    </svg>
-  )
-}
-
-function CameraIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-      <path d="M4 8h3l2-2h6l2 2h3v11H4V8Z" />
-      <circle cx="12" cy="13" r="3.25" />
-    </svg>
-  )
-}
-
-function MicIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-      <rect x="9" y="3" width="6" height="11" rx="3" />
-      <path d="M6 11a6 6 0 0 0 12 0M12 17v4" />
     </svg>
   )
 }

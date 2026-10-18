@@ -94,50 +94,34 @@ func (s *Server) moneyDraft(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 80*time.Second)
-	defer cancel()
-
-	text := strings.TrimSpace(in.Text)
-	if len(in.Audio) > 0 {
-		if s.WhisperURL == "" {
-			writeError(w, http.StatusServiceUnavailable, "No pude oír eso ahora. Anótalo a mano.")
-			return
-		}
-		transcript, err := draft.Transcribe(ctx, s.WhisperURL, audioFilename(in.AudioName), in.Audio)
-		if message, failed := draftFailure(err, "No escuché nada. Prueba de nuevo."); failed {
-			writeError(w, message.status, message.text)
-			return
-		}
-		if text != "" {
-			text = strings.TrimSpace(transcript + " " + text)
-		} else {
-			text = transcript
-		}
+	if len(in.Audio) > 0 || len(in.Image) > 0 {
+		writeError(w, http.StatusUnprocessableEntity, "Solo texto por ahora. Escribe el gasto.")
+		return
 	}
-	if text == "" && len(in.Image) == 0 {
-		writeError(w, http.StatusUnprocessableEntity, "Escribe, dicta o manda una foto.")
+	text := strings.TrimSpace(in.Text)
+	if text == "" {
+		writeError(w, http.StatusUnprocessableEntity, "Escribe el gasto.")
 		return
 	}
 	if utf8Len(text) > 2000 {
 		text = string([]rune(text)[:2000])
 	}
 
+	ctx, cancel := context.WithTimeout(r.Context(), 80*time.Second)
+	defer cancel()
+
 	categories, err := s.Store.Categories(ctx, currentUser(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudieron leer las categorías")
 		return
 	}
-	modelText := text
-	if modelText == "" {
-		modelText = "Lee la imagen y anota el gasto o el ingreso."
-	}
-	system, user := draft.Prompt(toDraftCategories(categories), s.today(), modelText, in.Previous, in.Memory)
-	raw, err := draft.Complete(ctx, s.OllamaURL, s.draftModel(len(in.Image) > 0), system, user, in.Image, s.OllamaNumThread)
+	system, user := draft.Prompt(toDraftCategories(categories), s.today(), text, in.Previous, in.Memory)
+	raw, err := draft.Complete(ctx, s.OllamaURL, s.draftModel(false), system, user, nil, s.OllamaNumThread)
 	if message, failed := draftFailure(err, "No entendí eso. Dilo de otra forma."); failed {
 		writeError(w, message.status, message.text)
 		return
 	}
-	proposal, err := draft.Normalize(text, raw, toDraftCategories(categories), s.today(), len(in.Image) > 0, in.Previous)
+	proposal, err := draft.Normalize(text, raw, toDraftCategories(categories), s.today(), false, in.Previous)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "No entendí eso. Dilo de otra forma.")
 		return
@@ -147,12 +131,7 @@ func (s *Server) moneyDraft(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) draftModel(image bool) string {
-	if image {
-		if s.OllamaModel != "" {
-			return s.OllamaModel
-		}
-		return s.OllamaTextModel
-	}
+	_ = image // visión desactivada: siempre modelo de texto
 	if s.OllamaTextModel != "" {
 		return s.OllamaTextModel
 	}

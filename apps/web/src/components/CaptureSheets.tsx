@@ -138,11 +138,23 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
   const [error, setError] = useState('')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [phrase, setPhrase] = useState('')
+  const [settledPhrase, setSettledPhrase] = useState('')
   const phraseEnabled = !movement?.id && kind === 'gasto'
-  const { draft, loading: drafting } = useCaptureDraft(phraseEnabled ? phrase : '', 'gasto', money)
+  const phrasePending = phraseEnabled && phrase.trim() !== settledPhrase
+  const { draft, loading: drafting } = useCaptureDraft(phraseEnabled ? settledPhrase : '', 'gasto', money)
+
+  // Espera a que deje de tipear antes de interpretar la frase.
+  useEffect(() => {
+    if (!phraseEnabled) {
+      setSettledPhrase('')
+      return
+    }
+    const timer = window.setTimeout(() => setSettledPhrase(phrase.trim()), 2000)
+    return () => window.clearTimeout(timer)
+  }, [phrase, phraseEnabled])
 
   useEffect(() => {
-    if (!phraseEnabled || !phrase.trim() || !draft) return
+    if (!phraseEnabled || !settledPhrase || !draft || phrasePending) return
     if (draft.amountCents > 0) setAmount(centsToInput(draft.amountCents))
     if (draft.currency === 'usd' || draft.currency === 'pen') setCurrency(draft.currency)
     if (draft.title.trim()) setNote(draft.title.trim())
@@ -150,7 +162,7 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
     if (draft.categoryId > 0) setCategoryId(draft.categoryId)
     if (draft.debtId) setSource({ type: 'debt', id: draft.debtId })
     else if (draft.accountId) setSource({ type: 'account', id: draft.accountId })
-  }, [draft, phrase, phraseEnabled])
+  }, [draft, settledPhrase, phraseEnabled, phrasePending])
 
   const noteSuggestions = uniqueNotes(money.movements, kind)
   const categories = [...money.categories, ...created].filter((item, index, all) => item.kind === kind && all.findIndex((other) => other.id === item.id) === index)
@@ -255,7 +267,10 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
                 onChange={(event) => setPhrase(event.target.value)}
               />
             </label>
-            {phrase.trim() && draft && (
+            {phrase.trim() && phrasePending && (
+              <p className="hint money-phrase-wait">Sigue escribiendo… al terminar, lo completo solo.</p>
+            )}
+            {phrase.trim() && !phrasePending && draft && (
               <div className="plan-parse money-parse">
                 <p className="plan-parse-preview">
                   Se guarda: “{draft.title || '…'}”

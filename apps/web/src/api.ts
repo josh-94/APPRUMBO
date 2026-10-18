@@ -125,11 +125,9 @@ export const api = {
   saveHomePrefs: (cards: HomeCard[]) =>
     request<{ cards: HomeCard[] }>('/api/home/prefs', { method: 'PUT', body: JSON.stringify({ cards }) }),
   month: (month?: string) => request<MonthMoney>(month ? `/api/money/month?month=${month}` : '/api/money/month'),
-  draftMoney: (body: { text?: string; audio?: Blob; image?: Blob; previous?: MoneyDraft; memory?: string }) => {
+  draftMoney: (body: { text?: string; previous?: MoneyDraft; memory?: string }) => {
     const form = new FormData()
     if (body.text) form.set('text', body.text)
-    if (body.audio) form.set('audio', body.audio, audioFilename(body.audio))
-    if (body.image) form.set('image', body.image, 'foto.jpg')
     if (body.previous) form.set('previous', JSON.stringify(body.previous))
     if (body.memory) form.set('memory', body.memory)
     return request<MoneyDraft>('/api/money/draft', { method: 'POST', body: form })
@@ -163,12 +161,4 @@ export const api = {
   confirmPay: (body: { kind: string; id: number; amountCents: number; balancePen: number; balanceUsd: number }) =>
     request<void>('/api/money/confirm', { method: 'POST', body: JSON.stringify(body) }),
   exportData: () => request<Record<string, unknown>>('/api/export'),
-}
-
-function audioFilename(blob: Blob) {
-  if (blob.type.includes('mp4') || blob.type.includes('aac') || blob.type.includes('m4a')) return 'audio.mp4'
-  if (blob.type.includes('mpeg') || blob.type.includes('mp3')) return 'audio.mp3'
-  if (blob.type.includes('wav')) return 'audio.wav'
-  if (blob.type.includes('ogg')) return 'audio.ogg'
-  return 'audio.webm'
 }

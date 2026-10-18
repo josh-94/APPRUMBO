@@ -765,6 +765,10 @@ button.plan-row, button.money-row { width: 100%; border: 0; text-align: left; cu
 .money-kind { margin: 4px 0 14px; }
 .money-parse { margin: 0 0 16px; }
 .money-parse .hint { margin: 8px 0 0; }
+.money-phrase-wait {
+  margin: -2px 0 12px;
+  color: var(--rumbo-color-ink-secondary);
+}
 .money-section-label {
   margin: 10px 0 10px !important;
   font-size: var(--rumbo-font-size-label);

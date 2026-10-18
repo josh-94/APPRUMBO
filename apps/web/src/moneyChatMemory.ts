@@ -2,7 +2,7 @@ import type { MoneyDraft } from './types'
 
 export const MONEY_CHAT_CAP = 20
 
-export type ChatUserBubble = { id: number; role: 'user'; text: string; imageUrl?: string }
+export type ChatUserBubble = { id: number; role: 'user'; text: string }
 export type ChatDraftBubble = { id: number; role: 'draft'; draft: MoneyDraft; saved: boolean }
 export type ChatActionBubble = { id: number; role: 'action'; text: string }
 export type ChatBubble = ChatUserBubble | ChatDraftBubble | ChatActionBubble
