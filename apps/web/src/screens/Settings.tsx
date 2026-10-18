@@ -1,7 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { hideOnOpen, setHideOnOpen } from '../components/HideMoney'
 import { Shell } from '../components/Shell'
+import { currencies, currencySymbol } from '../format'
+import type { HomeCard } from '../types'
+
+const homeOptions: { id: HomeCard; label: string }[] = [
+  { id: 'agenda', label: 'Agenda del día' },
+  { id: 'habits', label: 'Hábitos de hoy' },
+  { id: 'goals', label: 'Objetivos' },
+  { id: 'workouts', label: 'Entrenamientos' },
+]
 
 function iosDevice() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent)
@@ -23,10 +32,46 @@ function keyBytes(value: string) {
   return out
 }
 
-export function Settings({ pushReady, onLogout }: { pushReady: boolean; onLogout: () => void }) {
+export function Settings({ pushReady, onLogout, onCurrencyChange }: {
+  pushReady: boolean
+  onLogout: () => void
+  onCurrencyChange?: () => void
+}) {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [hideBalance, setHideBalance] = useState(hideOnOpen)
+  const [cards, setCards] = useState<HomeCard[]>(['agenda', 'habits', 'goals', 'workouts'])
+  const [currency, setCurrency] = useState('PEN')
+
+  useEffect(() => {
+    api.homePrefs().then((data) => setCards(data.cards)).catch(() => undefined)
+    api.plan().then((data) => setCurrency(data.currency || 'PEN')).catch(() => undefined)
+  }, [])
+
+  async function saveCurrency(next: string) {
+    setCurrency(next)
+    setError('')
+    try {
+      await api.setHomeCurrency(next)
+      setMessage('Moneda principal actualizada.')
+      onCurrencyChange?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar la moneda')
+    }
+  }
+
+  async function toggleCard(id: HomeCard) {
+    const next = cards.includes(id) ? cards.filter((card) => card !== id) : [...cards, id]
+    const ordered = homeOptions.map((item) => item.id).filter((card) => next.includes(card))
+    setCards(ordered)
+    try {
+      const saved = await api.saveHomePrefs(ordered)
+      setCards(saved.cards)
+      setMessage('Inicio actualizado.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar')
+    }
+  }
 
   async function download() {
     setError('')
@@ -77,6 +122,31 @@ export function Settings({ pushReady, onLogout }: { pushReady: boolean; onLogout
   return (
     <Shell title="Cuenta" tabs>
       <section className="panel">
+        <h2>Personalizar inicio</h2>
+        <p className="hint">Elige qué tarjetas aparecen en Inicio.</p>
+        {homeOptions.map((item) => (
+          <label key={item.id} className="checkline">
+            <input type="checkbox" checked={cards.includes(item.id)} onChange={() => void toggleCard(item.id)} />
+            {item.label}
+          </label>
+        ))}
+      </section>
+      <section className="panel">
+        <h2>Moneda principal</h2>
+        <p className="hint">Es la moneda con la que anotas gastos. El símbolo aparece en Inicio y al registrar.</p>
+        <label className="field">
+          Moneda
+          <select value={currency} onChange={(event) => void saveCurrency(event.target.value)}>
+            {currencies.map((item) => (
+              <option key={item.code} value={item.code}>
+                {item.symbol} · {item.name} ({item.code})
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="meta">Ahora: {currencySymbol(currency)} ({currency})</p>
+      </section>
+      <section className="panel">
         <h2>Saldo</h2>
         <label className="checkline">
           <input
@@ -90,7 +160,7 @@ export function Settings({ pushReady, onLogout }: { pushReady: boolean; onLogout
           />
           Ocultar el saldo al abrir
         </label>
-        <p className="hint">El ojo de Tu mes lo muestra solo en esta visita.</p>
+        <p className="hint">El ojo de Finanzas lo muestra solo en esta visita.</p>
       </section>
       <section className="panel">
         <h2>En el teléfono</h2>

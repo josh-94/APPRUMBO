@@ -37,15 +37,43 @@ export type Habit = {
   checks: string[]
 }
 
+export type Goal = {
+  id: number
+  name: string
+  kind: 'ahorro' | 'numero' | 'etapas'
+  targetCents: number
+  savedCents: number
+  deadline?: string
+  accountId?: number
+  pct: number
+  daysLeft?: number | null
+}
+
+export type WorkoutExercise = { id: number; name: string; position: number }
+export type WorkoutRoutine = { id: number; name: string; exercises: WorkoutExercise[] }
+export type WorkoutSet = { id?: number; exerciseName: string; reps: number; weightGrams: number; position?: number }
+export type WorkoutSession = {
+  id: number
+  routineId?: number
+  routineName?: string
+  occurredOn: string
+  note: string
+  durationMin: number
+  sets: WorkoutSet[]
+}
+export type WorkoutRecord = { exerciseName: string; weightGrams: number; reps: number; occurredOn: string }
+export type HomeCard = 'agenda' | 'habits' | 'goals' | 'workouts'
+
 export type MoneyAccount = { id: number; name: string }
 export type MoneyCategory = { id: number; name: string; kind: 'gasto' | 'ingreso'; position: number; icon: string; tint: string }
-export type MoneyCard = { id: number; name: string }
+export type MoneyCard = { id: number; name: string; currency: 'pen' | 'usd' }
 export type Movement = {
   id: number
   accountId: number
   debtId: number
   categoryId: number
   kind: 'gasto' | 'ingreso'
+  currency: 'pen' | 'usd'
   amountCents: number
   occurredOn: string
   accountName: string
@@ -54,6 +82,7 @@ export type Movement = {
 }
 export type MovementInput = {
   kind: 'gasto' | 'ingreso'
+  currency: 'pen' | 'usd'
   amountCents: number
   accountId?: number
   debtId?: number
@@ -102,6 +131,7 @@ export type DebtMove = {
 export type Bill = { id: number; name: string; amountCents: number; dueDay: number; categoryId: number; category: string }
 export type MoneyPlan = {
   fxHundredths: number
+  currency: string
   accounts: PayAccount[]
   debts: Debt[]
   bills: Bill[]
@@ -127,6 +157,8 @@ export type MonthMoney = {
   spentCents: number
   incomeCents: number
   remainingCents: number | null
+  fxHundredths: number
+  currency: string
   accounts: MoneyAccount[]
   cards: MoneyCard[]
   categories: MoneyCategory[]

@@ -5,10 +5,13 @@ import { atLocalDate, todayKey } from './format'
 import type { Habit, MonthMoney, Task, TaskInput, TaskList } from './types'
 import { TaskSheet } from './components/TaskSheet'
 import { HabitSheet, MoneySheet } from './components/CaptureSheets'
+import { UnifiedCapture } from './components/UnifiedCapture'
 import { PayConfirm } from './components/PlanSheets'
 import { MyDay } from './screens/MyDay'
 import { Tiempo } from './screens/Tiempo'
 import { AccountHistory, CuentasPage, PagosPage, Plata, PrestamosPage, TarjetaDetail, TarjetasPage } from './screens/Plata'
+import { GoalsPage } from './screens/Goals'
+import { WorkoutsPage } from './screens/Workouts'
 import { ListDetail, ListsHome } from './screens/Lists'
 import { Moment } from './screens/Moment'
 import { Settings } from './screens/Settings'
@@ -31,7 +34,10 @@ export function App() {
   })
   const [sheet, setSheet] = useState<Sheet>(null)
   const [habitOpen, setHabitOpen] = useState(false)
+  const [habitEdit, setHabitEdit] = useState<Habit | null>(null)
   const [moneyOpen, setMoneyOpen] = useState(false)
+  const [captureOpen, setCaptureOpen] = useState(false)
+  const [lifeTick, setLifeTick] = useState(0)
   const [payTask, setPayTask] = useState<Task | null>(null)
   const [accountEmail, setAccountEmail] = useState('')
   const [habits, setHabits] = useState<Habit[]>([])
@@ -43,6 +49,7 @@ export function App() {
 
   const loadLife = useCallback(() => {
     setMoneyTick((n) => n + 1)
+    setLifeTick((n) => n + 1)
     api.habits().then((data) => setHabits(data.habits)).catch(() => setHabits([]))
     api.month().then(setMoney).catch(() => setMoney(null))
   }, [])
@@ -193,12 +200,14 @@ export function App() {
               email={accountEmail}
               tasks={tasks}
               habits={habits}
-              money={money}
+              currency={money?.currency || 'PEN'}
               onOpen={(task) => setSheet({ mode: 'edit', task })}
               onCreateTask={() => setSheet({ mode: 'create', listId: defaultList })}
-              onCreateHabit={() => setHabitOpen(true)}
+              onCreateHabit={() => { setHabitEdit(null); setHabitOpen(true) }}
               onCreateMoney={() => setMoneyOpen(true)}
+              onCapture={() => setCaptureOpen(true)}
               onToggleHabit={(habit) => void toggleHabit(habit)}
+              onEditHabit={(habit) => { setHabitEdit(habit); setHabitOpen(true) }}
               onDone={(task) => void done(task)}
               onLater={(task, day) => void later(task, day)}
               onDelete={(task) => void remove(task)}
@@ -219,10 +228,14 @@ export function App() {
               onLater={(task, day) => void later(task, day)}
               onDelete={(task) => void remove(task)}
               onToggleHabit={(habit) => void toggleHabit(habit)}
-              onCreateHabit={() => setHabitOpen(true)}
+              onCreateHabit={() => { setHabitEdit(null); setHabitOpen(true) }}
+              onEditHabit={(habit) => { setHabitEdit(habit); setHabitOpen(true) }}
+              onCapture={() => setCaptureOpen(true)}
+              refresh={lifeTick}
             />
           }
         />
+        <Route path="/tiempo/entrenamientos" element={<WorkoutsPage />} />
         <Route path="/plata" element={<Plata onCreate={() => setMoneyOpen(true)} onChanged={loadLife} refresh={moneyTick} />} />
         <Route path="/plata/deudas" element={<Navigate to="/plata/tarjetas" replace />} />
         <Route path="/plata/tarjetas" element={<TarjetasPage />} />
@@ -231,6 +244,7 @@ export function App() {
         <Route path="/plata/cuentas" element={<CuentasPage />} />
         <Route path="/plata/cuentas/:id" element={<AccountHistory />} />
         <Route path="/plata/pagos" element={<PagosPage />} />
+        <Route path="/plata/metas" element={<GoalsPage />} />
         <Route path="/listas" element={<ListsHome lists={lists} onReloadLists={loadLists} />} />
         <Route
           path="/listas/:id"
@@ -270,6 +284,7 @@ export function App() {
           element={
             <Settings
               pushReady={pushReady}
+              onCurrencyChange={loadLife}
               onLogout={() => {
                 void api.logout().finally(() => setAuthed(false))
               }}
@@ -280,11 +295,15 @@ export function App() {
       </Routes>
       {habitOpen && (
         <HabitSheet
-          onClose={() => setHabitOpen(false)}
+          key={habitEdit?.id ?? 'new'}
+          habit={habitEdit}
+          onClose={() => { setHabitOpen(false); setHabitEdit(null) }}
           onSave={async (name, nGoal) => {
-            await api.createHabit(name, nGoal)
+            if (habitEdit) await api.updateHabit(habitEdit.id, name, nGoal)
+            else await api.createHabit(name, nGoal)
             loadLife()
           }}
+          onDelete={habitEdit ? async () => { await api.deleteHabit(habitEdit.id); loadLife() } : undefined}
         />
       )}
       {payTask && (
@@ -303,6 +322,26 @@ export function App() {
           money={money}
           onClose={() => setMoneyOpen(false)}
           onSave={async (input) => {
+            await api.createMovement(input)
+            loadLife()
+          }}
+          onCreateCategory={async (name, kind) => {
+            const category = await api.createCategory(name, kind)
+            loadLife()
+            return category
+          }}
+        />
+      )}
+      {captureOpen && lists && (
+        <UnifiedCapture
+          lists={lists}
+          money={money}
+          defaultListId={defaultList}
+          onClose={() => setCaptureOpen(false)}
+          onSaveTask={async (input) => {
+            await save(input)
+          }}
+          onSaveMoney={async (input) => {
             await api.createMovement(input)
             loadLife()
           }}

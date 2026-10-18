@@ -14,6 +14,7 @@ import (
 	"github.com/SherClockHolmes/webpush-go"
 
 	"hoy/internal/config"
+	"hoy/internal/fx"
 	"hoy/internal/httpapi"
 	"hoy/internal/notify"
 	"hoy/internal/store"
@@ -71,6 +72,7 @@ func main() {
 		OllamaModel:     cfg.OllamaModel,
 		OllamaTextModel: cfg.OllamaTextModel,
 		WhisperURL:      cfg.WhisperURL,
+		FX:              fx.NewClient(),
 	}
 	server := &http.Server{
 		Addr:              cfg.Addr,

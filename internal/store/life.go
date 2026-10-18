@@ -41,6 +41,7 @@ type Movement struct {
 	DebtID      int64  `json:"debtId"`
 	CategoryID  int64  `json:"categoryId"`
 	Kind        string `json:"kind"`
+	Currency    string `json:"currency"`
 	AmountCents int64  `json:"amountCents"`
 	OccurredOn  string `json:"occurredOn"`
 	AccountName string `json:"accountName"`
@@ -49,17 +50,20 @@ type Movement struct {
 }
 
 type MoneyCard struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Currency string `json:"currency"`
 }
 
 type MonthSummary struct {
-	SpentCents  int64
-	IncomeCents int64
-	Accounts    []Account
-	Cards       []MoneyCard
-	Categories  []Category
-	Movements   []Movement
+	SpentCents   int64
+	IncomeCents  int64
+	FxHundredths int
+	Currency     string
+	Accounts     []Account
+	Cards        []MoneyCard
+	Categories   []Category
+	Movements    []Movement
 }
 
 func (s *Store) Email(ctx context.Context, userID int64) (string, error) {
@@ -164,19 +168,66 @@ func (s *Store) SetHabitCheck(ctx context.Context, userID, habitID int64, day ti
 	return err
 }
 
+func (s *Store) UpdateHabit(ctx context.Context, userID, id int64, name string, nGoal int) error {
+	if nGoal < 1 || nGoal > 7 {
+		nGoal = 5
+	}
+	label, err := cleanLabel(name, 80)
+	if err != nil || label == "" {
+		return ErrBadMoney
+	}
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE habits SET name = $3, n_goal = $4
+		WHERE id = $1 AND user_id = $2 AND active`, id, userID, label, nGoal)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteHabit(ctx context.Context, userID, id int64) error {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE habits SET active = FALSE
+		WHERE id = $1 AND user_id = $2 AND active`, id, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) Month(ctx context.Context, userID int64, from, to time.Time) (MonthSummary, error) {
 	var summary MonthSummary
+	summary.FxHundredths = DefaultFxHundredths
+	summary.Currency = "PEN"
 	summary.Accounts = []Account{}
 	summary.Cards = []MoneyCard{}
 	summary.Categories = []Category{}
 	summary.Movements = []Movement{}
+	_ = s.pool.QueryRow(ctx, `
+		SELECT fx_hundredths, currency FROM money_settings WHERE user_id = $1`, userID).Scan(&summary.FxHundredths, &summary.Currency)
+	if summary.FxHundredths <= 0 {
+		summary.FxHundredths = DefaultFxHundredths
+	}
+	if summary.Currency == "" {
+		summary.Currency = "PEN"
+	}
 	if err := s.pool.QueryRow(ctx, `
 		SELECT
-			COALESCE(SUM(amount_cents) FILTER (WHERE kind = 'gasto'), 0),
-			COALESCE(SUM(amount_cents) FILTER (WHERE kind = 'ingreso'), 0)
+			COALESCE(SUM(
+				CASE WHEN currency = 'usd' THEN amount_cents * $4 / 100 ELSE amount_cents END
+			) FILTER (WHERE kind = 'gasto'), 0),
+			COALESCE(SUM(
+				CASE WHEN currency = 'usd' THEN amount_cents * $4 / 100 ELSE amount_cents END
+			) FILTER (WHERE kind = 'ingreso'), 0)
 		FROM movements
 		WHERE user_id = $1 AND occurred_on >= $2 AND occurred_on < $3`,
-		userID, from, to).Scan(&summary.SpentCents, &summary.IncomeCents); err != nil {
+		userID, from, to, summary.FxHundredths).Scan(&summary.SpentCents, &summary.IncomeCents); err != nil {
 		return summary, err
 	}
 	accounts, err := s.accounts(ctx, userID)
@@ -224,7 +275,7 @@ func (s *Store) accounts(ctx context.Context, userID int64) ([]Account, error) {
 
 func (s *Store) moneyCards(ctx context.Context, userID int64) ([]MoneyCard, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, name FROM debts
+		SELECT id, name, currency FROM debts
 		WHERE user_id = $1 AND kind = 'tarjeta'
 		ORDER BY due_day, id`, userID)
 	if err != nil {
@@ -234,7 +285,7 @@ func (s *Store) moneyCards(ctx context.Context, userID int64) ([]MoneyCard, erro
 	out := []MoneyCard{}
 	for rows.Next() {
 		var item MoneyCard
-		if err := rows.Scan(&item.ID, &item.Name); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Currency); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -270,7 +321,7 @@ func (s *Store) categories(ctx context.Context, userID int64) ([]Category, error
 
 func (s *Store) movements(ctx context.Context, userID int64, from, to time.Time) ([]Movement, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT m.id, COALESCE(m.account_id, 0), COALESCE(m.debt_id, 0), COALESCE(m.category_id, 0), m.kind, m.amount_cents,
+		SELECT m.id, COALESCE(m.account_id, 0), COALESCE(m.debt_id, 0), COALESCE(m.category_id, 0), m.kind, m.currency, m.amount_cents,
 		       to_char(m.occurred_on, 'YYYY-MM-DD'),
 		       COALESCE(a.name, d.name, ''), COALESCE(c.name, ''), COALESCE(m.note, '')
 		FROM movements m
@@ -286,7 +337,7 @@ func (s *Store) movements(ctx context.Context, userID int64, from, to time.Time)
 	var out []Movement
 	for rows.Next() {
 		var item Movement
-		if err := rows.Scan(&item.ID, &item.AccountID, &item.DebtID, &item.CategoryID, &item.Kind, &item.AmountCents, &item.OccurredOn, &item.AccountName, &item.Category, &item.Note); err != nil {
+		if err := rows.Scan(&item.ID, &item.AccountID, &item.DebtID, &item.CategoryID, &item.Kind, &item.Currency, &item.AmountCents, &item.OccurredOn, &item.AccountName, &item.Category, &item.Note); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -297,10 +348,26 @@ func (s *Store) movements(ctx context.Context, userID int64, from, to time.Time)
 	return out, rows.Err()
 }
 
+func normalizeMoveCurrency(raw string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "pen", "sol", "soles":
+		return "pen", nil
+	case "usd", "dolar", "dólar", "dolares", "dólares", "$":
+		return "usd", nil
+	default:
+		return "", ErrBadMoney
+	}
+}
+
 func (s *Store) CreateMovement(ctx context.Context, userID int64, item Movement, day time.Time) (Movement, error) {
 	if item.AmountCents <= 0 || (item.Kind != "gasto" && item.Kind != "ingreso") {
 		return Movement{}, ErrBadMoney
 	}
+	currency, err := normalizeMoveCurrency(item.Currency)
+	if err != nil {
+		return Movement{}, err
+	}
+	item.Currency = currency
 	if item.DebtID != 0 && item.Kind != "gasto" {
 		return Movement{}, ErrBadMoney
 	}
@@ -329,15 +396,15 @@ func (s *Store) CreateMovement(ctx context.Context, userID int64, item Movement,
 		}
 	}
 	err = tx.QueryRow(ctx, `
-		INSERT INTO movements (user_id, account_id, debt_id, category_id, kind, amount_cents, occurred_on, note)
-		VALUES ($1, NULLIF($2, 0), NULLIF($3, 0), NULLIF($4, 0), $5, $6, $7, $8)
+		INSERT INTO movements (user_id, account_id, debt_id, category_id, kind, currency, amount_cents, occurred_on, note)
+		VALUES ($1, NULLIF($2, 0), NULLIF($3, 0), NULLIF($4, 0), $5, $6, $7, $8, $9)
 		RETURNING id`,
-		userID, item.AccountID, item.DebtID, item.CategoryID, item.Kind, item.AmountCents, day, item.Note).Scan(&item.ID)
+		userID, item.AccountID, item.DebtID, item.CategoryID, item.Kind, item.Currency, item.AmountCents, day, item.Note).Scan(&item.ID)
 	if err != nil {
 		return Movement{}, err
 	}
 	if item.DebtID != 0 {
-		if err := applyCardBalance(ctx, tx, userID, item.DebtID, item.Kind, item.AmountCents); err != nil {
+		if err := applyCardBalance(ctx, tx, userID, item.DebtID, item.Kind, item.Currency, item.AmountCents); err != nil {
 			return Movement{}, err
 		}
 	}
@@ -353,6 +420,11 @@ func (s *Store) UpdateMovement(ctx context.Context, userID int64, item Movement,
 	if item.ID == 0 || item.AmountCents <= 0 || (item.Kind != "gasto" && item.Kind != "ingreso") {
 		return Movement{}, ErrBadMoney
 	}
+	currency, err := normalizeMoveCurrency(item.Currency)
+	if err != nil {
+		return Movement{}, err
+	}
+	item.Currency = currency
 	if item.DebtID != 0 && item.Kind != "gasto" {
 		return Movement{}, ErrBadMoney
 	}
@@ -371,8 +443,8 @@ func (s *Store) UpdateMovement(ctx context.Context, userID int64, item Movement,
 	defer tx.Rollback(ctx)
 	var prev Movement
 	err = tx.QueryRow(ctx, `
-		SELECT COALESCE(account_id, 0), COALESCE(debt_id, 0), kind, amount_cents
-		FROM movements WHERE id = $1 AND user_id = $2 FOR UPDATE`, item.ID, userID).Scan(&prev.AccountID, &prev.DebtID, &prev.Kind, &prev.AmountCents)
+		SELECT COALESCE(account_id, 0), COALESCE(debt_id, 0), kind, currency, amount_cents
+		FROM movements WHERE id = $1 AND user_id = $2 FOR UPDATE`, item.ID, userID).Scan(&prev.AccountID, &prev.DebtID, &prev.Kind, &prev.Currency, &prev.AmountCents)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Movement{}, ErrNotFound
 	}
@@ -380,7 +452,7 @@ func (s *Store) UpdateMovement(ctx context.Context, userID int64, item Movement,
 		return Movement{}, err
 	}
 	if prev.DebtID != 0 {
-		if err := applyCardBalance(ctx, tx, userID, prev.DebtID, reverseKind(prev.Kind), prev.AmountCents); err != nil {
+		if err := applyCardBalance(ctx, tx, userID, prev.DebtID, reverseKind(prev.Kind), prev.Currency, prev.AmountCents); err != nil {
 			return Movement{}, err
 		}
 	}
@@ -398,9 +470,9 @@ func (s *Store) UpdateMovement(ctx context.Context, userID int64, item Movement,
 	tag, err := tx.Exec(ctx, `
 		UPDATE movements
 		SET account_id = NULLIF($3, 0), debt_id = NULLIF($4, 0), category_id = NULLIF($5, 0),
-			kind = $6, amount_cents = $7, occurred_on = $8, note = $9
+			kind = $6, currency = $7, amount_cents = $8, occurred_on = $9, note = $10
 		WHERE id = $1 AND user_id = $2`,
-		item.ID, userID, item.AccountID, item.DebtID, item.CategoryID, item.Kind, item.AmountCents, day, item.Note)
+		item.ID, userID, item.AccountID, item.DebtID, item.CategoryID, item.Kind, item.Currency, item.AmountCents, day, item.Note)
 	if err != nil {
 		return Movement{}, err
 	}
@@ -408,7 +480,7 @@ func (s *Store) UpdateMovement(ctx context.Context, userID int64, item Movement,
 		return Movement{}, ErrNotFound
 	}
 	if item.DebtID != 0 {
-		if err := applyCardBalance(ctx, tx, userID, item.DebtID, item.Kind, item.AmountCents); err != nil {
+		if err := applyCardBalance(ctx, tx, userID, item.DebtID, item.Kind, item.Currency, item.AmountCents); err != nil {
 			return Movement{}, err
 		}
 	}
@@ -428,8 +500,8 @@ func (s *Store) DeleteMovement(ctx context.Context, userID, id int64) error {
 	defer tx.Rollback(ctx)
 	var prev Movement
 	err = tx.QueryRow(ctx, `
-		SELECT COALESCE(debt_id, 0), kind, amount_cents
-		FROM movements WHERE id = $1 AND user_id = $2 FOR UPDATE`, id, userID).Scan(&prev.DebtID, &prev.Kind, &prev.AmountCents)
+		SELECT COALESCE(debt_id, 0), kind, currency, amount_cents
+		FROM movements WHERE id = $1 AND user_id = $2 FOR UPDATE`, id, userID).Scan(&prev.DebtID, &prev.Kind, &prev.Currency, &prev.AmountCents)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
 	}
@@ -437,7 +509,7 @@ func (s *Store) DeleteMovement(ctx context.Context, userID, id int64) error {
 		return err
 	}
 	if prev.DebtID != 0 {
-		if err := applyCardBalance(ctx, tx, userID, prev.DebtID, reverseKind(prev.Kind), prev.AmountCents); err != nil {
+		if err := applyCardBalance(ctx, tx, userID, prev.DebtID, reverseKind(prev.Kind), prev.Currency, prev.AmountCents); err != nil {
 			return err
 		}
 	}
@@ -473,14 +545,16 @@ func (s *Store) lockMovementSource(ctx context.Context, tx pgx.Tx, userID int64,
 	return name, nil
 }
 
-func applyCardBalance(ctx context.Context, tx pgx.Tx, userID, debtID int64, kind string, amount int64) error {
+func applyCardBalance(ctx context.Context, tx pgx.Tx, userID, debtID int64, kind, currency string, amount int64) error {
 	delta := amount
 	if kind == "ingreso" {
 		delta = -amount
 	}
 	_, err := tx.Exec(ctx, `
-		UPDATE debts SET balance_pen = GREATEST(0, balance_pen + $3)
-		WHERE id = $1 AND user_id = $2`, debtID, userID, delta)
+		UPDATE debts SET
+			balance_pen = CASE WHEN $4 = 'pen' THEN GREATEST(0, balance_pen + $3) ELSE balance_pen END,
+			balance_usd = CASE WHEN $4 = 'usd' THEN GREATEST(0, balance_usd + $3) ELSE balance_usd END
+		WHERE id = $1 AND user_id = $2`, debtID, userID, delta, currency)
 	return err
 }
 

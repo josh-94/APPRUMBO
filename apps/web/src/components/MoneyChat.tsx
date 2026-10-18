@@ -160,6 +160,7 @@ export function MoneyChat({ money, onClose, onSaved, onOffline }: {
     try {
       await api.createMovement({
         kind: draft.kind,
+        currency: 'pen',
         amountCents: draft.amountCents,
         accountId,
         categoryId: draft.categoryId,

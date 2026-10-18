@@ -397,7 +397,9 @@ button, input, textarea, select { font: inherit; color: inherit; }
   background: var(--rumbo-color-primary-soft);
   color: var(--rumbo-color-primary);
   font-style: normal;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 .week-row { display: flex; gap: 8px; margin: 8px 0 16px; }
 .day-chip {
@@ -410,7 +412,12 @@ button, input, textarea, select { font: inherit; color: inherit; }
   color: inherit;
   text-decoration: none;
 }
-.day-chip.today { border-color: var(--rumbo-color-primary); background: var(--card); }
+.day-chip.today {
+  border-color: var(--rumbo-color-primary);
+  background: var(--rumbo-color-primary);
+  color: white;
+}
+.day-chip.today small { color: rgba(255, 255, 255, 0.85); }
 .day-chip strong { display: block; font-size: 18px; }
 .day-chip small { color: var(--muted); font-size: 11px; }
 .summary {
@@ -422,8 +429,9 @@ button, input, textarea, select { font: inherit; color: inherit; }
 }
 .summary-top, .headline-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .summary-top .label { margin: 0; }
-.headline-row { margin-bottom: 12px; }
+.headline-row { margin-bottom: 4px; }
 .headline-row .headline { flex: 1; }
+.summary.home-card { margin: 4px 0 16px; }
 .eye {
   width: 36px;
   height: 36px;
@@ -554,8 +562,21 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .move.ingreso .move-amount { color: var(--rumbo-color-income); }
 .move-chevron { color: var(--muted); font-size: 22px; line-height: 1; flex: none; }
 button.plan-row, button.money-row { width: 100%; border: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; }
-.month-nav { display: flex; align-items: center; gap: 8px; }
-.month-nav .kicker { flex: 1; margin: 0; }
+.month-nav {
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+}
+.month-nav .kicker {
+  margin: 0;
+  text-align: center;
+  justify-self: center;
+}
+.month-nav .month-step {
+  width: 40px;
+  justify-self: center;
+}
 .month-step {
   width: 36px;
   height: 36px;
@@ -572,11 +593,56 @@ button.plan-row, button.money-row { width: 100%; border: 0; text-align: left; cu
 .dots { display: flex; gap: 4px; margin-top: 4px; }
 .dots span { width: 8px; height: 8px; border-radius: 99px; background: var(--line); }
 .dots span.on { background: var(--rumbo-color-secondary); }
-.amount-input {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
+.amount-field {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
   margin: 4px 0 16px;
+  min-height: 72px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+  overflow: hidden;
+}
+.currency-toggle {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  border-right: 1px solid var(--line);
+  background: color-mix(in srgb, var(--line) 35%, white);
+}
+.currency-toggle button {
+  flex: 1;
+  min-width: 52px;
+  margin: 0;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  font-family: var(--rumbo-font-display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--muted, #6b7280);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.currency-toggle:has(button:only-child) button {
+  font-size: 18px;
+}
+.currency-toggle button + button {
+  border-top: 1px solid var(--line);
+}
+.currency-toggle button.on {
+  background: var(--rumbo-color-primary, #0f3d2e);
+  color: white;
+}
+.amount-field .amount-input {
+  display: block;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0;
   padding: 14px 16px;
   min-height: 72px;
   font-size: 40px;
@@ -585,9 +651,15 @@ button.plan-row, button.money-row { width: 100%; border: 0; text-align: left; cu
   font-weight: 800;
   text-align: center;
   letter-spacing: -0.03em;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: white;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.amount-field .amount-input:focus {
+  outline: none;
+}
+.amount-field:focus-within {
+  border-color: var(--rumbo-color-primary, #0f3d2e);
 }
 .chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 16px; }
 .chip-add { display: flex; gap: 8px; flex: 1 0 100%; }
@@ -993,3 +1065,143 @@ button.plan-row, button.money-row { width: 100%; border: 0; text-align: left; cu
 }
 .chat-tool:disabled { opacity: 0.45; }
 .chat-file { display: none; }
+
+.agenda-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.primary.compact { width: auto; padding: 10px 16px; margin: 0; }
+.habit-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.timeline { display: grid; gap: 8px; margin: 0 0 16px; }
+.timeline-block {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  border-radius: var(--rumbo-radius-md);
+  background: var(--rumbo-color-primary-soft);
+  color: var(--rumbo-color-primary-strong);
+  padding: 12px 14px;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.timeline-hour { font-weight: 700; font-variant-numeric: tabular-nums; }
+.home-card { margin: 0 0 14px; }
+.paper-card {
+  background: var(--card);
+  border-radius: var(--rumbo-radius-card);
+  padding: 14px 16px;
+  box-shadow: var(--rumbo-shadow-sm);
+}
+.goal-card {
+  background: var(--card);
+  border-radius: var(--rumbo-radius-card);
+  padding: 16px;
+  margin: 0 0 12px;
+  box-shadow: var(--rumbo-shadow-sm);
+}
+.goal-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.goal-ring {
+  --pct: 0%;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--rumbo-color-secondary) var(--pct), var(--rumbo-color-track) 0);
+  flex: none;
+}
+.goal-ring span {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.chart-card {
+  background: var(--card);
+  border-radius: var(--rumbo-radius-card);
+  padding: 14px 16px 16px;
+  margin: 0 0 12px;
+  box-shadow: var(--rumbo-shadow-sm);
+}
+.chart-card .section-label { margin-top: 0; }
+.donut-wrap { display: grid; gap: 14px; justify-items: center; }
+.donut {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.donut-hole {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 14px;
+}
+.donut-legend { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 8px; }
+.donut-legend li { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; }
+.day-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.day-bars-plot {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 104px;
+}
+.day-bars-axis {
+  display: flex;
+  gap: 2px;
+}
+.day-axis-label {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.day-axis-label.today {
+  color: var(--rumbo-color-primary);
+  font-weight: 800;
+}
+.day-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; min-width: 0; }
+.day-bar {
+  width: 100%;
+  max-width: 10px;
+  border-radius: 4px 4px 0 0;
+  background: var(--rumbo-color-primary);
+  opacity: 0.75;
+}
+.day-bar.hot { background: #C46B66; opacity: 1; }
+.day-bar-cut { color: #C46B66; font-size: 9px; line-height: 1; margin-bottom: 2px; }
+.day-avg-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--muted);
+  pointer-events: none;
+}
+.plata-tabs { flex-wrap: wrap; }
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--rumbo-radius-sm);
+  padding: 10px 12px;
+  resize: vertical;
+  background: var(--card);
+}

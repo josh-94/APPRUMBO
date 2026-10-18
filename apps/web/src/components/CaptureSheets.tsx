@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { MoneyCategory, MonthMoney, Movement, MovementInput } from '../types'
 import { categoryIcon, categoryIcons, categoryTints } from '../categories'
-import { centsToInput, todayKey } from '../format'
+import { centsToInput, currencySymbol, todayKey } from '../format'
 
 type MoneySource = { type: 'account'; id: number } | { type: 'debt'; id: number }
 
@@ -13,10 +13,26 @@ function initialSource(money: MonthMoney, movement?: Movement | null): MoneySour
   return { type: 'account', id: 0 }
 }
 
-export function HabitSheet({ onClose, onSave }: { onClose: () => void; onSave: (name: string, nGoal: number) => Promise<void> }) {
-  const [name, setName] = useState('')
-  const [nGoal, setNGoal] = useState(5)
+function initialCurrency(money: MonthMoney, movement?: Movement | null): 'pen' | 'usd' {
+  if (movement?.currency === 'usd' || movement?.currency === 'pen') return movement.currency
+  const source = initialSource(money, movement)
+  if (source.type === 'debt') {
+    const card = money.cards?.find((item) => item.id === source.id)
+    if (card?.currency === 'usd') return 'usd'
+  }
+  return 'pen'
+}
+
+export function HabitSheet({ habit, onClose, onSave, onDelete }: {
+  habit?: { id: number; name: string; nGoal: number } | null
+  onClose: () => void
+  onSave: (name: string, nGoal: number) => Promise<void>
+  onDelete?: () => Promise<void>
+}) {
+  const [name, setName] = useState(habit?.name ?? '')
+  const [nGoal, setNGoal] = useState(habit?.nGoal ?? 5)
   const [error, setError] = useState('')
+  const [confirming, setConfirming] = useState(false)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -32,7 +48,7 @@ export function HabitSheet({ onClose, onSave }: { onClose: () => void; onSave: (
     <div className="sheet-backdrop" onClick={onClose}>
       <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void submit(event)}>
         <div className="sheet-handle" />
-        <h2>Nuevo hábito</h2>
+        <h2>{habit ? 'Editar hábito' : 'Nuevo hábito'}</h2>
         <label className="field">
           Nombre
           <input value={name} required maxLength={80} onChange={(event) => setName(event.target.value)} />
@@ -47,6 +63,18 @@ export function HabitSheet({ onClose, onSave }: { onClose: () => void; onSave: (
         </div>
         {error && <p className="error">{error}</p>}
         <button type="submit" className="primary">Guardar</button>
+        {habit && onDelete && !confirming && (
+          <button type="button" className="ghost danger" onClick={() => setConfirming(true)}>Archivar</button>
+        )}
+        {habit && onDelete && confirming && (
+          <div className="confirm-delete">
+            <p>¿Archivar este hábito?</p>
+            <button type="button" className="ghost" onClick={() => setConfirming(false)}>Cancelar</button>
+            <button type="button" className="ghost danger" onClick={() => void onDelete().then(onClose).catch((err) => setError(err instanceof Error ? err.message : 'No se pudo archivar'))}>
+              Sí, archivar
+            </button>
+          </div>
+        )}
       </form>
     </div>
   )
@@ -61,7 +89,10 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
   onCreateCategory: (name: string, kind: 'gasto' | 'ingreso') => Promise<MoneyCategory>
 }) {
   const cards = money.cards ?? []
+  const homeCurrency = money.currency || 'PEN'
+  const homeSymbol = currencySymbol(homeCurrency)
   const [kind, setKind] = useState<'gasto' | 'ingreso'>(movement?.kind ?? 'gasto')
+  const [currency, setCurrency] = useState<'pen' | 'usd'>(() => initialCurrency(money, movement))
   const [amount, setAmount] = useState(movement ? centsToInput(movement.amountCents) : '')
   const [note, setNote] = useState(movement?.note ?? '')
   const [day, setDay] = useState(movement?.occurredOn || todayKey())
@@ -72,6 +103,16 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
   const [newName, setNewName] = useState('')
   const [error, setError] = useState('')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  function chooseSource(next: MoneySource) {
+    setSource(next)
+    if (next.type === 'debt') {
+      const card = cards.find((item) => item.id === next.id)
+      if (card?.currency === 'usd' || card?.currency === 'pen') setCurrency(card.currency)
+    } else {
+      setCurrency('pen')
+    }
+  }
   const categories = [...money.categories, ...created].filter((item, index, all) => item.kind === kind && all.findIndex((other) => other.id === item.id) === index)
   const explicit = categoryId && categories.some((item) => item.id === categoryId) ? categoryId : 0
   const otros = categories.find((item) => item.name === 'Otros')
@@ -117,6 +158,7 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
     try {
       await onSave({
         kind,
+        currency,
         amountCents: cents,
         accountId: source.type === 'account' ? source.id : 0,
         debtId: source.type === 'debt' ? source.id : 0,
@@ -139,14 +181,22 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
           <button type="button" className={kind === 'gasto' ? 'pill on' : 'pill quiet'} onClick={() => chooseKind('gasto')}>Gasto</button>
           <button type="button" className={kind === 'ingreso' ? 'pill on' : 'pill quiet'} onClick={() => chooseKind('ingreso')}>Ingreso</button>
         </div>
-        <input
-          className="amount-input"
-          inputMode="decimal"
-          placeholder="0.00"
-          value={amount}
-          autoFocus
-          onChange={(event) => setAmount(event.target.value)}
-        />
+        <div className="amount-field">
+          <div className="currency-toggle" role="group" aria-label="Moneda">
+            <button type="button" className={currency === 'pen' ? 'on' : ''} aria-pressed={currency === 'pen'} onClick={() => setCurrency('pen')}>{homeSymbol}</button>
+            {homeCurrency !== 'USD' && (
+              <button type="button" className={currency === 'usd' ? 'on' : ''} aria-pressed={currency === 'usd'} onClick={() => setCurrency('usd')}>$</button>
+            )}
+          </div>
+          <input
+            className="amount-input"
+            inputMode="decimal"
+            placeholder="0.00"
+            value={amount}
+            autoFocus
+            onChange={(event) => setAmount(event.target.value)}
+          />
+        </div>
         <label className="field">
           {kind === 'gasto' ? 'Gastaste en…' : 'De dónde'}
           <input
@@ -171,7 +221,7 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
               key={`a-${account.id}`}
               type="button"
               className={source.type === 'account' && source.id === account.id ? 'pill on' : 'pill quiet'}
-              onClick={() => setSource({ type: 'account', id: account.id })}
+              onClick={() => chooseSource({ type: 'account', id: account.id })}
             >
               {account.name}
             </button>
@@ -181,7 +231,7 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
               key={`c-${card.id}`}
               type="button"
               className={source.type === 'debt' && source.id === card.id ? 'pill on' : 'pill quiet'}
-              onClick={() => setSource({ type: 'debt', id: card.id })}
+              onClick={() => chooseSource({ type: 'debt', id: card.id })}
             >
               {card.name}
             </button>

@@ -117,6 +117,8 @@ func (s *Server) moneyMonth(w http.ResponseWriter, r *http.Request) {
 		"spentCents":     summary.SpentCents,
 		"incomeCents":    summary.IncomeCents,
 		"remainingCents": remaining,
+		"fxHundredths":   summary.FxHundredths,
+		"currency":       summary.Currency,
 		"accounts":       summary.Accounts,
 		"cards":          summary.Cards,
 		"categories":     summary.Categories,
@@ -127,6 +129,7 @@ func (s *Server) moneyMonth(w http.ResponseWriter, r *http.Request) {
 func (s *Server) createMovement(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Kind        string `json:"kind"`
+		Currency    string `json:"currency"`
 		AmountCents int64  `json:"amountCents"`
 		AccountID   int64  `json:"accountId"`
 		DebtID      int64  `json:"debtId"`
@@ -148,6 +151,7 @@ func (s *Server) createMovement(w http.ResponseWriter, r *http.Request) {
 	}
 	item, err := s.Store.CreateMovement(r.Context(), currentUser(r), store.Movement{
 		Kind:        body.Kind,
+		Currency:    body.Currency,
 		AmountCents: body.AmountCents,
 		AccountID:   body.AccountID,
 		DebtID:      body.DebtID,
@@ -176,6 +180,7 @@ func (s *Server) updateMovement(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		Kind        string `json:"kind"`
+		Currency    string `json:"currency"`
 		AmountCents int64  `json:"amountCents"`
 		AccountID   int64  `json:"accountId"`
 		DebtID      int64  `json:"debtId"`
@@ -194,6 +199,7 @@ func (s *Server) updateMovement(w http.ResponseWriter, r *http.Request) {
 	item, err := s.Store.UpdateMovement(r.Context(), currentUser(r), store.Movement{
 		ID:          id,
 		Kind:        body.Kind,
+		Currency:    body.Currency,
 		AmountCents: body.AmountCents,
 		AccountID:   body.AccountID,
 		DebtID:      body.DebtID,

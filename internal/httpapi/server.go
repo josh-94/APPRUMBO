@@ -14,6 +14,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 
+	"hoy/internal/fx"
 	"hoy/internal/schedule"
 	"hoy/internal/session"
 	"hoy/internal/store"
@@ -37,6 +38,7 @@ type Server struct {
 	OllamaModel     string
 	OllamaTextModel string
 	WhisperURL      string
+	FX              *fx.Client
 }
 
 func (s *Server) Handler() http.Handler {
@@ -66,8 +68,25 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/push/subscriptions", s.protected(s.deletePush))
 	mux.HandleFunc("GET /api/habits", s.protected(s.habits))
 	mux.HandleFunc("POST /api/habits", s.protected(s.createHabit))
+	mux.HandleFunc("PATCH /api/habits/{id}", s.protected(s.updateHabit))
+	mux.HandleFunc("DELETE /api/habits/{id}", s.protected(s.deleteHabit))
 	mux.HandleFunc("POST /api/habits/{id}/checks", s.protected(s.habitCheck))
 	mux.HandleFunc("DELETE /api/habits/{id}/checks", s.protected(s.habitCheck))
+	mux.HandleFunc("GET /api/agenda", s.protected(s.agenda))
+	mux.HandleFunc("GET /api/goals", s.protected(s.goals))
+	mux.HandleFunc("POST /api/goals", s.protected(s.saveGoal))
+	mux.HandleFunc("PATCH /api/goals/{id}", s.protected(s.saveGoal))
+	mux.HandleFunc("DELETE /api/goals/{id}", s.protected(s.deleteGoal))
+	mux.HandleFunc("POST /api/goals/{id}/contribute", s.protected(s.contributeGoal))
+	mux.HandleFunc("GET /api/workouts/routines", s.protected(s.workoutRoutines))
+	mux.HandleFunc("POST /api/workouts/routines", s.protected(s.saveWorkoutRoutine))
+	mux.HandleFunc("PATCH /api/workouts/routines/{id}", s.protected(s.saveWorkoutRoutine))
+	mux.HandleFunc("DELETE /api/workouts/routines/{id}", s.protected(s.deleteWorkoutRoutine))
+	mux.HandleFunc("GET /api/workouts/sessions", s.protected(s.workoutSessions))
+	mux.HandleFunc("POST /api/workouts/sessions", s.protected(s.addWorkoutSession))
+	mux.HandleFunc("GET /api/workouts/records", s.protected(s.workoutRecords))
+	mux.HandleFunc("GET /api/home/prefs", s.protected(s.homePrefs))
+	mux.HandleFunc("PUT /api/home/prefs", s.protected(s.homePrefs))
 	mux.HandleFunc("GET /api/money/month", s.protected(s.moneyMonth))
 	mux.HandleFunc("POST /api/money/draft", s.protected(s.moneyDraft))
 	mux.HandleFunc("POST /api/movements", s.protected(s.createMovement))
@@ -76,6 +95,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/categories", s.protected(s.createCategory))
 	mux.HandleFunc("GET /api/money/plan", s.protected(s.moneyPlan))
 	mux.HandleFunc("PUT /api/money/fx", s.protected(s.setFx))
+	mux.HandleFunc("PUT /api/money/currency", s.protected(s.setHomeCurrency))
 	mux.HandleFunc("POST /api/money/confirm", s.protected(s.confirmPay))
 	mux.HandleFunc("POST /api/accounts", s.protected(s.saveAccount))
 	mux.HandleFunc("PATCH /api/accounts/{id}", s.protected(s.saveAccount))

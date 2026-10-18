@@ -1,4 +1,4 @@
-import type { Bill, Debt, DebtMove, Habit, MoneyCategory, MoneyDraft, MoneyPlan, MonthMoney, Movement, MovementInput, PayAccount, Task, TaskInput, TaskList } from './types'
+import type { Bill, Debt, DebtMove, Goal, Habit, HomeCard, MoneyCategory, MoneyDraft, MoneyPlan, MonthMoney, Movement, MovementInput, PayAccount, Task, TaskInput, TaskList, WorkoutRecord, WorkoutRoutine, WorkoutSession, WorkoutSet } from './types'
 
 let onUnauthorized = () => {}
 
@@ -25,6 +25,19 @@ async function request<T>(path: string, options: RequestInit = {}, redirectOnAut
     throw new Error(data?.error || 'No se pudo completar')
   }
   return data as T
+}
+
+export type AgendaItem = {
+  type: 'task' | 'habit' | 'workout'
+  id: number
+  title: string
+  hour?: string
+  done?: boolean
+  nGoal?: number
+  doneWeek?: number
+  note?: string
+  payKind?: string
+  payRef?: number
 }
 
 export const api = {
@@ -59,10 +72,34 @@ export const api = {
   habits: () => request<{ habits: Habit[] }>('/api/habits'),
   createHabit: (name: string, nGoal: number) =>
     request<Habit>('/api/habits', { method: 'POST', body: JSON.stringify({ name, nGoal }) }),
+  updateHabit: (id: number, name: string, nGoal: number) =>
+    request<Habit>(`/api/habits/${id}`, { method: 'PATCH', body: JSON.stringify({ name, nGoal }) }),
+  deleteHabit: (id: number) => request<void>(`/api/habits/${id}`, { method: 'DELETE' }),
   checkHabit: (id: number, day: string, on: boolean) =>
     on
       ? request<void>(`/api/habits/${id}/checks`, { method: 'POST', body: JSON.stringify({ day }) })
       : request<void>(`/api/habits/${id}/checks?day=${day}`, { method: 'DELETE' }),
+  agenda: (day: string) => request<{ day: string; items: AgendaItem[] }>(`/api/agenda?day=${day}`),
+  goals: () => request<{ goals: Goal[] }>('/api/goals'),
+  saveGoal: (body: Partial<Goal> & { name: string; targetCents: number }) =>
+    request<Goal>(body.id ? `/api/goals/${body.id}` : '/api/goals', { method: body.id ? 'PATCH' : 'POST', body: JSON.stringify(body) }),
+  deleteGoal: (id: number) => request<void>(`/api/goals/${id}`, { method: 'DELETE' }),
+  contributeGoal: (id: number, body: { amountCents: number; accountId?: number; day?: string; note?: string }) =>
+    request<Goal>(`/api/goals/${id}/contribute`, { method: 'POST', body: JSON.stringify(body) }),
+  workoutRoutines: () => request<{ routines: WorkoutRoutine[] }>('/api/workouts/routines'),
+  saveWorkoutRoutine: (body: { id?: number; name: string; exercises: { name: string }[] }) =>
+    request<WorkoutRoutine>(body.id ? `/api/workouts/routines/${body.id}` : '/api/workouts/routines', {
+      method: body.id ? 'PATCH' : 'POST',
+      body: JSON.stringify(body),
+    }),
+  deleteWorkoutRoutine: (id: number) => request<void>(`/api/workouts/routines/${id}`, { method: 'DELETE' }),
+  workoutSessions: () => request<{ sessions: WorkoutSession[] }>('/api/workouts/sessions'),
+  addWorkoutSession: (body: { routineId?: number; day?: string; note?: string; durationMin?: number; sets: WorkoutSet[] }) =>
+    request<WorkoutSession>('/api/workouts/sessions', { method: 'POST', body: JSON.stringify(body) }),
+  workoutRecords: () => request<{ records: WorkoutRecord[] }>('/api/workouts/records'),
+  homePrefs: () => request<{ cards: HomeCard[] }>('/api/home/prefs'),
+  saveHomePrefs: (cards: HomeCard[]) =>
+    request<{ cards: HomeCard[] }>('/api/home/prefs', { method: 'PUT', body: JSON.stringify({ cards }) }),
   month: (month?: string) => request<MonthMoney>(month ? `/api/money/month?month=${month}` : '/api/money/month'),
   draftMoney: (body: { text?: string; audio?: Blob; image?: Blob; previous?: MoneyDraft }) => {
     const form = new FormData()
@@ -81,6 +118,8 @@ export const api = {
     request<MoneyCategory>('/api/categories', { method: 'POST', body: JSON.stringify({ name, kind, icon: look?.icon ?? '', tint: look?.tint ?? '' }) }),
   plan: () => request<MoneyPlan>('/api/money/plan'),
   setFx: (fxHundredths: number) => request<void>('/api/money/fx', { method: 'PUT', body: JSON.stringify({ fxHundredths }) }),
+  setHomeCurrency: (currency: string) =>
+    request<void>('/api/money/currency', { method: 'PUT', body: JSON.stringify({ currency }) }),
   saveAccount: (body: Partial<PayAccount> & { name: string }) =>
     request<PayAccount>(body.id ? `/api/accounts/${body.id}` : '/api/accounts', { method: body.id ? 'PATCH' : 'POST', body: JSON.stringify(body) }),
   deleteAccount: (id: number) => request<void>(`/api/accounts/${id}`, { method: 'DELETE' }),

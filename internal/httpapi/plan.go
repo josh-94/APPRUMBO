@@ -9,11 +9,17 @@ import (
 )
 
 func (s *Server) moneyPlan(w http.ResponseWriter, r *http.Request) {
-	if err := s.Store.EnsurePayTasks(r.Context(), currentUser(r), s.today(), s.Loc); err != nil {
+	userID := currentUser(r)
+	if err := s.Store.EnsurePayTasks(r.Context(), userID, s.today(), s.Loc); err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudo leer el plan")
 		return
 	}
-	plan, err := s.Store.MoneyPlan(r.Context(), currentUser(r))
+	if s.FX != nil {
+		if hundredths, err := s.FX.Hundredths(r.Context()); err == nil {
+			_ = s.Store.SetFx(r.Context(), userID, hundredths)
+		}
+	}
+	plan, err := s.Store.MoneyPlan(r.Context(), userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudo leer el plan")
 		return
@@ -32,6 +38,25 @@ func (s *Server) setFx(w http.ResponseWriter, r *http.Request) {
 	if err := s.Store.SetFx(r.Context(), currentUser(r), body.FxHundredths); err != nil {
 		if errors.Is(err, store.ErrBadMoney) {
 			writeError(w, http.StatusUnprocessableEntity, "El tipo de cambio no parece correcto.")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "No se pudo guardar")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) setHomeCurrency(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Currency string `json:"currency"`
+	}
+	if err := readJSON(w, r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "JSON inválido")
+		return
+	}
+	if err := s.Store.SetHomeCurrency(r.Context(), currentUser(r), body.Currency); err != nil {
+		if errors.Is(err, store.ErrBadMoney) {
+			writeError(w, http.StatusUnprocessableEntity, "Esa moneda no parece correcta.")
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "No se pudo guardar")

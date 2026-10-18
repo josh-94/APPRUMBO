@@ -53,11 +53,8 @@ export function money(cents: number, code = 'PEN') {
   return `${sign}${currencySymbol(code)} ${formatted}`
 }
 
-export function soles(cents: number) {
-  const sign = cents < 0 ? '−' : ''
-  const abs = Math.abs(cents) / 100
-  const formatted = new Intl.NumberFormat('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(abs)
-  return `${sign}S/ ${formatted}`
+export function soles(cents: number, code = 'PEN') {
+  return money(cents, code)
 }
 
 export function todayKey(date = new Date()) {
@@ -76,7 +73,7 @@ export function weekChips(date = new Date()) {
   const monday = new Date(date)
   const delta = (monday.getDay() + 6) % 7
   monday.setDate(monday.getDate() - delta)
-  const labels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie']
+  const labels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
   return labels.map((label, index) => {
     const day = new Date(monday)
     day.setDate(monday.getDate() + index)

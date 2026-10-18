@@ -15,14 +15,23 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
   const current = currentMonthKey()
   const { hidden, toggle } = useHideMoney()
   const [month, setMonth] = useState(current)
+  const [tab, setTab] = useState<'resumen' | 'movimientos'>('movimientos')
   const [money, setMoney] = useState<MonthMoney | null>(null)
   const [editing, setEditing] = useState<Movement | null>(null)
   const [adding, setAdding] = useState(false)
   const [chat, setChat] = useState(false)
   const [offlineNote, setOfflineNote] = useState(false)
+  const [query, setQuery] = useState('')
+  const [kindFilter, setKindFilter] = useState<'todos' | 'gasto' | 'ingreso'>('todos')
   const viewingNow = month === current
   const rows = spendRows(money)
   const tallest = Math.max(...rows.map((row) => row.cents), 1)
+  const dayBars = daySpendBars(money)
+  const filtered = (money?.movements ?? []).filter((item) => {
+    if (kindFilter !== 'todos' && item.kind !== kindFilter) return false
+    const title = `${item.note} ${item.category} ${item.accountName}`.toLowerCase()
+    return !query.trim() || title.includes(query.trim().toLowerCase())
+  })
 
   useEffect(() => {
     api.month(month).then(setMoney).catch(() => setMoney(null))
@@ -35,25 +44,100 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
         <p className="kicker">{monthTitle(month, current)}</p>
         <button type="button" className="month-step" aria-label="Mes siguiente" disabled={viewingNow} onClick={() => setMonth(shiftMonth(month, 1))}>›</button>
       </div>
-      <div className="headline-row">
-        <h1 className="headline">{headline(money, hidden, viewingNow)}</h1>
-        <EyeButton hidden={hidden} onToggle={toggle} />
+      <section className="summary home-card">
+        <div className="summary-top">
+          <p className="label">Tu mes</p>
+          <EyeButton hidden={hidden} onToggle={toggle} />
+        </div>
+        <strong>{headline(money, hidden, viewingNow)}</strong>
+        <p>Ingresos menos gastos este mes.</p>
+      </section>
+      <div className="switch-row plata-tabs">
+        <button type="button" className={tab === 'movimientos' ? 'pill on' : 'pill quiet'} onClick={() => setTab('movimientos')}>Movimientos</button>
+        <button type="button" className={tab === 'resumen' ? 'pill on' : 'pill quiet'} onClick={() => setTab('resumen')}>Resumen</button>
+        <Link className="pill quiet" to="/plata/metas">Metas</Link>
       </div>
-      <div className="spend-row">
-        {rows.map((row) => (
-          <div key={row.category.id} className="spend-col">
-            <span className={`spend-bar tint ${categoryTint(row.category.tint)}`} style={{ height: barHeight(row.cents, tallest) }}>
-              <span className="spend-icon" aria-hidden="true">{categoryIcon(row.category.icon)}</span>
-            </span>
-            <strong>{hidden ? '••••' : shortAmount(row.cents)}</strong>
-            <span className="spend-name">{row.category.name}</span>
+
+      {tab === 'resumen' && (
+        <>
+          <section className="chart-card">
+            <h2 className="section-label">Gasto por categoría</h2>
+            <DonutChart rows={rows} hidden={hidden} currency={money?.currency || 'PEN'} />
+          </section>
+          <section className="chart-card">
+            <div className="section-head">
+              <h2 className="section-label">Gasto por día</h2>
+              <span className="meta">promedio {hidden ? '••••' : soles(dayBars.avg, money?.currency || 'PEN')}</span>
+            </div>
+            <DayBars
+              bars={dayBars.bars}
+              avg={dayBars.avg}
+              max={dayBars.max}
+              hidden={hidden}
+              currency={money?.currency || 'PEN'}
+              todayDay={viewingNow ? new Date().getDate() : 0}
+            />
+            {dayBars.peakDay && (
+              <p className="hint">
+                Día de más gasto: el {dayBars.peakDay} ({hidden ? '••••' : soles(dayBars.peakCents, money?.currency || 'PEN')}).
+                En rojo pastel, días que pasaron 1,5× tu promedio{dayBars.truncated ? '; ▲ = barra cortada' : ''}.
+              </p>
+            )}
+          </section>
+        </>
+      )}
+
+      {tab === 'movimientos' && (
+        <>
+          <div className="spend-row">
+            {rows.map((row) => (
+              <div key={row.category.id} className="spend-col">
+                <span className={`spend-bar tint ${categoryTint(row.category.tint)}`} style={{ height: barHeight(row.cents, tallest) }}>
+                  <span className="spend-icon" aria-hidden="true">{categoryIcon(row.category.icon)}</span>
+                </span>
+                <strong>{hidden ? '••••' : shortAmount(row.cents, money?.currency || 'PEN')}</strong>
+                <span className="spend-name">{row.category.name}</span>
+              </div>
+            ))}
+            <button type="button" className="spend-col add" onClick={() => setAdding(true)}>
+              <span className="spend-bar add">+</span>
+              <span className="spend-name">Añadir categoría</span>
+            </button>
           </div>
-        ))}
-        <button type="button" className="spend-col add" onClick={() => setAdding(true)}>
-          <span className="spend-bar add">+</span>
-          <span className="spend-name">Añadir categoría</span>
-        </button>
-      </div>
+          <label className="field">
+            <input value={query} placeholder="Buscar movimiento…" onChange={(event) => setQuery(event.target.value)} />
+          </label>
+          <div className="switch-row">
+            {(['todos', 'gasto', 'ingreso'] as const).map((value) => (
+              <button key={value} type="button" className={kindFilter === value ? 'pill on' : 'pill quiet'} onClick={() => setKindFilter(value)}>
+                {value === 'todos' ? 'Todos' : value === 'gasto' ? 'Gastos' : 'Ingresos'}
+              </button>
+            ))}
+          </div>
+          {filtered.length === 0 && (
+            <p className="empty">{viewingNow ? 'Aún no registras nada este mes. Empieza con lo último que gastaste.' : 'En este mes no anotaste nada.'}</p>
+          )}
+          {filtered.length > 0 && (
+            <div className="ledger">
+              {filtered.map((item) => {
+                const title = item.note || item.category || (item.kind === 'ingreso' ? 'Ingreso' : 'Gasto')
+                return (
+                  <button key={item.id} type="button" className={item.kind === 'ingreso' ? 'move ingreso' : 'move gasto'} onClick={() => setEditing(item)}>
+                    <span className="move-mark" aria-hidden="true">{title.trim().charAt(0).toUpperCase()}</span>
+                    <span className="move-copy">
+                      <strong>{title}</strong>
+                      <span className="meta">{item.accountName ? `${item.accountName} · ` : ''}{movementDate(item.occurredOn)}</span>
+                    </span>
+                    <strong className="move-amount">{movementAmount(item.kind, item.amountCents, item.currency, money?.currency || 'PEN', hidden)}</strong>
+                    <span className="move-chevron" aria-hidden="true">›</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
+
       {offlineNote && <p className="hint">Hace falta conexión. Anótalo a mano.</p>}
       <button type="button" className="spend-fab chat" aria-label="Contar un gasto" onClick={() => {
         if (!navigator.onLine || !money) {
@@ -73,27 +157,6 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
           <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
         </svg>
       </button>
-      {money && money.movements.length === 0 && (
-        <p className="empty">{viewingNow ? 'Aún no registras nada este mes. Empieza con lo último que gastaste.' : 'En este mes no anotaste nada.'}</p>
-      )}
-      {money && money.movements.length > 0 && (
-        <div className="ledger">
-          {money.movements.map((item) => {
-            const title = item.note || item.category || (item.kind === 'ingreso' ? 'Ingreso' : 'Gasto')
-            return (
-              <button key={item.id} type="button" className={item.kind === 'ingreso' ? 'move ingreso' : 'move gasto'} onClick={() => setEditing(item)}>
-                <span className="move-mark" aria-hidden="true">{title.trim().charAt(0).toUpperCase()}</span>
-                <span className="move-copy">
-                  <strong>{title}</strong>
-                  <span className="meta">{item.accountName ? `${item.accountName} · ` : ''}{movementDate(item.occurredOn)}</span>
-                </span>
-                <strong className="move-amount">{movementAmount(item.kind, item.amountCents, hidden)}</strong>
-                <span className="move-chevron" aria-hidden="true">›</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
       <nav className="plan-links four">
         <Link className="plan-link cuentas" to="/plata/cuentas">
           <i aria-hidden="true"><WalletIcon /></i>
@@ -109,7 +172,7 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
         </Link>
         <Link className="plan-link pagos" to="/plata/pagos">
           <i aria-hidden="true"><CalendarIcon /></i>
-          Pagos recurrentes
+          Pagos
         </Link>
       </nav>
       {adding && (
@@ -207,7 +270,7 @@ export function TarjetasPage() {
                 <span style={{ width: `${cardUsedPct(item, fx)}%` }} />
               </div>
               <p className="credit-line">
-                Línea de crédito: {item.limitCents ? mask(hidden, soles(item.limitCents)) : 'Sin línea'}
+                Línea de crédito: {item.limitCents ? mask(hidden, cardLimitLabel(item)) : 'Sin línea'}
               </p>
             </button>
             <button type="button" className="account-edit" aria-label={`Editar ${item.name}`} onClick={() => setEditing(item)}>
@@ -274,7 +337,7 @@ export function TarjetaDetail() {
               <span style={{ width: `${cardUsedPct(card, fx)}%` }} />
             </div>
             <p className="credit-line">
-              Línea de crédito: {card.limitCents ? mask(hidden, soles(card.limitCents)) : 'Sin línea'}
+              Línea de crédito: {card.limitCents ? mask(hidden, cardLimitLabel(card)) : 'Sin línea'}
             </p>
           </article>
 
@@ -443,7 +506,7 @@ export function AccountHistory() {
                   <strong>{title}</strong>
                   <span className="meta">{item.kind === 'ingreso' ? 'Ingreso' : 'Gasto'} · {movementDate(item.occurredOn)}</span>
                 </span>
-                <strong className="move-amount">{movementAmount(item.kind, item.amountCents, hidden)}</strong>
+                <strong className="move-amount">{movementAmount(item.kind, item.amountCents, item.currency, money?.currency || 'PEN', hidden)}</strong>
                 <span className="move-chevron" aria-hidden="true">›</span>
               </button>
             )
@@ -520,11 +583,17 @@ function usePlan() {
   return { plan, reload }
 }
 
+function movePenCents(move: Movement, fx: number) {
+  if (move.currency === 'usd') return Math.floor((move.amountCents * fx) / 100)
+  return move.amountCents
+}
+
 function spendRows(money: MonthMoney | null) {
+  const fx = money?.fxHundredths ?? 340
   const totals = new Map<number, number>()
   for (const move of money?.movements ?? []) {
     if (move.kind !== 'gasto' || !move.categoryId) continue
-    totals.set(move.categoryId, (totals.get(move.categoryId) ?? 0) + move.amountCents)
+    totals.set(move.categoryId, (totals.get(move.categoryId) ?? 0) + movePenCents(move, fx))
   }
   return (money?.categories ?? [])
     .filter((item) => item.kind === 'gasto')
@@ -532,13 +601,114 @@ function spendRows(money: MonthMoney | null) {
     .sort((a, b) => b.cents - a.cents || a.category.position - b.category.position)
 }
 
+function daySpendBars(money: MonthMoney | null) {
+  const fx = money?.fxHundredths ?? 340
+  const byDay = new Map<number, number>()
+  for (const move of money?.movements ?? []) {
+    if (move.kind !== 'gasto') continue
+    const day = Number(move.occurredOn.slice(8, 10))
+    byDay.set(day, (byDay.get(day) ?? 0) + movePenCents(move, fx))
+  }
+  const daysInMonth = money?.movements[0]
+    ? new Date(Number(money.movements[0].occurredOn.slice(0, 4)), Number(money.movements[0].occurredOn.slice(5, 7)), 0).getDate()
+    : 31
+  const bars = Array.from({ length: daysInMonth }, (_, index) => ({
+    day: index + 1,
+    cents: byDay.get(index + 1) ?? 0,
+  }))
+  const active = bars.filter((item) => item.cents > 0)
+  const avg = active.length ? Math.round(active.reduce((sum, item) => sum + item.cents, 0) / active.length) : 0
+  const peak = bars.reduce((best, item) => (item.cents > best.cents ? item : best), { day: 0, cents: 0 })
+  const rawMax = Math.max(...bars.map((item) => item.cents), 1)
+  const displayMax = avg > 0 ? Math.max(avg * 2, ...bars.filter((item) => item.cents <= avg * 3).map((item) => item.cents), 1) : rawMax
+  return {
+    bars,
+    avg,
+    max: displayMax,
+    peakDay: peak.cents ? peak.day : 0,
+    peakCents: peak.cents,
+    truncated: rawMax > displayMax,
+  }
+}
+
+function DonutChart({ rows, hidden, currency }: { rows: ReturnType<typeof spendRows>; hidden: boolean; currency: string }) {
+  const total = rows.reduce((sum, row) => sum + row.cents, 0) || 1
+  const spent = rows.reduce((sum, row) => sum + row.cents, 0)
+  let offset = 0
+  const slices = rows.filter((row) => row.cents > 0).map((row) => {
+    const pct = (row.cents / total) * 100
+    const slice = { ...row, pct, offset }
+    offset += pct
+    return slice
+  })
+  const gradient = slices.length
+    ? `conic-gradient(${slices.map((slice) => {
+        const color = slice.category.tint === 'ciruela' ? '#8E3A9E' : slice.category.tint === 'azul' ? '#3C5FB8' : '#066B49'
+        return `${color} ${slice.offset}% ${slice.offset + slice.pct}%`
+      }).join(', ')})`
+    : 'conic-gradient(#E3ECE4 0% 100%)'
+  return (
+    <div className="donut-wrap">
+      <div className="donut" style={{ background: gradient }}>
+        <div className="donut-hole">
+          <strong>{hidden ? '••••' : soles(spent, currency)}</strong>
+        </div>
+      </div>
+      <ul className="donut-legend">
+        {slices.slice(0, 6).map((slice) => (
+          <li key={slice.category.id}>
+            <span>{slice.category.name}</span>
+            <strong>{hidden ? '••••' : soles(slice.cents, currency)} · {Math.round(slice.pct)}%</strong>
+          </li>
+        ))}
+        {slices.length === 0 && <li><span>Sin gastos</span><strong>{soles(0, currency)}</strong></li>}
+      </ul>
+    </div>
+  )
+}
+
+function DayBars({ bars, avg, max, hidden, currency, todayDay }: {
+  bars: { day: number; cents: number }[]
+  avg: number
+  max: number
+  hidden: boolean
+  currency: string
+  todayDay: number
+}) {
+  return (
+    <div className="day-bars" aria-hidden={hidden}>
+      <div className="day-bars-plot">
+        {bars.map((bar) => {
+          const hot = avg > 0 && bar.cents > avg * 1.5
+          const height = Math.max(4, Math.round((Math.min(bar.cents, max) / max) * 96))
+          const cut = bar.cents > max
+          return (
+            <div key={bar.day} className="day-bar-col" title={hidden ? undefined : `Día ${bar.day}: ${soles(bar.cents, currency)}`}>
+              {cut && <span className="day-bar-cut">▲</span>}
+              <span className={hot ? 'day-bar hot' : 'day-bar'} style={{ height }} />
+            </div>
+          )
+        })}
+        {avg > 0 && <span className="day-avg-line" style={{ bottom: `${Math.round((Math.min(avg, max) / max) * 96)}px` }} />}
+      </div>
+      <div className="day-bars-axis">
+        {bars.map((bar) => (
+          <span key={bar.day} className={bar.day === todayDay ? 'day-axis-label today' : 'day-axis-label'}>
+            {bar.day}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function barHeight(cents: number, tallest: number) {
   return 72 + Math.round((cents / tallest) * 108)
 }
 
-function shortAmount(cents: number) {
+function shortAmount(cents: number, currency = 'PEN') {
   if (!cents) return '0'
-  return soles(cents)
+  return soles(cents, currency)
 }
 
 function currentMonthKey(date = new Date()) {
@@ -551,20 +721,25 @@ function shiftMonth(key: string, delta: number) {
   return currentMonthKey(date)
 }
 
-function monthTitle(key: string, current: string) {
-  if (key === current) return 'Este mes'
+function monthTitle(key: string, _current?: string) {
   const [year, month] = key.split('-').map(Number)
-  const text = new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1))
+  const nowYear = new Date().getFullYear()
+  const text = new Intl.DateTimeFormat('es', {
+    month: 'long',
+    ...(year === nowYear ? {} : { year: 'numeric' as const }),
+  }).format(new Date(year, month - 1, 1))
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
 function headline(money: MonthMoney | null, hidden: boolean, viewingNow: boolean) {
   if (!money) return 'Cargando'
-  if (hidden && (money.spentCents > 0 || money.incomeCents > 0)) return 'S/ ••••'
+  const code = money.currency || 'PEN'
+  const sym = currencySymbol(code)
+  if (hidden && (money.spentCents > 0 || money.incomeCents > 0)) return `${sym} ••••`
   if (money.incomeCents > 0 && money.remainingCents !== null) {
-    return viewingNow ? `Te quedan ${soles(money.remainingCents)}` : `Te quedaron ${soles(money.remainingCents)}`
+    return viewingNow ? `Te quedan ${soles(money.remainingCents, code)}` : `Te quedaron ${soles(money.remainingCents, code)}`
   }
-  if (money.spentCents > 0) return viewingNow ? `Llevas ${soles(money.spentCents)} gastados` : `Gastaste ${soles(money.spentCents)}`
+  if (money.spentCents > 0) return viewingNow ? `Llevas ${soles(money.spentCents, code)} gastados` : `Gastaste ${soles(money.spentCents, code)}`
   return viewingNow ? 'Aún sin movimientos' : 'Sin movimientos'
 }
 
@@ -576,15 +751,23 @@ function movementDate(day: string) {
   return `${date} ${monthNames[month - 1]}`
 }
 
-function movementAmount(kind: 'gasto' | 'ingreso', cents: number, hidden: boolean) {
-  if (hidden) return 'S/ ••••'
-  const number = soles(cents).replace(/^S\/\s*/, '')
-  return kind === 'gasto' ? `S/\u00A0\u2212${number}` : `S/\u00A0+${number}`
+function movementAmount(kind: 'gasto' | 'ingreso', cents: number, currency: 'pen' | 'usd' | undefined, homeCurrency: string, hidden: boolean) {
+  if (currency === 'usd') {
+    if (hidden) return '$ ••••'
+    const number = dolares(cents).replace(/^\$\s*/, '')
+    return kind === 'gasto' ? `$\u00A0\u2212${number}` : `$\u00A0+${number}`
+  }
+  const code = homeCurrency || 'PEN'
+  const sym = currencySymbol(code)
+  if (hidden) return `${sym} ••••`
+  const formatted = soles(cents, code)
+  const number = formatted.slice(sym.length).trim()
+  return kind === 'gasto' ? `${sym}\u00A0\u2212${number}` : `${sym}\u00A0+${number}`
 }
 
-function mask(hidden: boolean, text: string) {
+function mask(hidden: boolean, text: string, homeCurrency = 'PEN') {
   if (!hidden) return text
-  return text.startsWith('$') ? '$ ••••' : 'S/ ••••'
+  return text.startsWith('$') ? '$ ••••' : `${currencySymbol(homeCurrency)} ••••`
 }
 
 function debtAmount(debt: Debt) {
@@ -605,14 +788,26 @@ function cardDebtPen(debt: Debt, fx: number) {
   return debt.balancePen + Math.floor((debt.balanceUsd * fx) / 100)
 }
 
-function cardAvailable(debt: Debt, fx: number) {
+function cardLimitPen(debt: Debt, fx: number) {
   if (!debt.limitCents) return 0
-  return Math.max(0, debt.limitCents - cardDebtPen(debt, fx))
+  if (debt.currency === 'usd') return Math.floor((debt.limitCents * fx) / 100)
+  return debt.limitCents
+}
+
+function cardLimitLabel(debt: Debt) {
+  return debt.currency === 'usd' ? dolares(debt.limitCents) : soles(debt.limitCents)
+}
+
+function cardAvailable(debt: Debt, fx: number) {
+  const limit = cardLimitPen(debt, fx)
+  if (!limit) return 0
+  return Math.max(0, limit - cardDebtPen(debt, fx))
 }
 
 function cardUsedPct(debt: Debt, fx: number) {
-  if (!debt.limitCents) return 0
-  return Math.min(100, Math.round((cardDebtPen(debt, fx) / debt.limitCents) * 100))
+  const limit = cardLimitPen(debt, fx)
+  if (!limit) return 0
+  return Math.min(100, Math.round((cardDebtPen(debt, fx) / limit) * 100))
 }
 
 function nextPayLabel(dueDay: number) {

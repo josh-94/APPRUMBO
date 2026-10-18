@@ -182,7 +182,7 @@ export function DebtSheet({ debt, kind: lockedKind, onClose, onSaved }: {
         kind,
         name: name.trim(),
         dueDay: day,
-        currency: card ? 'pen' : currency,
+        currency,
         balancePen: parseCents(balancePen),
         balanceUsd: parseCents(balanceUsd),
         cuotaPen: parseCents(cuotaPen),
@@ -206,7 +206,14 @@ export function DebtSheet({ debt, kind: lockedKind, onClose, onSaved }: {
         <label className="field">Nombre<input value={name} required maxLength={80} placeholder={card ? 'Amex Gold' : 'Préstamo vehicular'} onChange={(event) => setName(event.target.value)} /></label>
         {card && (
           <>
-            <label className="field">Línea de crédito<input inputMode="decimal" placeholder="0.00" value={limit} onChange={(event) => setLimit(event.target.value)} /></label>
+            <label className="field">
+              Línea de crédito en {currency === 'usd' ? 'dólares' : 'soles'}
+              <input inputMode="decimal" placeholder="0.00" value={limit} onChange={(event) => setLimit(event.target.value)} />
+            </label>
+            <div className="switch-row">
+              <button type="button" className={currency === 'pen' ? 'pill on' : 'pill quiet'} onClick={() => setCurrency('pen')}>Soles</button>
+              <button type="button" className={currency === 'usd' ? 'pill on' : 'pill quiet'} onClick={() => setCurrency('usd')}>Dólares</button>
+            </div>
             <p className="field-label">Color de la tarjeta</p>
             <div className="card-tint-pick">
               {cardTints.map((item) => (

@@ -62,6 +62,7 @@ type Bill struct {
 
 type MoneyPlan struct {
 	FxHundredths  int          `json:"fxHundredths"`
+	Currency      string       `json:"currency"`
 	Accounts      []PayAccount `json:"accounts"`
 	Debts         []Debt       `json:"debts"`
 	Bills         []Bill       `json:"bills"`
@@ -102,10 +103,14 @@ func NextPayDate(day int, today time.Time, last *time.Time, loc *time.Location) 
 }
 
 func (s *Store) MoneyPlan(ctx context.Context, userID int64) (MoneyPlan, error) {
-	plan := MoneyPlan{FxHundredths: DefaultFxHundredths, Accounts: []PayAccount{}, Debts: []Debt{}, Bills: []Bill{}}
-	err := s.pool.QueryRow(ctx, `SELECT fx_hundredths FROM money_settings WHERE user_id = $1`, userID).Scan(&plan.FxHundredths)
+	plan := MoneyPlan{FxHundredths: DefaultFxHundredths, Currency: "PEN", Accounts: []PayAccount{}, Debts: []Debt{}, Bills: []Bill{}}
+	err := s.pool.QueryRow(ctx, `
+		SELECT fx_hundredths, currency FROM money_settings WHERE user_id = $1`, userID).Scan(&plan.FxHundredths, &plan.Currency)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return MoneyPlan{}, err
+	}
+	if plan.Currency == "" {
+		plan.Currency = "PEN"
 	}
 	accounts, err := s.payAccounts(ctx, userID)
 	if err != nil {
@@ -139,6 +144,46 @@ func (s *Store) SetFx(ctx context.Context, userID int64, hundredths int) error {
 		INSERT INTO money_settings (user_id, fx_hundredths) VALUES ($1, $2)
 		ON CONFLICT (user_id) DO UPDATE SET fx_hundredths = EXCLUDED.fx_hundredths`, userID, hundredths)
 	return err
+}
+
+func normalizeHomeCurrency(raw string) (string, error) {
+	code := strings.ToUpper(strings.TrimSpace(raw))
+	if len(code) < 1 || len(code) > 6 {
+		return "", ErrBadMoney
+	}
+	for _, r := range code {
+		if r < 'A' || r > 'Z' {
+			return "", ErrBadMoney
+		}
+	}
+	return code, nil
+}
+
+func (s *Store) SetHomeCurrency(ctx context.Context, userID int64, raw string) error {
+	code, err := normalizeHomeCurrency(raw)
+	if err != nil {
+		return err
+	}
+	_, err = s.pool.Exec(ctx, `
+		INSERT INTO money_settings (user_id, fx_hundredths, currency) VALUES ($1, $2, $3)
+		ON CONFLICT (user_id) DO UPDATE SET currency = EXCLUDED.currency`,
+		userID, DefaultFxHundredths, code)
+	return err
+}
+
+func (s *Store) HomeCurrency(ctx context.Context, userID int64) (string, error) {
+	var code string
+	err := s.pool.QueryRow(ctx, `SELECT currency FROM money_settings WHERE user_id = $1`, userID).Scan(&code)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "PEN", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if code == "" {
+		return "PEN", nil
+	}
+	return code, nil
 }
 
 func (s *Store) SaveAccount(ctx context.Context, userID int64, item PayAccount) (PayAccount, error) {
@@ -217,17 +262,15 @@ func (s *Store) SaveDebt(ctx context.Context, userID int64, item Debt) (Debt, er
 	if item.DueDay < 1 || item.DueDay > 31 || item.BalancePen < 0 || item.BalanceUsd < 0 || item.CuotaPen < 0 || item.CuotaUsd < 0 {
 		return Debt{}, ErrBadMoney
 	}
+	if item.Currency != "pen" && item.Currency != "usd" {
+		return Debt{}, ErrBadMoney
+	}
 	if item.Kind == "prestamo" {
-		if item.Currency != "pen" && item.Currency != "usd" {
-			return Debt{}, ErrBadMoney
-		}
 		if item.Currency == "pen" {
 			item.BalanceUsd, item.CuotaUsd = 0, 0
 		} else {
 			item.BalancePen, item.CuotaPen = 0, 0
 		}
-	} else {
-		item.Currency = "pen"
 	}
 	item.Name = name
 	item.Last4 = strings.TrimSpace(item.Last4)
@@ -321,7 +364,7 @@ func (s *Store) DebtMoves(ctx context.Context, userID, debtID int64) ([]DebtMove
 			UNION ALL
 			SELECT id, debt_id,
 			       CASE WHEN kind = 'gasto' THEN 'consumo' ELSE 'pago' END,
-			       'pen', amount_cents,
+			       currency, amount_cents,
 			       to_char(occurred_on, 'YYYY-MM-DD'), COALESCE(note, ''), 'month', occurred_on, id
 			FROM movements WHERE debt_id = $1 AND user_id = $2
 		) AS ledger
@@ -675,15 +718,27 @@ func (s *Store) ConfirmPay(ctx context.Context, userID int64, in ConfirmPay, day
 }
 
 func (s *Store) payAccounts(ctx context.Context, userID int64) ([]PayAccount, error) {
+	fx := DefaultFxHundredths
+	_ = s.pool.QueryRow(ctx, `SELECT fx_hundredths FROM money_settings WHERE user_id = $1`, userID).Scan(&fx)
+	if fx <= 0 {
+		fx = DefaultFxHundredths
+	}
 	rows, err := s.pool.Query(ctx, `
 		SELECT a.id, a.name, COALESCE(a.pay_every, ''), COALESCE(a.payday, 0), COALESCE(a.payday_cents, 0),
 		       COALESCE(a.payday2, 0), COALESCE(a.payday2_cents, 0), a.currency,
-		       COALESCE(SUM(CASE WHEN m.kind = 'ingreso' THEN m.amount_cents ELSE -m.amount_cents END), 0)
+		       COALESCE(SUM(
+		         CASE WHEN m.kind = 'ingreso' THEN 1 ELSE -1 END *
+		         CASE
+		           WHEN UPPER(a.currency) = 'USD' AND m.currency = 'pen' THEN (m.amount_cents * 100) / $2
+		           WHEN UPPER(a.currency) <> 'USD' AND m.currency = 'usd' THEN (m.amount_cents * $2) / 100
+		           ELSE m.amount_cents
+		         END
+		       ), 0)
 		FROM accounts a
 		LEFT JOIN movements m ON m.account_id = a.id AND m.user_id = a.user_id
 		WHERE a.user_id = $1
 		GROUP BY a.id
-		ORDER BY a.id`, userID)
+		ORDER BY a.id`, userID, fx)
 	if err != nil {
 		return nil, err
 	}
