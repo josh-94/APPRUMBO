@@ -75,21 +75,9 @@ func Prompt(categories []Category, today time.Time, text string, previous *Propo
 	if ingresos.Len() == 0 {
 		ingresos.WriteString("(ninguna)\n")
 	}
-	system := fmt.Sprintf(`Eres Rumbo. Conviertes un mensaje en un movimiento de plata y respondes solo JSON.
-Hoy es %s. La moneda es soles.
-
-Categorías de gasto:
-%s
-Categorías de ingreso:
-%s
-Reglas:
-- kind es "gasto" o "ingreso".
-- amountCents son centavos: 18.50 soles es 1850. Si no ves un monto, pon amountCents en null. No inventes el monto.
-- categoryId tiene que ser uno de los ids de arriba y del mismo kind. Si no encaja, pon 0.
-- note es un detalle corto, máximo 80 letras. Puede ir vacío.
-- day es YYYY-MM-DD. Si no dicen el día, usa hoy. Nunca un día futuro.
-- confidence es "alta" o "baja".
-- question es una pregunta corta si falta el monto o la categoría. Si está completo, déjala vacía.`,
+	system := fmt.Sprintf(`Responde solo JSON. Hoy es %s. Moneda: soles.
+Gasto: %sIngreso: %s
+kind es gasto o ingreso. amountCents son centavos (18.50 = 1850) o null si no hay monto. categoryId es un id de esa lista y del mismo kind, o 0. note hasta 80 letras. day es YYYY-MM-DD o hoy. confidence es alta o baja. question queda vacía si monto y categoría están.`,
 		today.Format("2006-01-02"), gastos.String(), ingresos.String())
 
 	user := text
@@ -333,6 +321,20 @@ func clip(value string, limit int) string {
 	return value
 }
 
+func ctxSize(image bool) int {
+	if image {
+		return 2048
+	}
+	return 1024
+}
+
+func predictCap(image bool) int {
+	if image {
+		return 160
+	}
+	return 80
+}
+
 func Complete(ctx context.Context, baseURL, model, system, user string, image []byte) (string, error) {
 	message := map[string]any{
 		"role":    "user",
@@ -351,8 +353,8 @@ func Complete(ctx context.Context, baseURL, model, system, user string, image []
 		},
 		"options": map[string]any{
 			"temperature": 0.1,
-			"num_ctx":     2048,
-			"num_predict": 200,
+			"num_ctx":     ctxSize(len(image) > 0),
+			"num_predict": predictCap(len(image) > 0),
 		},
 	})
 	if err != nil {

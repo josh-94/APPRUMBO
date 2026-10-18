@@ -24,18 +24,19 @@ import (
 var dummyPasswordHash = []byte("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy")
 
 type Server struct {
-	Store          *store.Store
-	Redis          *redis.Client
-	Loc            *time.Location
-	SessionSecret  string
-	CookieSecure   bool
-	VAPIDPublic    string
-	GoogleID       string
-	GoogleSecret   string
-	GoogleRedirect string
-	OllamaURL      string
-	OllamaModel    string
-	WhisperURL     string
+	Store           *store.Store
+	Redis           *redis.Client
+	Loc             *time.Location
+	SessionSecret   string
+	CookieSecure    bool
+	VAPIDPublic     string
+	GoogleID        string
+	GoogleSecret    string
+	GoogleRedirect  string
+	OllamaURL       string
+	OllamaModel     string
+	OllamaTextModel string
+	WhisperURL      string
 }
 
 func (s *Server) Handler() http.Handler {

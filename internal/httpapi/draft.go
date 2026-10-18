@@ -17,7 +17,7 @@ import (
 const draftBodyLimit = 8 << 20
 
 func (s *Server) moneyDraft(w http.ResponseWriter, r *http.Request) {
-	if s.OllamaURL == "" || s.OllamaModel == "" {
+	if s.OllamaURL == "" || (s.OllamaModel == "" && s.OllamaTextModel == "") {
 		writeError(w, http.StatusServiceUnavailable, "No pude leer eso ahora. Anótalo a mano.")
 		return
 	}
@@ -63,7 +63,7 @@ func (s *Server) moneyDraft(w http.ResponseWriter, r *http.Request) {
 		modelText = "Lee la imagen y anota el gasto o el ingreso."
 	}
 	system, user := draft.Prompt(toDraftCategories(categories), s.today(), modelText, in.Previous)
-	raw, err := draft.Complete(ctx, s.OllamaURL, s.OllamaModel, system, user, in.Image)
+	raw, err := draft.Complete(ctx, s.OllamaURL, s.draftModel(len(in.Image) > 0), system, user, in.Image)
 	if message, failed := draftFailure(err, "No entendí eso. Dilo de otra forma."); failed {
 		writeError(w, message.status, message.text)
 		return
@@ -75,6 +75,19 @@ func (s *Server) moneyDraft(w http.ResponseWriter, r *http.Request) {
 	}
 	proposal.Transcript = text
 	writeJSON(w, http.StatusOK, proposal)
+}
+
+func (s *Server) draftModel(image bool) string {
+	if image {
+		if s.OllamaModel != "" {
+			return s.OllamaModel
+		}
+		return s.OllamaTextModel
+	}
+	if s.OllamaTextModel != "" {
+		return s.OllamaTextModel
+	}
+	return s.OllamaModel
 }
 
 type draftInput struct {

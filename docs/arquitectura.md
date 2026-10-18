@@ -43,7 +43,7 @@ Producción es el perfil `tunnel` de [deploy/compose.yaml](../deploy/compose.yam
 | `worker` | Lee esa cola y manda el push. | 64 MiB |
 | `web` | nginx. Estáticos y proxy hacia la API. | 64 MiB |
 | `cloudflared` | Túnel. El token vive en `deploy/.env`, que no está en git. | 128 MiB |
-| `ollama` | Modelo Qwen2.5-VL 3B. Lee el texto y la foto del chat de gastos. Un solo modelo, y se descarga a los 10 minutos. | 3.5 GiB |
+| `ollama` | Qwen2.5 1.5B para texto y voz. Qwen2.5-VL 3B solo si hay foto. Un modelo a la vez, y se descarga a los 10 minutos. | 3.5 GiB |
 | `ollama-pull` | Baja ese modelo la primera vez y sale. No se queda encendido. | 128 MiB |
 | `whisper` | Whisper small. Transcribe la voz en español y convierte el audio del teléfono a wav. | 768 MiB |
 

@@ -45,6 +45,7 @@ services:
     environment:
       OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5vl:3b}
+      OLLAMA_TEXT_MODEL: ${OLLAMA_TEXT_MODEL:-qwen2.5:1.5b}
       WHISPER_URL: ${WHISPER_URL:-http://whisper:8080}
     mem_limit: 128m
     restart: unless-stopped
@@ -125,6 +126,7 @@ services:
     environment:
       OLLAMA_HOST: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5vl:3b}
+      OLLAMA_TEXT_MODEL: ${OLLAMA_TEXT_MODEL:-qwen2.5:1.5b}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -134,6 +136,7 @@ services:
           if [ "$$i" -gt 90 ]; then echo "ollama no respondió"; exit 1; fi
           sleep 2
         done
+        ollama pull "$$OLLAMA_TEXT_MODEL"
         ollama pull "$$OLLAMA_MODEL"
     mem_limit: 128m
     restart: on-failure
