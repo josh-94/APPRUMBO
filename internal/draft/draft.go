@@ -523,14 +523,14 @@ func Complete(ctx context.Context, baseURL, model, system, user string, image []
 	return completeChat(ctx, baseURL, model, system, user, image, ctxSize(len(image) > 0), predictCap(len(image) > 0), numThread)
 }
 
-// CompleteMoney uses a small context for fast money chat drafts on CPU.
-func CompleteMoney(ctx context.Context, baseURL, model, system, user string, numThread int) (string, error) {
-	return completeChat(ctx, baseURL, model, system, user, nil, 512, 72, numThread)
+// CompleteMoney prefers Groq when configured, then Ollama.
+func CompleteMoney(ctx context.Context, cfg LLMConfig, system, user string) (string, error) {
+	return completeWithFallback(ctx, cfg, system, user, 72)
 }
 
-// CompleteCapture uses a smaller context for fast structured capture drafts.
-func CompleteCapture(ctx context.Context, baseURL, model, system, user string, numThread int) (string, error) {
-	return completeChat(ctx, baseURL, model, system, user, nil, 512, 72, numThread)
+// CompleteCapture prefers Groq when configured, then Ollama.
+func CompleteCapture(ctx context.Context, cfg LLMConfig, system, user string) (string, error) {
+	return completeWithFallback(ctx, cfg, system, user, 72)
 }
 
 func completeChat(ctx context.Context, baseURL, model, system, user string, image []byte, numCtx, numPredict, numThread int) (string, error) {

@@ -73,6 +73,8 @@ func main() {
 		OllamaModel:     cfg.OllamaModel,
 		OllamaTextModel: cfg.OllamaTextModel,
 		OllamaNumThread: cfg.OllamaNumThread,
+		GroqAPIKey:      cfg.GroqAPIKey,
+		GroqModel:       cfg.GroqModel,
 		WhisperURL:      cfg.WhisperURL,
 		FX:              fx.NewClient(),
 		Foods:           foods.NewClient(),

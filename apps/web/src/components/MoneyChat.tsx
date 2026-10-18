@@ -10,7 +10,7 @@ import {
   type ChatBubble,
 } from '../moneyChatMemory'
 import { soles, todayKey } from '../format'
-import { patchMoneyDraft } from '../patchMoneyDraft'
+import { patchMoneyDraft, proposeNewCategory } from '../patchMoneyDraft'
 import type { MoneyDraft, MonthMoney } from '../types'
 
 export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: {
@@ -24,6 +24,7 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [saving, setSaving] = useState(0)
+  const [creatingCategory, setCreatingCategory] = useState(0)
   const [error, setError] = useState('')
   const logRef = useRef<HTMLDivElement>(null)
   const alive = useRef(true)
@@ -71,19 +72,39 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
     return undefined
   }
 
+  function appendDraft(userId: number, label: string, draft: MoneyDraft) {
+    const draftId = nextId()
+    setMessages((items) => trimChat([
+      ...items,
+      { id: userId, role: 'user', text: label },
+      { id: draftId, role: 'draft', draft, saved: false },
+    ]))
+  }
+
   async function send(value: string) {
     const label = value.trim()
     if (!label) return
     const id = nextId()
     const previous = previousDraft()
-    // Correcciones cortas (categoría / cuenta / nota) en el teléfono: sin API ni Ollama.
     const localPatch = previous ? patchMoneyDraft(label, previous, money) : null
     if (localPatch) {
-      const draftId = nextId()
+      appendDraft(id, label, localPatch)
+      setText('')
+      setError('')
+      return
+    }
+    const proposal = previous ? proposeNewCategory(label, previous, money) : null
+    if (proposal) {
+      const proposeId = nextId()
       setMessages((items) => trimChat([
         ...items,
         { id, role: 'user', text: label },
-        { id: draftId, role: 'draft', draft: localPatch, saved: false },
+        {
+          id: proposeId,
+          role: 'propose-category',
+          name: proposal.name,
+          kind: proposal.kind,
+        },
       ]))
       setText('')
       setError('')
@@ -125,8 +146,55 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
   function submit(event: FormEvent) {
     event.preventDefault()
     const value = text.trim()
-    if (!value || busy) return
+    if (!value || busy || creatingCategory) return
     void send(value)
+  }
+
+  function dismissCategory(proposeId: number) {
+    setMessages((items) => items.map((item) => (
+      item.id === proposeId && item.role === 'propose-category'
+        ? { ...item, resolved: 'dismissed' as const }
+        : item
+    )))
+  }
+
+  async function acceptCategory(proposeId: number, name: string, kind: 'gasto' | 'ingreso') {
+    if (!navigator.onLine) {
+      onOffline()
+      return
+    }
+    const previous = previousDraft()
+    if (!previous) return
+    setCreatingCategory(proposeId)
+    setError('')
+    try {
+      const category = await api.createCategory(name, kind)
+      const next: MoneyDraft = {
+        ...previous,
+        categoryId: category.id,
+        category: category.name,
+        question: '',
+        confidence: 'alta',
+      }
+      const draftId = nextId()
+      setMessages((items) => trimChat([
+        ...items.map((item) => (
+          item.id === proposeId && item.role === 'propose-category'
+            ? { ...item, resolved: 'created' as const }
+            : item
+        )),
+        { id: draftId, role: 'draft', draft: next, saved: false },
+      ]))
+      onSaved()
+    } catch (err) {
+      if (!navigator.onLine || err instanceof TypeError) {
+        onOffline()
+        return
+      }
+      setError(err instanceof Error ? err.message : 'No se pudo crear la categoría')
+    } finally {
+      setCreatingCategory(0)
+    }
   }
 
   async function confirm(id: number, draft: MoneyDraft) {
@@ -193,6 +261,35 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
                 </div>
               )
             }
+            if (item.role === 'propose-category') {
+              return (
+                <div key={item.id} className="chat-propose">
+                  <p>¿Creo la categoría «{item.name}»?</p>
+                  {item.resolved === 'created' && <p className="ok">Categoría creada</p>}
+                  {item.resolved === 'dismissed' && <p className="hint">No la creé.</p>}
+                  {!item.resolved && (
+                    <div className="chat-propose-actions">
+                      <button
+                        type="button"
+                        className="primary"
+                        disabled={creatingCategory === item.id}
+                        onClick={() => void acceptCategory(item.id, item.name, item.kind)}
+                      >
+                        {creatingCategory === item.id ? 'Creando…' : 'Crear'}
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost"
+                        disabled={creatingCategory === item.id}
+                        onClick={() => dismissCategory(item.id)}
+                      >
+                        No
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            }
             const ready = item.draft.amountCents > 0 && item.draft.categoryId > 0
             return (
               <div key={item.id} className="chat-draft">
@@ -228,10 +325,10 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
             value={text}
             maxLength={2000}
             placeholder="Almuerzo 18.50"
-            disabled={busy}
+            disabled={busy || creatingCategory > 0}
             onChange={(event) => setText(event.target.value)}
           />
-          <button type="submit" className="chat-tool send" aria-label="Enviar" disabled={busy || !text.trim()}>
+          <button type="submit" className="chat-tool send" aria-label="Enviar" disabled={busy || creatingCategory > 0 || !text.trim()}>
             <SendIcon />
           </button>
         </form>

@@ -46,7 +46,9 @@ Producción es el perfil `tunnel` de [deploy/compose.yaml](../deploy/compose.yam
 
 Redis no guarda la sesión de cada visita: la cookie viaja con el navegador y la API la verifica sola.
 
-Ollama no publica puertos y no sale por el túnel. Solo la API le habla, dentro de la red de Docker. Los pesos quedan en el volumen `ollamadata`. El primer arranque los descarga y deja el modelo en RAM; hasta que termina, el chat dice que el modelo se está preparando. La API manda `num_thread` (`OLLAMA_NUM_THREAD`, por defecto 4) y contextos cortos. El chat de gastos y la captura aceptan solo texto; si llega audio o imagen, la API responde 422. El borrador no se guarda solo: la persona lo confirma y ahí la API anota el movimiento.
+Ollama no publica puertos y no sale por el túnel. Solo la API le habla, dentro de la red de Docker. Los pesos quedan en el volumen `ollamadata`. El primer arranque los descarga y deja el modelo en RAM; hasta que termina, el chat dice que el modelo se está preparando. La API manda `num_thread` (`OLLAMA_NUM_THREAD`, por defecto 4) y contextos cortos.
+
+Los borradores de gasto/captura que necesitan modelo usan **Groq** si hay `GROQ_API_KEY` en `deploy/.env`; si falla o no hay key, caen a Ollama. Muchas correcciones cortas se resuelven en local sin llamar a ningún modelo. El chat de gastos y la captura aceptan solo texto; si llega audio o imagen, la API responde 422. El borrador no se guarda solo: la persona lo confirma y ahí la API anota el movimiento.
 
 El reloj de la app sale de `APP_TIMEZONE` en `deploy/.env`. El ejemplo del repo dice `America/Bogota`. Lima marca la misma hora (UTC−5, sin horario de verano).
 

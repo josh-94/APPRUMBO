@@ -5,7 +5,14 @@ export const MONEY_CHAT_CAP = 20
 export type ChatUserBubble = { id: number; role: 'user'; text: string }
 export type ChatDraftBubble = { id: number; role: 'draft'; draft: MoneyDraft; saved: boolean }
 export type ChatActionBubble = { id: number; role: 'action'; text: string }
-export type ChatBubble = ChatUserBubble | ChatDraftBubble | ChatActionBubble
+export type ChatProposeCategoryBubble = {
+  id: number
+  role: 'propose-category'
+  name: string
+  kind: 'gasto' | 'ingreso'
+  resolved?: 'created' | 'dismissed'
+}
+export type ChatBubble = ChatUserBubble | ChatDraftBubble | ChatActionBubble | ChatProposeCategoryBubble
 
 type StoredUser = { id: number; role: 'user'; text: string }
 type StoredDraft = { id: number; role: 'draft'; draft: MoneyDraft; saved: boolean }
@@ -77,7 +84,10 @@ export function loadMoneyChat(userKey: string): ChatBubble[] {
 
 export function saveMoneyChat(userKey: string, messages: ChatBubble[]) {
   try {
-    const trimmed = messages.slice(-MONEY_CHAT_CAP)
+    // Propuestas de categoría no se persisten (solo sesión actual).
+    const trimmed = messages
+      .filter((item): item is Exclude<ChatBubble, ChatProposeCategoryBubble> => item.role !== 'propose-category')
+      .slice(-MONEY_CHAT_CAP)
     const stored: StoredBubble[] = trimmed.map((item) => {
       if (item.role === 'user') return { id: item.id, role: 'user', text: item.text.slice(0, 500) }
       if (item.role === 'action') return { id: item.id, role: 'action', text: item.text.slice(0, 200) }
@@ -133,6 +143,7 @@ export function memoryForDraft(messages: ChatBubble[]): string {
       lines.push(`Hecho: ${item.text}`)
       continue
     }
+    if (item.role === 'propose-category') continue
     const amount = item.draft.amountCents ? `${(item.draft.amountCents / 100).toFixed(2)}` : '?'
     const bits = [
       item.draft.kind,

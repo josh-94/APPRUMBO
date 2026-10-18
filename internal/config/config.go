@@ -24,6 +24,8 @@ type Config struct {
 	OllamaModel     string
 	OllamaTextModel string
 	OllamaNumThread int
+	GroqAPIKey      string
+	GroqModel       string
 	WhisperURL      string
 }
 
@@ -44,6 +46,8 @@ func Load() (Config, error) {
 		OllamaModel:     os.Getenv("OLLAMA_MODEL"),
 		OllamaTextModel: env("OLLAMA_TEXT_MODEL", "qwen2.5:3b"),
 		OllamaNumThread: envInt("OLLAMA_NUM_THREAD", 4),
+		GroqAPIKey:      os.Getenv("GROQ_API_KEY"),
+		GroqModel:       env("GROQ_MODEL", "llama-3.1-8b-instant"),
 		WhisperURL:      os.Getenv("WHISPER_URL"),
 	}
 	if cfg.DatabaseURL == "" || cfg.RedisURL == "" {

@@ -17,7 +17,7 @@ import (
 const draftBodyLimit = 8 << 20
 
 func (s *Server) captureDraft(w http.ResponseWriter, r *http.Request) {
-	if s.OllamaURL == "" || (s.OllamaModel == "" && s.OllamaTextModel == "") {
+	if !s.draftLLMReady() {
 		writeError(w, http.StatusServiceUnavailable, "No pude leer eso ahora. Anótalo a mano.")
 		return
 	}
@@ -71,7 +71,7 @@ func (s *Server) captureDraft(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	system, user := draft.CapturePrompt(body.Intent, categories, sources, s.today(), text)
-	raw, err := draft.CompleteCapture(ctx, s.OllamaURL, s.draftModel(false), system, user, s.OllamaNumThread)
+	raw, err := draft.CompleteCapture(ctx, s.draftLLM(), system, user)
 	if message, failed := draftFailure(err, "No entendí eso. Dilo de otra forma."); failed {
 		writeError(w, message.status, message.text)
 		return
@@ -86,7 +86,7 @@ func (s *Server) captureDraft(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) moneyDraft(w http.ResponseWriter, r *http.Request) {
-	if s.OllamaURL == "" || (s.OllamaModel == "" && s.OllamaTextModel == "") {
+	if !s.draftLLMReady() {
 		writeError(w, http.StatusServiceUnavailable, "No pude leer eso ahora. Anótalo a mano.")
 		return
 	}
@@ -128,7 +128,7 @@ func (s *Server) moneyDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	system, user := draft.Prompt(cats, s.today(), text, in.Previous, in.Memory)
-	raw, err := draft.CompleteMoney(ctx, s.OllamaURL, s.draftModel(false), system, user, s.OllamaNumThread)
+	raw, err := draft.CompleteMoney(ctx, s.draftLLM(), system, user)
 	if message, failed := draftFailure(err, "No entendí eso. Dilo de otra forma."); failed {
 		writeError(w, message.status, message.text)
 		return
@@ -181,6 +181,23 @@ func (s *Server) draftModel(image bool) string {
 		return s.OllamaTextModel
 	}
 	return s.OllamaModel
+}
+
+func (s *Server) draftLLMReady() bool {
+	if strings.TrimSpace(s.GroqAPIKey) != "" {
+		return true
+	}
+	return s.OllamaURL != "" && (s.OllamaModel != "" || s.OllamaTextModel != "")
+}
+
+func (s *Server) draftLLM() draft.LLMConfig {
+	return draft.LLMConfig{
+		GroqAPIKey:      s.GroqAPIKey,
+		GroqModel:       s.GroqModel,
+		OllamaURL:       s.OllamaURL,
+		OllamaModel:     s.draftModel(false),
+		OllamaNumThread: s.OllamaNumThread,
+	}
 }
 
 type draftInput struct {

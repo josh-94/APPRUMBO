@@ -39,6 +39,8 @@ type Server struct {
 	OllamaModel     string
 	OllamaTextModel string
 	OllamaNumThread int
+	GroqAPIKey      string
+	GroqModel       string
 	WhisperURL      string
 	FX              *fx.Client
 	Foods           *foods.Client

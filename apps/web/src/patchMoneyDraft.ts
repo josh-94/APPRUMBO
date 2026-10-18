@@ -79,10 +79,58 @@ function extractNote(text: string) {
   return ''
 }
 
+const CREATE_CATEGORY_RE = /^(?:crea(?:r)?|nueva)\s+categor[ií]a\s+(.+)$/i
+const JUNK_NAMES = new Set([
+  'no', 'si', 'sí', 'ok', 'okay', 'vale', 'ya', 'listo', 'gracias', 'hola',
+  'no se', 'no sé', 'nose', 'nada', 'ninguna', 'ninguno', 'tal vez', 'quizas', 'quizás',
+])
+
+function sanitizeCategoryName(raw: string) {
+  let name = raw.trim().replace(/^['"]+|['"]+$/g, '')
+  name = name.replace(/\s+/g, ' ').slice(0, 40).trim()
+  if (!name) return ''
+  return name.charAt(0).toUpperCase() + name.slice(1)
+}
+
+function isJunkName(name: string) {
+  const key = name.trim().toLowerCase()
+  if (!key || key.length < 2) return true
+  if (JUNK_NAMES.has(key)) return true
+  if (/^\?+$/.test(key)) return true
+  return false
+}
+
+export type NewCategoryProposal = { name: string; kind: 'gasto' | 'ingreso' }
+
+/** Suggest creating a category when the open draft needs one (or user says "crea categoría X"). */
+export function proposeNewCategory(text: string, previous: MoneyDraft, money: MonthMoney): NewCategoryProposal | null {
+  const trimmed = text.trim()
+  if (!trimmed || !previous.amountCents || hasAmount(trimmed)) return null
+
+  const kind = previous.kind === 'ingreso' ? 'ingreso' : 'gasto'
+  const createMatch = trimmed.match(CREATE_CATEGORY_RE)
+  let name = ''
+  if (createMatch) {
+    name = sanitizeCategoryName(createMatch[1] || '')
+  } else {
+    if (previous.categoryId > 0) return null
+    if ([...trimmed].length > 40) return null
+    if (matchCategory(trimmed, money, kind) || matchSource(trimmed, money) || extractNote(trimmed)) return null
+    name = sanitizeCategoryName(trimmed)
+  }
+  if (!name || isJunkName(name)) return null
+  const exists = money.categories.some(
+    (item) => item.kind === kind && item.name.trim().toLowerCase() === name.toLowerCase(),
+  )
+  if (exists) return null
+  return { name, kind }
+}
+
 /** Patch the open draft from a short correction. Returns null if the server should handle it. */
 export function patchMoneyDraft(text: string, previous: MoneyDraft, money: MonthMoney): MoneyDraft | null {
   const trimmed = text.trim()
   if (!trimmed || !previous.amountCents || hasAmount(trimmed)) return null
+  if (CREATE_CATEGORY_RE.test(trimmed)) return null
 
   const kind = previous.kind === 'ingreso' ? 'ingreso' : 'gasto'
   const category = matchCategory(trimmed, money, kind)

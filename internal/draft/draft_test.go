@@ -255,8 +255,46 @@ func TestCompleteAndTranscribe(t *testing.T) {
 		_, _ = w.Write([]byte(`{"message":{"content":"{\"kind\":\"gasto\"}"}}`))
 	}))
 	defer money.Close()
-	if _, err := CompleteMoney(context.Background(), money.URL, "qwen2.5:3b", "s", "u", 4); err != nil {
+	if _, err := CompleteMoney(context.Background(), LLMConfig{
+		OllamaURL: money.URL, OllamaModel: "qwen2.5:3b", OllamaNumThread: 4,
+	}, "s", "u"); err != nil {
 		t.Fatalf("CompleteMoney %v", err)
+	}
+
+	groqOK := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/completions" {
+			http.NotFound(w, r)
+			return
+		}
+		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
+			t.Error("missing bearer")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"kind\":\"gasto\",\"amountCents\":200}"}}]}`))
+	}))
+	defer groqOK.Close()
+	gotGroq, err := CompleteMoney(context.Background(), LLMConfig{
+		GroqAPIKey: "test-key", GroqModel: "llama-3.1-8b-instant", GroqBaseURL: groqOK.URL,
+	}, "s", "u")
+	if err != nil || !strings.Contains(gotGroq, "gasto") {
+		t.Fatalf("groq %q %v", gotGroq, err)
+	}
+
+	groqFail := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "rate limit", http.StatusTooManyRequests)
+	}))
+	defer groqFail.Close()
+	ollamaFallback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"message":{"content":"{\"kind\":\"gasto\",\"via\":\"ollama\"}"}}`))
+	}))
+	defer ollamaFallback.Close()
+	gotFallback, err := CompleteMoney(context.Background(), LLMConfig{
+		GroqAPIKey: "test-key", GroqBaseURL: groqFail.URL,
+		OllamaURL: ollamaFallback.URL, OllamaModel: "qwen2.5:3b", OllamaNumThread: 4,
+	}, "s", "u")
+	if err != nil || !strings.Contains(gotFallback, "ollama") {
+		t.Fatalf("fallback %q %v", gotFallback, err)
 	}
 
 	missing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
