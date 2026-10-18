@@ -127,8 +127,14 @@ func TryLocalMoney(text string, categories []Category, sources []PaySource, toda
 			kind = "gasto"
 		}
 		cat, hasCat := matchLocalCategory(text, kind, categories)
-		src, hasSrc := MatchPaySource(text, sources)
+		// No usar palabras de "borra lo de X" para elegir cuenta (p. ej. ahorros).
+		src, hasSrc := MatchPaySource(TextForPaySource(text), sources)
 		noteFix, hasNote := extractNoteCorrection(text)
+		if !hasNote {
+			if stripped, ok := stripWordsFromNote(previous.Note, text); ok {
+				noteFix, hasNote = stripped, true
+			}
+		}
 		short := utf8.RuneCountInString(text) <= 48
 		if !hasCat && !hasSrc && !hasNote {
 			return Proposal{}, false
@@ -232,8 +238,11 @@ var (
 	localMoneyAmountRe = regexp.MustCompile(`(?i)(?:(?:s\s*/|soles?)\s*\d{1,6}(?:[.,]\d{1,2})?|\d{1,6}(?:[.,]\d{1,2})?\s*soles?|\d{1,6}[.,]\d{1,2}|\b\d{1,6}\b)`)
 	localMoneyNoiseRe  = regexp.MustCompile(`(?i)\b(agregar|añadir|anotar|mis|gastos?|ingresos?|gast[eé]|pase|pasé|compré|compre|en|de|a|mi|la|el|los|las|un|una|con|por|tarjeta|cuenta|amex|yape|plin|soles?|categor[ií]a)\b`)
 	localCategoryCueRe = regexp.MustCompile(`(?i)\bcategor[ií]a\s+\S+`)
-	noteCorrectionRe   = regexp.MustCompile(`(?i)(?:solo\s+fue\s+en|fue\s+solo\s+en|solo\s+en|la\s+nota\s+es|nota\s*:)\s+['"]?(.+?)['"]?\s*$`)
+	noteCorrectionRe   = regexp.MustCompile(`(?i)(?:solo\s+fue\s+en|fue\s+solo\s+en|solo\s+en|(?:el\s+)?gasto\s+es\s+solo(?:\s+en)?|es\s+solo(?:\s+en)?|la\s+nota\s+es|nota\s*:)\s+['"]?(.+?)['"]?\s*$`)
 	noteQuotedRe       = regexp.MustCompile(`['"]([^'"]{1,40})['"]`)
+	noteBorraEsRe      = regexp.MustCompile(`(?i)(?:borra|quita|elimina|saca)\b[\s\S]+?\bes\s+(.+)$`)
+	noteBorraWordRe    = regexp.MustCompile(`(?i)(?:borra|quita|elimina|saca)\s+(?:lo\s+de\s+|la\s+palabra\s+)?([^\s,.;]+)`)
+	noteEditLeadRe     = regexp.MustCompile(`(?i)\b(?:borra|quita|elimina|saca)\s+(?:lo\s+de\s+|la\s+palabra\s+)?[^\s,.;]+`)
 )
 
 func localMoneyNote(text, category string) string {
@@ -258,6 +267,12 @@ func extractNoteCorrection(text string) (string, bool) {
 			return note, true
 		}
 	}
+	if m := noteBorraEsRe.FindStringSubmatch(text); m != nil {
+		note := clip(m[1], noteLimit)
+		if note != "" {
+			return note, true
+		}
+	}
 	if m := noteCorrectionRe.FindStringSubmatch(text); m != nil {
 		note := clip(m[1], noteLimit)
 		if note != "" {
@@ -265,6 +280,41 @@ func extractNoteCorrection(text string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// TextForPaySource drops "borra/quita lo de …" so those words are not treated as a pay account.
+func TextForPaySource(text string) string {
+	return strings.TrimSpace(noteEditLeadRe.ReplaceAllString(text, " "))
+}
+
+func stripWordsFromNote(note, text string) (string, bool) {
+	note = strings.TrimSpace(note)
+	if note == "" {
+		return "", false
+	}
+	matches := noteBorraWordRe.FindAllStringSubmatch(text, -1)
+	if len(matches) == 0 {
+		return "", false
+	}
+	out := note
+	changed := false
+	for _, m := range matches {
+		word := strings.ToLower(strings.TrimSpace(m[1]))
+		if word == "" || word == "lo" || word == "la" {
+			continue
+		}
+		re := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(word) + `\b`)
+		next := strings.TrimSpace(re.ReplaceAllString(out, " "))
+		next = strings.Join(strings.Fields(next), " ")
+		if next != out {
+			out = next
+			changed = true
+		}
+	}
+	if !changed {
+		return "", false
+	}
+	return clip(out, noteLimit), true
 }
 
 func Normalize(text, raw string, categories []Category, today time.Time, trustModelAmount bool, previous *Proposal) (Proposal, error) {

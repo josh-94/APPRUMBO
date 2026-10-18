@@ -160,6 +160,27 @@ func TestTryLocalMoneyCategoryCorrection(t *testing.T) {
 	}
 }
 
+func TestTryLocalMoneyNoteBorraAhorrosKeepsCard(t *testing.T) {
+	today := time.Date(2026, 10, 17, 0, 0, 0, 0, time.UTC)
+	categories := []Category{{ID: 4, Name: "Regalos", Kind: "gasto"}}
+	sources := []PaySource{
+		{ID: 1, Name: "Ahorros Soles - BCP", Kind: "account"},
+		{ID: 3, Name: "BCP Amex Gold", Kind: "debt"},
+	}
+	previous := &Proposal{
+		Kind: "gasto", AmountCents: 4000, CategoryID: 4, Category: "Regalos",
+		Note: "ramo flores ahorros", Day: "2026-10-17", DebtID: 3, SourceName: "BCP Amex Gold",
+	}
+	got, ok := TryLocalMoney("borra lo de ahorros, es ramo de flores", categories, sources, today, previous)
+	if !ok || got.Note != "ramo de flores" || got.DebtID != 3 || got.AccountID != 0 || got.SourceName != "BCP Amex Gold" {
+		t.Fatalf("borra ahorros %+v ok=%v", got, ok)
+	}
+	got, ok = TryLocalMoney("el gasto es solo ramo de flores", categories, sources, today, previous)
+	if !ok || got.Note != "ramo de flores" || got.DebtID != 3 {
+		t.Fatalf("es solo %+v ok=%v", got, ok)
+	}
+}
+
 func TestMatchPaySourceIgnoresSolesInAccountName(t *testing.T) {
 	sources := []PaySource{
 		{ID: 1, Name: "Ahorros Soles - BCP", Kind: "account"},

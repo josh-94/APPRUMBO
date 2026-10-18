@@ -139,7 +139,8 @@ func (s *Server) moneyDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if proposal.AccountID == 0 && proposal.DebtID == 0 {
-		if src, ok := draft.MatchPaySource(text, sources); ok {
+		// Ignorar "borra lo de ahorros…" al elegir medio de pago; heredar el borrador si no hay pista clara.
+		if src, ok := draft.MatchPaySource(draft.TextForPaySource(text), sources); ok {
 			if src.Kind == "debt" {
 				proposal.DebtID = src.ID
 			} else {

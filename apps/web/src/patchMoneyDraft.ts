@@ -16,7 +16,10 @@ const GENERIC_NOISE = new Set(['cuenta', 'tarjeta', 'banco', 'efectivo'])
 
 const AMOUNT_RE = /(?:(?:s\s*\/|soles?)\s*\d{1,6}(?:[.,]\d{1,2})?|\d{1,6}(?:[.,]\d{1,2})?\s*soles?|\d{1,6}[.,]\d{1,2}|(?:gast\w*|pag\w*|compr\w*|anotar|añadir|agregar)\s+\d{1,6}(?:[.,]\d{1,2})?|\b\d{1,6}(?:[.,]\d{1,2})?\b)/i
 const NOTE_QUOTED_RE = /['"]([^'"]{1,40})['"]/
-const NOTE_CUE_RE = /(?:solo\s+fue\s+en|fue\s+solo\s+en|solo\s+en|la\s+nota\s+es|nota\s*:)\s+['"]?(.+?)['"]?\s*$/i
+const NOTE_BORRA_ES_RE = /(?:borra|quita|elimina|saca)\b[\s\S]+?\bes\s+(.+)$/i
+const NOTE_CUE_RE = /(?:solo\s+fue\s+en|fue\s+solo\s+en|solo\s+en|(?:el\s+)?gasto\s+es\s+solo(?:\s+en)?|es\s+solo(?:\s+en)?|la\s+nota\s+es|nota\s*:)\s+['"]?(.+?)['"]?\s*$/i
+const NOTE_BORRA_WORD_RE = /(?:borra|quita|elimina|saca)\s+(?:lo\s+de\s+|la\s+palabra\s+)?([^\s,.;]+)/gi
+const NOTE_EDIT_LEAD_RE = /\b(?:borra|quita|elimina|saca)\s+(?:lo\s+de\s+|la\s+palabra\s+)?[^\s,.;]+/gi
 
 function hasAmount(text: string) {
   return AMOUNT_RE.test(text.trim())
@@ -68,8 +71,12 @@ function scoreSource(
   return score
 }
 
+function stripNoteEditPhrases(text: string) {
+  return text.replace(NOTE_EDIT_LEAD_RE, ' ').replace(/\s+/g, ' ').trim()
+}
+
 function matchSource(text: string, money: MonthMoney): SourceHit | null {
-  const lower = text.toLowerCase()
+  const lower = stripNoteEditPhrases(text).toLowerCase()
   const preferCard = lower.includes('tarjeta')
   const preferAccount = lower.includes('cuenta') || lower.includes('ahorro')
   let best: SourceHit | null = null
@@ -89,12 +96,37 @@ function matchSource(text: string, money: MonthMoney): SourceHit | null {
   return best
 }
 
-function extractNote(text: string) {
+function extractNote(text: string, previousNote = '') {
   const quoted = text.match(NOTE_QUOTED_RE)
   if (quoted?.[1]?.trim()) return quoted[1].trim().slice(0, 80)
+  const borraEs = text.match(NOTE_BORRA_ES_RE)
+  if (borraEs?.[1]?.trim()) return borraEs[1].trim().slice(0, 80)
   const cue = text.match(NOTE_CUE_RE)
   if (cue?.[1]?.trim()) return cue[1].trim().slice(0, 80)
+  if (previousNote.trim()) {
+    const stripped = stripWordsFromNote(previousNote, text)
+    if (stripped !== null) return stripped
+  }
   return ''
+}
+
+function stripWordsFromNote(note: string, text: string) {
+  let out = note.trim()
+  if (!out) return null
+  let changed = false
+  for (const match of text.matchAll(NOTE_BORRA_WORD_RE)) {
+    const word = (match[1] || '').trim().toLowerCase()
+    if (!word || word === 'lo' || word === 'la') continue
+    const next = out
+      .replace(new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'), ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (next !== out) {
+      out = next
+      changed = true
+    }
+  }
+  return changed ? out.slice(0, 80) : null
 }
 
 const CREATE_CATEGORY_RE = /^(?:crea(?:r)?|nueva)\s+categor[ií]a\s+(.+)$/i
@@ -153,7 +185,7 @@ export function patchMoneyDraft(text: string, previous: MoneyDraft, money: Month
   const kind = previous.kind === 'ingreso' ? 'ingreso' : 'gasto'
   const category = matchCategory(trimmed, money, kind)
   const source = matchSource(trimmed, money)
-  const note = extractNote(trimmed)
+  const note = extractNote(trimmed, previous.note || '')
   if (!category && !source && !note) return null
 
   const next: MoneyDraft = {
