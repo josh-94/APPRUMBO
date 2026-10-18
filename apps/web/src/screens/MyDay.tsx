@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../api'
+import { api, type AgendaItem } from '../api'
 import type { Goal, Habit, HomeCard, Task, WorkoutSession } from '../types'
 import { currencySymbol, displayName, soles, todayKey, weekChips } from '../format'
+import { habitCountOn, habitDoneOn, habitMetaLine } from '../habitUtils'
 import { Shell } from '../components/Shell'
 import { TaskRow } from '../components/TaskRow'
 import { useHideMoney } from '../components/HideMoney'
@@ -19,6 +20,7 @@ type Props = {
   onCapture: () => void
   onToggleHabit: (habit: Habit) => void
   onEditHabit?: (habit: Habit) => void
+  onIncHabit?: (habit: Habit) => void
   onDone: (task: Task) => void
   onLater: (task: Task, day: string) => void
   onDelete: (task: Task) => void
@@ -43,6 +45,7 @@ export function MyDay({
   onCapture,
   onToggleHabit,
   onEditHabit,
+  onIncHabit,
   onDone,
   onLater,
   onDelete,
@@ -54,6 +57,8 @@ export function MyDay({
   const [cards, setCards] = useState<HomeCard[]>(['agenda', 'habits', 'goals', 'workouts'])
   const [goals, setGoals] = useState<Goal[]>([])
   const [sessions, setSessions] = useState<WorkoutSession[]>([])
+  const [agendaDay, setAgendaDay] = useState(todayKey())
+  const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([])
 
   useEffect(() => {
     api.homePrefs().then((data) => setCards(data.cards)).catch(() => undefined)
@@ -61,9 +66,14 @@ export function MyDay({
     api.workoutSessions().then((data) => setSessions(data.sessions)).catch(() => setSessions([]))
   }, [])
 
+  useEffect(() => {
+    api.agenda(agendaDay).then((data) => setAgendaItems(data.items)).catch(() => setAgendaItems([]))
+  }, [agendaDay, tasks, habits])
+
   const today = todayKey()
   const todaySessions = sessions.filter((item) => item.occurredOn === today)
   const activeGoal = goals[0]
+  const agendaTasks = agendaItems.filter((item) => item.type === 'task')
 
   return (
     <Shell tabs>
@@ -78,7 +88,7 @@ export function MyDay({
       <div className="quick-grid">
         <button type="button" className="quick-card" onClick={onCreateMoney}><i>{currencySymbol(currency)}</i>Anotar gasto</button>
         <button type="button" className="quick-card" onClick={onCapture}><i>+</i>Anotar</button>
-        <button type="button" className="quick-card" onClick={onCreateHabit}><i>o</i>Hábitos</button>
+        <Link className="quick-card" to="/habitos"><i>o</i>Hábitos</Link>
       </div>
 
       {cards.map((card) => {
@@ -87,27 +97,47 @@ export function MyDay({
             <section key={card} className="home-card paper-card">
               <div className="section-head">
                 <h2 className="section-label">{cardLabels.agenda}</h2>
-                <Link className="text-button" to="/tiempo">Ver</Link>
               </div>
               <div className="week-row">
                 {chips.map((chip) => (
-                  <div key={chip.key} className={chip.today ? 'day-chip today' : 'day-chip'}>
+                  <button
+                    key={chip.key}
+                    type="button"
+                    className={chip.key === agendaDay ? 'day-chip today' : 'day-chip'}
+                    aria-pressed={chip.key === agendaDay}
+                    onClick={() => setAgendaDay(chip.key)}
+                  >
                     <small>{chip.label}</small>
                     <strong>{chip.day}</strong>
-                  </div>
+                  </button>
                 ))}
               </div>
-              {tasks && open.length === 0 && <p className="empty">Nada pendiente por ahora.</p>}
-              {open.slice(0, 4).map((task) => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  onOpen={() => onOpen(task)}
-                  onDone={() => onDone(task)}
-                  onLater={(day) => onLater(task, day)}
-                  onDelete={() => onDelete(task)}
-                />
-              ))}
+              {agendaTasks.length === 0 && (
+                <p className="empty">{agendaDay === today ? 'Nada pendiente por ahora.' : 'Ese día no tienes nada en la agenda.'}</p>
+              )}
+              {agendaTasks.slice(0, 6).map((item) => {
+                const task = tasks?.find((entry) => entry.id === item.id)
+                if (task) {
+                  return (
+                    <TaskRow
+                      key={item.id}
+                      task={task}
+                      onOpen={() => onOpen(task)}
+                      onDone={() => onDone(task)}
+                      onLater={(day) => onLater(task, day)}
+                      onDelete={() => onDelete(task)}
+                    />
+                  )
+                }
+                return (
+                  <article key={item.id} className="card">
+                    <div className="card-body">
+                      <span className="card-title">{item.title}</span>
+                      {item.hour && <span className="meta">{item.hour}</span>}
+                    </div>
+                  </article>
+                )
+              })}
               <button type="button" className="ghost" onClick={onCreateTask}>Nueva tarea</button>
             </section>
           )
@@ -117,11 +147,18 @@ export function MyDay({
             <section key={card} className="home-card paper-card">
               <div className="section-head">
                 <h2 className="section-label">{cardLabels.habits}</h2>
-                <span className="meta">{habits.filter((h) => h.checks.includes(today)).length}/{habits.length} hoy</span>
+                <Link className="text-button" to="/habitos">Ver todo</Link>
               </div>
-              {habits.length === 0 && <p className="empty">Sin hábitos aún.</p>}
+              <p className="meta">{habits.filter((h) => habitDoneOn(h, today)).length}/{habits.length} hoy</p>
+              {habits.length === 0 && <p className="empty">Sin hábitos aún. <button type="button" className="text-button" onClick={onCreateHabit}>Crear uno</button></p>}
               {habits.map((habit) => (
-                <HabitRow key={habit.id} habit={habit} onToggle={() => onToggleHabit(habit)} onEdit={onEditHabit ? () => onEditHabit(habit) : undefined} />
+                <HabitRow
+                  key={habit.id}
+                  habit={habit}
+                  onToggle={() => onToggleHabit(habit)}
+                  onEdit={onEditHabit ? () => onEditHabit(habit) : undefined}
+                  onInc={onIncHabit && habit.dailyGoal > 1 && !habitDoneOn(habit, today) ? () => onIncHabit(habit) : undefined}
+                />
               ))}
             </section>
           )
@@ -189,9 +226,17 @@ function WorkoutWeek({ sessions }: { sessions: WorkoutSession[] }) {
   )
 }
 
-export function HabitRow({ habit, onToggle, onEdit }: { habit: Habit; onToggle: () => void; onEdit?: () => void }) {
+export function HabitRow({ habit, onToggle, onEdit, onInc }: {
+  habit: Habit
+  onToggle: () => void
+  onEdit?: () => void
+  onInc?: () => void
+}) {
+  const day = today()
+  const done = habitDoneOn(habit, day)
   return (
     <div className="habit">
+      <span className="habits-icon" aria-hidden>{habit.icon || '✨'}</span>
       <div>
         <strong>{habit.name}</strong>
         <div className="dots" aria-hidden>
@@ -199,11 +244,12 @@ export function HabitRow({ habit, onToggle, onEdit }: { habit: Habit; onToggle: 
             <span key={index} className={index < habit.doneThisWeek ? 'on' : ''} />
           ))}
         </div>
-        <p className="meta">{habit.doneThisWeek} de {habit.nGoal} · {habit.streakWeeks} {habit.streakWeeks === 1 ? 'semana' : 'semanas'}</p>
+        <p className="meta">{habitMetaLine(habit, day)}</p>
       </div>
       <div className="habit-actions">
         {onEdit && <button type="button" className="text-button" onClick={onEdit}>Editar</button>}
-        <button type="button" onClick={onToggle}>{habit.checks.includes(today()) ? 'Hecho' : 'Marcar'}</button>
+        {onInc && <button type="button" onClick={onInc}>+ {habitCountOn(habit, day)}/{habit.dailyGoal}</button>}
+        <button type="button" onClick={onToggle}>{done ? 'Hecho' : 'Marcar'}</button>
       </div>
     </div>
   )

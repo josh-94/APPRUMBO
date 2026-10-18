@@ -16,6 +16,51 @@ import (
 
 const draftBodyLimit = 8 << 20
 
+func (s *Server) captureDraft(w http.ResponseWriter, r *http.Request) {
+	if s.OllamaURL == "" || (s.OllamaModel == "" && s.OllamaTextModel == "") {
+		writeError(w, http.StatusServiceUnavailable, "No pude leer eso ahora. Anótalo a mano.")
+		return
+	}
+	var body struct {
+		Text   string `json:"text"`
+		Intent string `json:"intent"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "JSON inválido")
+		return
+	}
+	text := strings.TrimSpace(body.Text)
+	if text == "" {
+		writeError(w, http.StatusUnprocessableEntity, "Escribe qué quieres anotar.")
+		return
+	}
+	if utf8Len(text) > 500 {
+		text = string([]rune(text)[:500])
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 80*time.Second)
+	defer cancel()
+
+	categories, err := s.Store.Categories(ctx, currentUser(r))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudieron leer las categorías")
+		return
+	}
+	system, user := draft.CapturePrompt(body.Intent, toDraftCategories(categories), s.today(), text)
+	raw, err := draft.Complete(ctx, s.OllamaURL, s.draftModel(false), system, user, nil)
+	if message, failed := draftFailure(err, "No entendí eso. Dilo de otra forma."); failed {
+		writeError(w, message.status, message.text)
+		return
+	}
+	proposal, err := draft.NormalizeCapture(text, raw, body.Intent, toDraftCategories(categories), s.today())
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "No entendí eso. Dilo de otra forma.")
+		return
+	}
+	proposal.Transcript = text
+	writeJSON(w, http.StatusOK, proposal)
+}
+
 func (s *Server) moneyDraft(w http.ResponseWriter, r *http.Request) {
 	if s.OllamaURL == "" || (s.OllamaModel == "" && s.OllamaTextModel == "") {
 		writeError(w, http.StatusServiceUnavailable, "No pude leer eso ahora. Anótalo a mano.")

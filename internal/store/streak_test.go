@@ -30,3 +30,19 @@ func TestStreakWeeksCountsCurrentWhenMet(t *testing.T) {
 		t.Fatalf("racha = %d, want 2", got)
 	}
 }
+
+func TestStreakDaysFromYesterdayWhenTodayOpen(t *testing.T) {
+	days := []string{"2026-10-15", "2026-10-16"}
+	today := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
+	if got := StreakDays(days, today); got != 2 {
+		t.Fatalf("racha días = %d, want 2", got)
+	}
+}
+
+func TestStreakDaysIncludesToday(t *testing.T) {
+	days := []string{"2026-10-16", "2026-10-17"}
+	today := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
+	if got := StreakDays(days, today); got != 2 {
+		t.Fatalf("racha días = %d, want 2", got)
+	}
+}

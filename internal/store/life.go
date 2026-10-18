@@ -12,13 +12,31 @@ import (
 var ErrHabitLimit = errors.New("habit limit")
 var ErrBadMoney = errors.New("bad money")
 
+type HabitCheck struct {
+	Day   string `json:"day"`
+	Count int    `json:"count"`
+}
+
 type Habit struct {
-	ID           int64    `json:"id"`
-	Name         string   `json:"name"`
-	NGoal        int      `json:"nGoal"`
-	DoneThisWeek int      `json:"doneThisWeek"`
-	StreakWeeks  int      `json:"streakWeeks"`
-	Checks       []string `json:"checks"`
+	ID           int64        `json:"id"`
+	Name         string       `json:"name"`
+	NGoal        int          `json:"nGoal"`
+	Icon         string       `json:"icon"`
+	Category     string       `json:"category"`
+	DailyGoal    int          `json:"dailyGoal"`
+	DoneToday    int          `json:"doneToday"`
+	DoneThisWeek int          `json:"doneThisWeek"`
+	StreakWeeks  int          `json:"streakWeeks"`
+	StreakDays   int          `json:"streakDays"`
+	Checks       []HabitCheck `json:"checks"`
+}
+
+type HabitInput struct {
+	Name      string
+	NGoal     int
+	Icon      string
+	Category  string
+	DailyGoal int
 }
 
 type Account struct {
@@ -77,7 +95,7 @@ func (s *Store) Email(ctx context.Context, userID int64) (string, error) {
 
 func (s *Store) Habits(ctx context.Context, userID int64, today time.Time) ([]Habit, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, name, n_goal FROM habits
+		SELECT id, name, n_goal, icon, category, daily_goal FROM habits
 		WHERE user_id = $1 AND active
 		ORDER BY id`, userID)
 	if err != nil {
@@ -87,8 +105,17 @@ func (s *Store) Habits(ctx context.Context, userID int64, today time.Time) ([]Ha
 	var habits []Habit
 	for rows.Next() {
 		var h Habit
-		if err := rows.Scan(&h.ID, &h.Name, &h.NGoal); err != nil {
+		if err := rows.Scan(&h.ID, &h.Name, &h.NGoal, &h.Icon, &h.Category, &h.DailyGoal); err != nil {
 			return nil, err
+		}
+		if h.Icon == "" {
+			h.Icon = "✨"
+		}
+		if h.Category == "" {
+			h.Category = "general"
+		}
+		if h.DailyGoal < 1 {
+			h.DailyGoal = 1
 		}
 		habits = append(habits, h)
 	}
@@ -99,41 +126,81 @@ func (s *Store) Habits(ctx context.Context, userID int64, today time.Time) ([]Ha
 		habits = []Habit{}
 	}
 	start := mondayOf(today)
+	todayKey := today.Format("2006-01-02")
 	for i := range habits {
-		checks, err := s.habitDays(ctx, habits[i].ID, start.AddDate(0, 0, -370))
+		checks, err := s.habitChecks(ctx, habits[i].ID, start.AddDate(0, 0, -370))
 		if err != nil {
 			return nil, err
 		}
-		habits[i].Checks = checksInWeek(checks, start)
-		habits[i].DoneThisWeek = len(habits[i].Checks)
-		habits[i].StreakWeeks = StreakWeeks(checks, habits[i].NGoal, today)
+		habits[i].Checks = checks
+		doneDays := completedDays(checks, habits[i].DailyGoal)
+		habits[i].DoneThisWeek = len(checksInWeek(doneDays, start))
+		habits[i].DoneToday = countOnDay(checks, todayKey)
+		habits[i].StreakWeeks = StreakWeeks(doneDays, habits[i].NGoal, today)
+		habits[i].StreakDays = StreakDays(doneDays, today)
 	}
 	return habits, nil
 }
 
-func (s *Store) habitDays(ctx context.Context, habitID int64, since time.Time) ([]string, error) {
+func (s *Store) habitChecks(ctx context.Context, habitID int64, since time.Time) ([]HabitCheck, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT to_char(day, 'YYYY-MM-DD') FROM habit_checks
+		SELECT to_char(day, 'YYYY-MM-DD'), count FROM habit_checks
 		WHERE habit_id = $1 AND day >= $2
 		ORDER BY day`, habitID, since)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var days []string
+	var checks []HabitCheck
 	for rows.Next() {
-		var day string
-		if err := rows.Scan(&day); err != nil {
+		var c HabitCheck
+		if err := rows.Scan(&c.Day, &c.Count); err != nil {
 			return nil, err
 		}
-		days = append(days, day)
+		checks = append(checks, c)
 	}
-	return days, rows.Err()
+	if checks == nil {
+		checks = []HabitCheck{}
+	}
+	return checks, rows.Err()
 }
 
-func (s *Store) CreateHabit(ctx context.Context, userID int64, name string, nGoal int) (int64, error) {
-	if nGoal < 1 || nGoal > 7 {
-		nGoal = 5
+func normalizeHabitInput(in HabitInput) (HabitInput, error) {
+	label, err := cleanLabel(in.Name, 80)
+	if err != nil || label == "" {
+		return HabitInput{}, ErrBadMoney
+	}
+	in.Name = label
+	if in.NGoal < 1 || in.NGoal > 7 {
+		in.NGoal = 5
+	}
+	if in.DailyGoal < 1 || in.DailyGoal > 99 {
+		in.DailyGoal = 1
+	}
+	icon := strings.TrimSpace(in.Icon)
+	if icon == "" {
+		icon = "✨"
+	}
+	runes := []rune(icon)
+	if len(runes) > 8 {
+		icon = string(runes[:8])
+	}
+	in.Icon = icon
+	switch strings.ToLower(strings.TrimSpace(in.Category)) {
+	case "estudios", "finanzas", "salud", "general":
+		in.Category = strings.ToLower(strings.TrimSpace(in.Category))
+	case "":
+		in.Category = "general"
+	default:
+		return HabitInput{}, ErrBadMoney
+	}
+	return in, nil
+}
+
+func (s *Store) CreateHabit(ctx context.Context, userID int64, in HabitInput) (int64, error) {
+	in, err := normalizeHabitInput(in)
+	if err != nil {
+		return 0, err
 	}
 	var count int
 	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM habits WHERE user_id = $1 AND active`, userID).Scan(&count); err != nil {
@@ -143,42 +210,68 @@ func (s *Store) CreateHabit(ctx context.Context, userID int64, name string, nGoa
 		return 0, ErrHabitLimit
 	}
 	var id int64
-	err := s.pool.QueryRow(ctx, `
-		INSERT INTO habits (user_id, name, n_goal) VALUES ($1, $2, $3) RETURNING id`,
-		userID, name, nGoal).Scan(&id)
+	err = s.pool.QueryRow(ctx, `
+		INSERT INTO habits (user_id, name, n_goal, icon, category, daily_goal)
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+		userID, in.Name, in.NGoal, in.Icon, in.Category, in.DailyGoal).Scan(&id)
 	return id, err
 }
 
-func (s *Store) SetHabitCheck(ctx context.Context, userID, habitID int64, day time.Time, on bool) error {
+func (s *Store) SetHabitCheckCount(ctx context.Context, userID, habitID int64, day time.Time, count int) error {
 	var owner int64
-	err := s.pool.QueryRow(ctx, `SELECT user_id FROM habits WHERE id = $1 AND active`, habitID).Scan(&owner)
+	var dailyGoal int
+	err := s.pool.QueryRow(ctx, `
+		SELECT user_id, daily_goal FROM habits WHERE id = $1 AND active`, habitID).Scan(&owner, &dailyGoal)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && owner != userID) {
 		return ErrNotFound
 	}
 	if err != nil {
 		return err
 	}
-	if on {
-		_, err = s.pool.Exec(ctx, `
-			INSERT INTO habit_checks (habit_id, day) VALUES ($1, $2)
-			ON CONFLICT DO NOTHING`, habitID, day)
+	if dailyGoal < 1 {
+		dailyGoal = 1
+	}
+	if count <= 0 {
+		_, err = s.pool.Exec(ctx, `DELETE FROM habit_checks WHERE habit_id = $1 AND day = $2`, habitID, day)
 		return err
 	}
-	_, err = s.pool.Exec(ctx, `DELETE FROM habit_checks WHERE habit_id = $1 AND day = $2`, habitID, day)
+	if count > dailyGoal {
+		count = dailyGoal
+	}
+	_, err = s.pool.Exec(ctx, `
+		INSERT INTO habit_checks (habit_id, day, count) VALUES ($1, $2, $3)
+		ON CONFLICT (habit_id, day) DO UPDATE SET count = EXCLUDED.count`, habitID, day, count)
 	return err
 }
 
-func (s *Store) UpdateHabit(ctx context.Context, userID, id int64, name string, nGoal int) error {
-	if nGoal < 1 || nGoal > 7 {
-		nGoal = 5
+func (s *Store) SetHabitCheck(ctx context.Context, userID, habitID int64, day time.Time, on bool) error {
+	if !on {
+		return s.SetHabitCheckCount(ctx, userID, habitID, day, 0)
 	}
-	label, err := cleanLabel(name, 80)
-	if err != nil || label == "" {
-		return ErrBadMoney
+	var dailyGoal int
+	err := s.pool.QueryRow(ctx, `
+		SELECT daily_goal FROM habits WHERE id = $1 AND user_id = $2 AND active`, habitID, userID).Scan(&dailyGoal)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if dailyGoal < 1 {
+		dailyGoal = 1
+	}
+	return s.SetHabitCheckCount(ctx, userID, habitID, day, dailyGoal)
+}
+
+func (s *Store) UpdateHabit(ctx context.Context, userID, id int64, in HabitInput) error {
+	in, err := normalizeHabitInput(in)
+	if err != nil {
+		return err
 	}
 	tag, err := s.pool.Exec(ctx, `
-		UPDATE habits SET name = $3, n_goal = $4
-		WHERE id = $1 AND user_id = $2 AND active`, id, userID, label, nGoal)
+		UPDATE habits SET name = $3, n_goal = $4, icon = $5, category = $6, daily_goal = $7
+		WHERE id = $1 AND user_id = $2 AND active`,
+		id, userID, in.Name, in.NGoal, in.Icon, in.Category, in.DailyGoal)
 	if err != nil {
 		return err
 	}
@@ -682,6 +775,53 @@ func checksInWeek(days []string, start time.Time) []string {
 		out = []string{}
 	}
 	return out
+}
+
+func completedDays(checks []HabitCheck, dailyGoal int) []string {
+	if dailyGoal < 1 {
+		dailyGoal = 1
+	}
+	var days []string
+	for _, c := range checks {
+		if c.Count >= dailyGoal {
+			days = append(days, c.Day)
+		}
+	}
+	if days == nil {
+		days = []string{}
+	}
+	return days
+}
+
+func countOnDay(checks []HabitCheck, day string) int {
+	for _, c := range checks {
+		if c.Day == day {
+			return c.Count
+		}
+	}
+	return 0
+}
+
+// StreakDays cuenta días seguidos cumplidos. Si hoy no está hecho, arranca desde ayer.
+func StreakDays(days []string, today time.Time) int {
+	set := map[string]bool{}
+	for _, day := range days {
+		set[day] = true
+	}
+	today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
+	cursor := today
+	if !set[cursor.Format("2006-01-02")] {
+		cursor = cursor.AddDate(0, 0, -1)
+	}
+	streak := 0
+	for i := 0; i < 400; i++ {
+		if !set[cursor.Format("2006-01-02")] {
+			break
+		}
+		streak++
+		cursor = cursor.AddDate(0, 0, -1)
+	}
+	return streak
 }
 
 // StreakWeeks cuenta semanas seguidas con al menos nGoal checks.

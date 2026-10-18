@@ -1,213 +1,314 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { api, type AgendaItem } from '../api'
-import type { Habit, Task, TaskList } from '../types'
-import { dayLabel, todayKey } from '../format'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { api } from '../api'
+import type { CalendarEvent, EventInput, Goal, Task } from '../types'
+import { todayKey } from '../format'
 import { Shell } from '../components/Shell'
-import { TaskRow } from '../components/TaskRow'
-import { HabitRow } from './MyDay'
+import { EventSheet } from '../components/plan/EventSheet'
+import { CalendarDayView, CalendarMonthView, CalendarWeekView } from '../components/plan/CalendarViews'
+import {
+  type PlanLayer,
+  type PlanView,
+  navLabel,
+  rangeForView,
+  shiftAnchor,
+  toOverlayEvents,
+  toOverlayGoals,
+  toOverlayTasks,
+  todayStatusLabel,
+} from '../components/plan/calendarUtils'
+import { dateChipLabel, formatDurationChip, parsedToStartsEnds } from '../parseEventLine'
+import { captureToParsed, useCaptureDraft } from '../useCaptureDraft'
 
 type Props = {
   tasks: Task[] | null
-  habits: Habit[]
-  lists: TaskList[] | null
-  onOpen: (task: Task) => void
-  onDone: (task: Task) => void
-  onLater: (task: Task, day: string) => void
-  onDelete: (task: Task) => void
-  onToggleHabit: (habit: Habit) => void
-  onCreateHabit: () => void
-  onEditHabit: (habit: Habit) => void
-  onCapture: () => void
+  onOpenTask: (task: Task) => void
   refresh: number
 }
 
-type Mode = 'day' | 'week'
-
-export function Tiempo({
-  tasks,
-  habits,
-  lists,
-  onOpen,
-  onDone,
-  onLater,
-  onDelete,
-  onToggleHabit,
-  onCreateHabit,
-  onEditHabit,
-  onCapture,
-  refresh,
-}: Props) {
-  const [mode, setMode] = useState<Mode>('day')
-  const [day, setDay] = useState(todayKey())
-  const [items, setItems] = useState<AgendaItem[]>([])
+export function Tiempo({ tasks, onOpenTask, refresh }: Props) {
+  const [view, setView] = useState<PlanView>('day')
+  const [anchor, setAnchor] = useState(todayKey())
+  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [goals, setGoals] = useState<Goal[]>([])
+  const [layers, setLayers] = useState<Record<PlanLayer, boolean>>({
+    events: true,
+    tasks: true,
+    goals: true,
+  })
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [quick, setQuick] = useState('')
+  const [sheet, setSheet] = useState<{ mode: 'create' } | { mode: 'edit'; event: CalendarEvent } | null>(null)
+  const [tick, setTick] = useState(0)
+  const [savingQuick, setSavingQuick] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
   const today = todayKey()
+  const { draft, loading: drafting } = useCaptureDraft(quick, 'evento')
+  const parsed = useMemo(() => (draft ? captureToParsed(draft) : null), [draft])
+
+  const range = useMemo(() => rangeForView(view, anchor), [view, anchor])
 
   useEffect(() => {
-    api.agenda(day).then((data) => setItems(data.items)).catch(() => setItems([]))
-  }, [day, refresh, habits])
+    api.events(range.from, range.to).then((data) => setEvents(data.events)).catch(() => setEvents([]))
+  }, [range.from, range.to, refresh, tick])
 
-  const timed = items.filter((item) => item.type === 'task' && item.hour).sort((a, b) => (a.hour || '').localeCompare(b.hour || ''))
-  const untimed = items.filter((item) => item.type === 'task' && !item.hour)
-  const dayHabits = items.filter((item) => item.type === 'habit')
-  const workouts = items.filter((item) => item.type === 'workout')
-  const undated = useMemo(() => (tasks ?? []).filter((task) => task.status === 'open' && !task.dueDay), [tasks])
+  useEffect(() => {
+    api.goals().then((data) => setGoals(data.goals)).catch(() => setGoals([]))
+  }, [refresh, tick])
 
-  const days = new Map<string, Task[]>()
-  for (const task of tasks ?? []) {
-    if (!task.dueDay) continue
-    const bucket = days.get(task.dueDay) ?? []
-    bucket.push(task)
-    days.set(task.dueDay, bucket)
+  useEffect(() => {
+    if (!filtersOpen) return
+    function onPointer(ev: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(ev.target as Node)) {
+        setFiltersOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onPointer)
+    return () => document.removeEventListener('mousedown', onPointer)
+  }, [filtersOpen])
+
+  const overlays = useMemo(() => {
+    const items = []
+    if (layers.events) items.push(...toOverlayEvents(events))
+    if (layers.tasks) items.push(...toOverlayTasks(tasks ?? []))
+    if (layers.goals) items.push(...toOverlayGoals(goals))
+    return items
+  }, [events, tasks, goals, layers])
+
+  const todayTimedCount = useMemo(
+    () => events.filter((event) => !event.allDay && todayKey(new Date(event.startsAt)) === today).length,
+    [events, today],
+  )
+
+  const todayTotal = useMemo(
+    () => events.filter((event) => todayKey(new Date(event.startsAt)) === today).length,
+    [events, today],
+  )
+
+  const weekdayLong = useMemo(() => {
+    const text = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric' }).format(new Date())
+    return text.charAt(0).toUpperCase() + text.slice(1)
+  }, [])
+
+  async function saveEvent(input: EventInput, id?: number) {
+    if (id) await api.updateEvent(id, input)
+    else await api.createEvent(input)
+    setTick((n) => n + 1)
   }
-  const keys = [...days.keys()].sort()
 
-  function shiftDay(delta: number) {
-    const date = new Date(`${day}T12:00:00`)
-    date.setDate(date.getDate() + delta)
-    setDay(todayKey(date))
+  async function addQuick() {
+    if (!parsed || !parsed.title.trim() || savingQuick) return
+    setSavingQuick(true)
+    try {
+      const { startsAt, endsAt } = parsedToStartsEnds(parsed)
+      await api.createEvent({
+        title: parsed.title,
+        location: '',
+        description: '',
+        allDay: parsed.allDay,
+        startsAt,
+        endsAt,
+        color: 'menta',
+        remindMinutes: null,
+        repeatRule: 'none',
+        repeatWeekdays: [],
+      })
+      if (parsed.date !== anchor) setAnchor(parsed.date)
+      setQuick('')
+      setTick((n) => n + 1)
+    } finally {
+      setSavingQuick(false)
+    }
   }
 
-  function taskById(id: number) {
-    return (tasks ?? []).find((task) => task.id === id)
+  function openEvent(id: number) {
+    const event = events.find((item) => item.id === id)
+    if (event) setSheet({ mode: 'edit', event })
+  }
+
+  function openTask(id: number) {
+    const task = (tasks ?? []).find((item) => item.id === id)
+    if (task) onOpenTask(task)
   }
 
   return (
     <Shell tabs>
-      <div className="agenda-head">
-        <div>
-          <p className="kicker">Planificar</p>
-          <h1 className="headline">Tu agenda</h1>
+      <div className="plan-head">
+        <div className="plan-title-row">
+          <span className="plan-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75">
+              <rect x="4" y="5" width="16" height="15" rx="2" />
+              <path d="M8 3v4M16 3v4M4 10h16" />
+            </svg>
+          </span>
+          <div>
+            <h1 className="plan-title">Planificar</h1>
+            <p className="plan-sub">
+              {todayTimedCount === 0
+                ? 'Hoy no tienes nada con hora en el calendario.'
+                : todayTimedCount === 1
+                  ? 'Hoy tienes 1 cosa con hora.'
+                  : `Hoy tienes ${todayTimedCount} cosas con hora.`}
+            </p>
+          </div>
         </div>
-        <button type="button" className="primary compact" onClick={onCapture}>+ Nuevo</button>
+        <button type="button" className="primary plan-cta" onClick={() => setSheet({ mode: 'create' })}>
+          + Nuevo evento
+        </button>
       </div>
 
-      <div className="switch-row">
-        <button type="button" className={mode === 'day' ? 'pill on' : 'pill quiet'} onClick={() => setMode('day')}>Día</button>
-        <button type="button" className={mode === 'week' ? 'pill on' : 'pill quiet'} onClick={() => setMode('week')}>Semana</button>
-        <Link className="pill quiet" to="/listas">Listas</Link>
-        <Link className="pill quiet" to="/tiempo/entrenamientos">Gym</Link>
+      <div className="plan-status-card">
+        <p className="kicker">Hoy · {weekdayLong.toLowerCase()}</p>
+        <strong>{todayStatusLabel(todayTotal)}</strong>
       </div>
 
-      {mode === 'day' && (
-        <>
-          <div className="month-nav">
-            <button type="button" className="month-step" aria-label="Día anterior" onClick={() => shiftDay(-1)}>‹</button>
-            <p className="kicker">{dayLabel(day)}</p>
-            <button type="button" className="month-step" aria-label="Día siguiente" onClick={() => shiftDay(1)}>›</button>
+      <div className="plan-quick">
+        <input
+          value={quick}
+          onChange={(ev) => setQuick(ev.target.value)}
+          placeholder="+ Agregar evento… ej: Reunión mañana"
+          onKeyDown={(ev) => {
+            if (ev.key === 'Enter') {
+              ev.preventDefault()
+              void addQuick()
+            }
+          }}
+        />
+        <button type="button" className="primary compact" disabled={!parsed?.title || savingQuick} onClick={() => void addQuick()}>
+          Agregar
+        </button>
+      </div>
+      {parsed && quick.trim() && (
+        <div className="plan-parse">
+          <p className="plan-parse-preview">
+            Se guardará: ‘{parsed.preview}’
+            {drafting ? <span className="hint"> · Entendiendo…</span> : null}
+          </p>
+          <div className="plan-parse-chips">
+            <span className="chip quiet">{dateChipLabel(parsed.date)}</span>
+            {!parsed.allDay && <span className="chip quiet">{parsed.time}</span>}
+            {!parsed.allDay && <span className="chip quiet">{formatDurationChip(parsed.durationMin)}</span>}
+            {parsed.allDay && <span className="chip quiet">Todo el día</span>}
           </div>
-          {day !== today && (
-            <button type="button" className="text-button" onClick={() => setDay(today)}>Hoy</button>
-          )}
-
-          <h2 className="section-label">Con hora</h2>
-          {timed.length === 0 && <p className="empty">Hoy no tienes nada con hora en el calendario.</p>}
-          <div className="timeline">
-            {timed.map((item) => {
-              const task = taskById(item.id)
-              return (
-                <button
-                  key={`t-${item.id}`}
-                  type="button"
-                  className="timeline-block"
-                  onClick={() => task && onOpen(task)}
-                >
-                  <span className="timeline-hour">{item.hour}</span>
-                  <strong>{item.title}</strong>
-                </button>
-              )
-            })}
-          </div>
-
-          {workouts.length > 0 && (
-            <>
-              <h2 className="section-label">Entrenamientos</h2>
-              {workouts.map((item) => (
-                <Link key={`w-${item.id}`} className="list-link" to="/tiempo/entrenamientos">
-                  <span>{item.title || 'Sesión'}{item.note ? ` · ${item.note}` : ''}</span>
-                  <strong>›</strong>
-                </Link>
-              ))}
-            </>
-          )}
-
-          <h2 className="section-label">Hábitos</h2>
-          {dayHabits.length === 0 && habits.length === 0 && <p className="empty">Un hábito a la vez. Empieza con algo de 2 minutos.</p>}
-          {habits.map((habit) => (
-            <HabitRow
-              key={habit.id}
-              habit={habit}
-              onToggle={() => onToggleHabit(habit)}
-              onEdit={() => onEditHabit(habit)}
-            />
-          ))}
-          <button type="button" className="ghost" onClick={onCreateHabit}>Nuevo hábito</button>
-
-          {untimed.length > 0 && (
-            <>
-              <h2 className="section-label">Sin hora</h2>
-              {untimed.map((item) => {
-                const task = taskById(item.id)
-                if (!task) return null
-                return (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    onOpen={() => onOpen(task)}
-                    onDone={() => onDone(task)}
-                    onLater={(value) => onLater(task, value)}
-                    onDelete={() => onDelete(task)}
-                  />
-                )
-              })}
-            </>
-          )}
-
-          <h2 className="section-label">Sin fecha</h2>
-          {undated.length === 0 && <p className="empty">Nada en la bandeja sin fecha.</p>}
-          {undated.slice(0, 8).map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              onOpen={() => onOpen(task)}
-              onDone={() => onDone(task)}
-              onLater={(value) => onLater(task, value)}
-              onDelete={() => onDelete(task)}
-            />
-          ))}
-        </>
+        </div>
       )}
 
-      {mode === 'week' && (
-        <>
-          <h2 className="section-label">Listas</h2>
-          <div className="stack">
-            {lists?.map((list) => (
-              <Link key={list.id} className="list-link" to={`/listas/${list.id}`}>
-                <span>{list.name}</span>
-                <strong>{list.openCount}</strong>
-              </Link>
-            ))}
-          </div>
-          <h2 className="section-label">Con fecha</h2>
-          {tasks === null && <p className="empty">Cargando</p>}
-          {tasks && keys.length === 0 && <p className="empty">No hay tareas con fecha en los próximos 7 días.</p>}
-          {keys.map((key) => (
-            <section key={key}>
-              <h2 className="section-label">{dayLabel(key)}</h2>
-              {days.get(key)?.map((task) => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  onOpen={() => onOpen(task)}
-                  onDone={() => onDone(task)}
-                  onLater={(value) => onLater(task, value)}
-                  onDelete={() => onDelete(task)}
-                />
-              ))}
-            </section>
+      <div className="plan-nav">
+        <button type="button" className="pill quiet" onClick={() => setAnchor(today)}>Hoy</button>
+        <div className="plan-nav-range">
+          <button type="button" className="month-step" aria-label="Anterior" onClick={() => setAnchor((d) => shiftAnchor(view, d, -1))}>‹</button>
+          <strong className="plan-nav-label">{navLabel(view, anchor)}</strong>
+          <button type="button" className="month-step" aria-label="Siguiente" onClick={() => setAnchor((d) => shiftAnchor(view, d, 1))}>›</button>
+        </div>
+      </div>
+
+      <div className="plan-switch-row">
+        <div className="plan-switch">
+          {([
+            ['day', 'Día'],
+            ['week', 'Semana'],
+            ['month', 'Mes'],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={view === key ? 'on' : ''}
+              onClick={() => setView(key)}
+            >
+              {label}
+            </button>
           ))}
-        </>
+        </div>
+        <div className="plan-filter-wrap" ref={filterRef}>
+          <button
+            type="button"
+            className={filtersOpen ? 'plan-filter-btn on' : 'plan-filter-btn'}
+            aria-label="Filtros del calendario"
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((v) => !v)}
+          >
+            <span className="plan-filter-dots" aria-hidden="true">
+              <i className="dot menta" />
+              <i className="dot horizonte" />
+              <i className="dot ciruela" />
+              <i className="dot impulso" />
+            </span>
+          </button>
+          {filtersOpen && (
+            <div className="plan-filter-pop">
+              <p className="plan-filter-title">Elige qué mostrar en el calendario.</p>
+              {(
+                [
+                  ['events', 'Eventos', 'menta'],
+                  ['tasks', 'Tareas', 'horizonte'],
+                  ['goals', 'Objetivos', 'ciruela'],
+                ] as const
+              ).map(([key, label, tint]) => (
+                <label key={key} className="plan-filter-row">
+                  <input
+                    type="checkbox"
+                    checked={layers[key]}
+                    onChange={(ev) => setLayers((current) => ({ ...current, [key]: ev.target.checked }))}
+                  />
+                  <span className={`plan-filter-tint color-${tint}`} />
+                  {label}
+                </label>
+              ))}
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => setLayers({ events: true, tasks: true, goals: true })}
+              >
+                Mostrar todo
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {view === 'day' && (
+        <CalendarDayView items={overlays} anchor={anchor} onOpenEvent={openEvent} onOpenTask={openTask} />
+      )}
+      {view === 'week' && (
+        <CalendarWeekView
+          items={overlays}
+          anchor={anchor}
+          onOpenEvent={openEvent}
+          onOpenTask={openTask}
+          onSelectDay={(day) => {
+            setAnchor(day)
+            setView('day')
+          }}
+        />
+      )}
+      {view === 'month' && (
+        <CalendarMonthView
+          items={overlays}
+          anchor={anchor}
+          onOpenEvent={openEvent}
+          onOpenTask={openTask}
+          onSelectDay={(day) => {
+            setAnchor(day)
+            setView('day')
+          }}
+        />
+      )}
+
+      {sheet && (
+        <EventSheet
+          key={sheet.mode === 'edit' ? sheet.event.id : 'new'}
+          event={sheet.mode === 'edit' ? sheet.event : null}
+          defaultDay={anchor}
+          onClose={() => setSheet(null)}
+          onSave={saveEvent}
+          onDelete={
+            sheet.mode === 'edit'
+              ? async () => {
+                  await api.deleteEvent(sheet.event.id)
+                  setTick((n) => n + 1)
+                }
+              : undefined
+          }
+        />
       )}
     </Shell>
   )

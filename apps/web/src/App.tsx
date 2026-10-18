@@ -11,7 +11,9 @@ import { MyDay } from './screens/MyDay'
 import { Tiempo } from './screens/Tiempo'
 import { AccountHistory, CuentasPage, PagosPage, Plata, PrestamosPage, TarjetaDetail, TarjetasPage } from './screens/Plata'
 import { GoalsPage } from './screens/Goals'
+import { HabitsPage } from './screens/Habits'
 import { WorkoutsPage } from './screens/Workouts'
+import { habitDoneOn } from './habitUtils'
 import { ListDetail, ListsHome } from './screens/Lists'
 import { Moment } from './screens/Moment'
 import { Settings } from './screens/Settings'
@@ -129,7 +131,13 @@ export function App() {
 
   async function toggleHabit(habit: Habit) {
     const day = todayKey()
-    await api.checkHabit(habit.id, day, !habit.checks.includes(day))
+    const done = habitDoneOn(habit, day)
+    await api.checkHabit(habit.id, day, done ? 0 : Math.max(1, habit.dailyGoal || 1))
+    loadLife()
+  }
+
+  async function setHabitCount(habit: Habit, day: string, count: number) {
+    await api.checkHabit(habit.id, day, count)
     loadLife()
   }
 
@@ -208,6 +216,11 @@ export function App() {
               onCapture={() => setCaptureOpen(true)}
               onToggleHabit={(habit) => void toggleHabit(habit)}
               onEditHabit={(habit) => { setHabitEdit(habit); setHabitOpen(true) }}
+              onIncHabit={(habit) => {
+                const day = todayKey()
+                const next = Math.min(habit.dailyGoal, (habit.checks.find((c) => c.day === day)?.count ?? 0) + 1)
+                void setHabitCount(habit, day, next)
+              }}
               onDone={(task) => void done(task)}
               onLater={(task, day) => void later(task, day)}
               onDelete={(task) => void remove(task)}
@@ -221,21 +234,23 @@ export function App() {
           element={
             <Tiempo
               tasks={tasks}
-              habits={habits}
-              lists={lists}
-              onOpen={(task) => setSheet({ mode: 'edit', task })}
-              onDone={(task) => void done(task)}
-              onLater={(task, day) => void later(task, day)}
-              onDelete={(task) => void remove(task)}
-              onToggleHabit={(habit) => void toggleHabit(habit)}
-              onCreateHabit={() => { setHabitEdit(null); setHabitOpen(true) }}
-              onEditHabit={(habit) => { setHabitEdit(habit); setHabitOpen(true) }}
-              onCapture={() => setCaptureOpen(true)}
+              onOpenTask={(task) => setSheet({ mode: 'edit', task })}
               refresh={lifeTick}
             />
           }
         />
         <Route path="/tiempo/entrenamientos" element={<WorkoutsPage />} />
+        <Route
+          path="/habitos"
+          element={
+            <HabitsPage
+              habits={habits}
+              onCreate={() => { setHabitEdit(null); setHabitOpen(true) }}
+              onEdit={(habit) => { setHabitEdit(habit); setHabitOpen(true) }}
+              onSetCount={(habit, day, count) => void setHabitCount(habit, day, count)}
+            />
+          }
+        />
         <Route path="/plata" element={<Plata onCreate={() => setMoneyOpen(true)} onChanged={loadLife} refresh={moneyTick} />} />
         <Route path="/plata/deudas" element={<Navigate to="/plata/tarjetas" replace />} />
         <Route path="/plata/tarjetas" element={<TarjetasPage />} />
@@ -298,9 +313,9 @@ export function App() {
           key={habitEdit?.id ?? 'new'}
           habit={habitEdit}
           onClose={() => { setHabitOpen(false); setHabitEdit(null) }}
-          onSave={async (name, nGoal) => {
-            if (habitEdit) await api.updateHabit(habitEdit.id, name, nGoal)
-            else await api.createHabit(name, nGoal)
+          onSave={async (input) => {
+            if (habitEdit) await api.updateHabit(habitEdit.id, input)
+            else await api.createHabit(input)
             loadLife()
           }}
           onDelete={habitEdit ? async () => { await api.deleteHabit(habitEdit.id); loadLife() } : undefined}

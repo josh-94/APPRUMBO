@@ -330,9 +330,9 @@ func ctxSize(image bool) int {
 
 func predictCap(image bool) int {
 	if image {
-		return 160
+		return 200
 	}
-	return 80
+	return 160
 }
 
 func Complete(ctx context.Context, baseURL, model, system, user string, image []byte) (string, error) {

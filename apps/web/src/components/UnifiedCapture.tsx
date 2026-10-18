@@ -1,41 +1,16 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import type { MoneyCategory, MonthMoney, MovementInput, TaskInput, TaskList } from '../types'
-import { combineLocal, todayKey } from '../format'
+import type { MoneyCategory, MonthMoney, Movement, MovementInput, TaskInput, TaskList } from '../types'
+import { combineLocal, currencySymbol, todayKey } from '../format'
+import { dateChipLabel } from '../parseEventLine'
+import { useCaptureDraft } from '../useCaptureDraft'
 import { MoneySheet } from './CaptureSheets'
 
 type Kind = 'tarea' | 'recordatorio' | 'gasto'
 
-function parseLine(raw: string, kind: Kind): { title: string; date: string; time: string; remind: boolean } {
-  let text = raw.trim()
-  let date = todayKey()
-  let time = kind === 'recordatorio' ? '09:00' : ''
-  const lower = text.toLowerCase()
-  if (/\bmañana\b/.test(lower)) {
-    const d = new Date()
-    d.setDate(d.getDate() + 1)
-    date = todayKey(d)
-    text = text.replace(/\bmañana\b/gi, '').trim()
-  } else if (/\bhoy\b/.test(lower)) {
-    date = todayKey()
-    text = text.replace(/\bhoy\b/gi, '').trim()
-  }
-  const hourMatch = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i)
-  if (hourMatch) {
-    let hour = Number(hourMatch[1])
-    const minute = hourMatch[2] ? Number(hourMatch[2]) : 0
-    const meridiem = hourMatch[3]?.toLowerCase()
-    if (meridiem === 'pm' && hour < 12) hour += 12
-    if (meridiem === 'am' && hour === 12) hour = 0
-    time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
-    text = text.replace(hourMatch[0], '').trim()
-  }
-  text = text.replace(/\s{2,}/g, ' ').trim()
-  return {
-    title: text || raw.trim(),
-    date,
-    time: time || (kind === 'recordatorio' ? '09:00' : ''),
-    remind: kind === 'recordatorio',
-  }
+function formatMoneyChip(cents: number, currency: string) {
+  if (!cents) return ''
+  const symbol = currencySymbol(currency === 'usd' ? 'USD' : 'PEN')
+  return `${symbol} ${(cents / 100).toFixed(2)}`
 }
 
 export function UnifiedCapture({
@@ -58,21 +33,21 @@ export function UnifiedCapture({
   const [kind, setKind] = useState<Kind>('tarea')
   const [line, setLine] = useState('')
   const [error, setError] = useState('')
-  const parsed = useMemo(() => parseLine(line, kind), [line, kind])
+  const [saving, setSaving] = useState(false)
+  const [moneyPrefill, setMoneyPrefill] = useState<Movement | null>(null)
+  const { draft, loading: drafting } = useCaptureDraft(line, kind)
 
-  if (kind === 'gasto') {
-    if (!money) {
-      return (
-        <div className="sheet-backdrop" onClick={onClose}>
-          <div className="sheet" onClick={(event) => event.stopPropagation()}>
-            <p className="empty">Cargando finanzas…</p>
-          </div>
-        </div>
-      )
-    }
+  const previewTitle = draft?.title || ''
+  const moneyReady = useMemo(() => {
+    if (!draft || draft.kind !== 'gasto') return false
+    return draft.confidence === 'alta' && draft.amountCents > 0 && draft.categoryId > 0
+  }, [draft])
+
+  if (moneyPrefill && money) {
     return (
       <MoneySheet
         money={money}
+        movement={moneyPrefill}
         onClose={onClose}
         onSave={onSaveMoney}
         onCreateCategory={onCreateCategory}
@@ -82,28 +57,73 @@ export function UnifiedCapture({
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    if (!parsed.title) {
+    if (!draft || !previewTitle.trim()) {
       setError('Escribe qué quieres anotar.')
       return
     }
-    const listId = defaultListId || lists[0]?.id
-    if (!listId) {
-      setError('Crea una lista primero.')
-      return
-    }
+    setSaving(true)
+    setError('')
     try {
+      if (kind === 'gasto') {
+        if (!money) {
+          setError('Cargando finanzas…')
+          return
+        }
+        if (moneyReady) {
+          const accountId = money.accounts[0]?.id
+          if (!accountId) {
+            setError('Crea una cuenta primero.')
+            return
+          }
+          await onSaveMoney({
+            kind: 'gasto',
+            currency: draft.currency === 'usd' ? 'usd' : 'pen',
+            amountCents: draft.amountCents,
+            accountId,
+            categoryId: draft.categoryId,
+            day: draft.day || todayKey(),
+            note: draft.title,
+          })
+          onClose()
+          return
+        }
+        setMoneyPrefill({
+          id: 0,
+          accountId: money.accounts[0]?.id ?? 0,
+          debtId: 0,
+          categoryId: draft.categoryId || 0,
+          kind: 'gasto',
+          currency: draft.currency === 'usd' ? 'usd' : 'pen',
+          amountCents: draft.amountCents || 0,
+          occurredOn: draft.day || todayKey(),
+          accountName: '',
+          category: draft.category || '',
+          note: draft.title || line.trim(),
+        })
+        return
+      }
+
+      const listId = defaultListId || lists[0]?.id
+      if (!listId) {
+        setError('Crea una lista primero.')
+        return
+      }
+      const time = draft.time || (kind === 'recordatorio' ? '09:00' : '09:00')
+      const remind = kind === 'recordatorio' ? true : draft.remind || Boolean(draft.time)
       await onSaveTask({
         listId,
-        title: parsed.title,
+        title: draft.title,
         notes: '',
-        dueAt: combineLocal(parsed.date, parsed.time || '09:00'),
-        remind: parsed.remind || Boolean(parsed.time),
+        dueAt: combineLocal(draft.day || todayKey(), time),
+        remind,
         pinned: false,
         repeatWeekdays: [],
       })
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -113,29 +133,51 @@ export function UnifiedCapture({
         <div className="sheet-handle" />
         <h2>Anotar</h2>
         <div className="switch-row">
-          <button type="button" className={kind === 'tarea' ? 'pill on' : 'pill quiet'} onClick={() => setKind('tarea')}>Tarea</button>
-          <button type="button" className={kind === 'recordatorio' ? 'pill on' : 'pill quiet'} onClick={() => setKind('recordatorio')}>Recordatorio</button>
-          <button type="button" className="pill quiet" onClick={() => setKind('gasto' as Kind)}>Gasto</button>
+          <button type="button" className={kind === 'tarea' ? 'pill on' : 'pill quiet'} onClick={() => { setKind('tarea'); setError('') }}>Tarea</button>
+          <button type="button" className={kind === 'recordatorio' ? 'pill on' : 'pill quiet'} onClick={() => { setKind('recordatorio'); setError('') }}>Recordatorio</button>
+          <button type="button" className={kind === 'gasto' ? 'pill on' : 'pill quiet'} onClick={() => { setKind('gasto'); setError('') }}>Gasto</button>
         </div>
         <label className="field">
-          {kind === 'recordatorio' ? 'Qué te aviso' : 'Qué hacer'}
+          {kind === 'gasto' ? 'Qué gastaste' : kind === 'recordatorio' ? 'Qué te aviso' : 'Qué hacer'}
           <input
             value={line}
             autoFocus
-            placeholder={kind === 'recordatorio' ? 'Pagar luz mañana 6pm' : 'Reunión mañana 8am'}
+            placeholder={
+              kind === 'gasto'
+                ? 'gaste 25 en farmacia'
+                : kind === 'recordatorio'
+                  ? 'Pagar luz mañana 6pm'
+                  : 'Reunión mañana 8am'
+            }
             onChange={(event) => setLine(event.target.value)}
           />
         </label>
-        {line.trim() && (
-          <p className="hint">
-            Se guarda: “{parsed.title}”
-            {parsed.date ? ` · ${parsed.date}` : ''}
-            {parsed.time ? ` · ${parsed.time}` : ''}
-            {parsed.remind ? ' · aviso' : ''}
-          </p>
+        {line.trim() && draft && (
+          <div className="plan-parse">
+            <p className="plan-parse-preview">
+              Se guarda: “{previewTitle}”
+              {drafting ? <span className="hint"> · Entendiendo…</span> : null}
+            </p>
+            <div className="plan-parse-chips">
+              {kind !== 'gasto' && <span className="chip quiet">{dateChipLabel(draft.day || todayKey())}</span>}
+              {kind !== 'gasto' && draft.time ? <span className="chip quiet">{draft.time}</span> : null}
+              {kind === 'recordatorio' || draft.remind ? <span className="chip quiet">aviso</span> : null}
+              {kind === 'gasto' && draft.amountCents > 0 ? (
+                <span className="chip quiet">{formatMoneyChip(draft.amountCents, draft.currency)}</span>
+              ) : null}
+              {kind === 'gasto' && draft.category ? <span className="chip quiet">{draft.category}</span> : null}
+              {kind === 'gasto' && draft.day ? <span className="chip quiet">{dateChipLabel(draft.day)}</span> : null}
+            </div>
+            {kind === 'gasto' && draft.question ? <p className="hint">{draft.question}</p> : null}
+            {kind === 'gasto' && !moneyReady && !drafting ? (
+              <p className="hint">Al guardar te pediré completar lo que falte.</p>
+            ) : null}
+          </div>
         )}
         {error && <p className="error">{error}</p>}
-        <button type="submit" className="primary">Guardar</button>
+        <button type="submit" className="primary" disabled={saving || !line.trim()}>
+          {kind === 'gasto' && !moneyReady ? 'Continuar' : 'Guardar'}
+        </button>
       </form>
     </div>
   )

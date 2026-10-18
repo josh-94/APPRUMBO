@@ -15,14 +15,19 @@ func (s *Server) updateHabit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name  string `json:"name"`
-		NGoal int    `json:"nGoal"`
+		Name      string `json:"name"`
+		NGoal     int    `json:"nGoal"`
+		Icon      string `json:"icon"`
+		Category  string `json:"category"`
+		DailyGoal int    `json:"dailyGoal"`
 	}
 	if err := readJSON(w, r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "JSON inválido")
 		return
 	}
-	if err := s.Store.UpdateHabit(r.Context(), currentUser(r), id, body.Name, body.NGoal); err != nil {
+	if err := s.Store.UpdateHabit(r.Context(), currentUser(r), id, store.HabitInput{
+		Name: body.Name, NGoal: body.NGoal, Icon: body.Icon, Category: body.Category, DailyGoal: body.DailyGoal,
+	}); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "No está")
 			return
@@ -366,11 +371,11 @@ func (s *Server) agenda(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, habit := range habits {
 		items = append(items, map[string]any{
-			"type":   "habit",
-			"id":     habit.ID,
-			"title":  habit.Name,
-			"done":   containsDay(habit.Checks, dayKey),
-			"nGoal":  habit.NGoal,
+			"type":     "habit",
+			"id":       habit.ID,
+			"title":    habit.Name,
+			"done":     habitDoneOn(habit, dayKey),
+			"nGoal":    habit.NGoal,
 			"doneWeek": habit.DoneThisWeek,
 		})
 	}
@@ -391,9 +396,13 @@ func sameDay(t time.Time, day time.Time) bool {
 	return y1 == y2 && m1 == m2 && d1 == d2
 }
 
-func containsDay(days []string, day string) bool {
-	for _, item := range days {
-		if item == day {
+func habitDoneOn(habit store.Habit, day string) bool {
+	goal := habit.DailyGoal
+	if goal < 1 {
+		goal = 1
+	}
+	for _, check := range habit.Checks {
+		if check.Day == day && check.Count >= goal {
 			return true
 		}
 	}

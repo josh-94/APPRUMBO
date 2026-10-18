@@ -20,8 +20,11 @@ func (s *Server) habits(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) createHabit(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name  string `json:"name"`
-		NGoal int    `json:"nGoal"`
+		Name      string `json:"name"`
+		NGoal     int    `json:"nGoal"`
+		Icon      string `json:"icon"`
+		Category  string `json:"category"`
+		DailyGoal int    `json:"dailyGoal"`
 	}
 	if err := readJSON(w, r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "JSON inválido")
@@ -32,9 +35,15 @@ func (s *Server) createHabit(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "El nombre del hábito no sirve")
 		return
 	}
-	id, err := s.Store.CreateHabit(r.Context(), currentUser(r), name, body.NGoal)
+	id, err := s.Store.CreateHabit(r.Context(), currentUser(r), store.HabitInput{
+		Name: name, NGoal: body.NGoal, Icon: body.Icon, Category: body.Category, DailyGoal: body.DailyGoal,
+	})
 	if errors.Is(err, store.ErrHabitLimit) {
 		writeError(w, http.StatusUnprocessableEntity, "Máximo 7 hábitos. Archiva uno para crear otro.")
+		return
+	}
+	if errors.Is(err, store.ErrBadMoney) {
+		writeError(w, http.StatusUnprocessableEntity, "El hábito no se pudo guardar")
 		return
 	}
 	if err != nil {
@@ -60,12 +69,32 @@ func (s *Server) habitCheck(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	day, ok := s.checkDay(w, r)
+	raw := r.URL.Query().Get("day")
+	var count *int
+	if r.Method == http.MethodPost {
+		var body struct {
+			Day   string `json:"day"`
+			Count *int   `json:"count"`
+		}
+		_ = readJSON(w, r, &body)
+		if raw == "" {
+			raw = body.Day
+		}
+		count = body.Count
+	}
+	day, ok := s.parseCheckDay(w, raw)
 	if !ok {
 		return
 	}
-	on := r.Method == http.MethodPost
-	if err := s.Store.SetHabitCheck(r.Context(), currentUser(r), id, day, on); err != nil {
+	var err error
+	if r.Method == http.MethodDelete || (count != nil && *count <= 0) {
+		err = s.Store.SetHabitCheckCount(r.Context(), currentUser(r), id, day, 0)
+	} else if count != nil {
+		err = s.Store.SetHabitCheckCount(r.Context(), currentUser(r), id, day, *count)
+	} else {
+		err = s.Store.SetHabitCheck(r.Context(), currentUser(r), id, day, true)
+	}
+	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "No está")
 			return
@@ -85,6 +114,10 @@ func (s *Server) checkDay(w http.ResponseWriter, r *http.Request) (time.Time, bo
 		_ = readJSON(w, r, &body)
 		raw = body.Day
 	}
+	return s.parseCheckDay(w, raw)
+}
+
+func (s *Server) parseCheckDay(w http.ResponseWriter, raw string) (time.Time, bool) {
 	today := s.today()
 	if raw == "" {
 		return today, true

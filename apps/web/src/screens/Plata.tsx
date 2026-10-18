@@ -41,7 +41,7 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
     <Shell tabs>
       <div className="month-nav">
         <button type="button" className="month-step" aria-label="Mes anterior" onClick={() => setMonth(shiftMonth(month, -1))}>‹</button>
-        <p className="kicker">{monthTitle(month, current)}</p>
+        <p className="month-title">{monthTitle(month, current)}</p>
         <button type="button" className="month-step" aria-label="Mes siguiente" disabled={viewingNow} onClick={() => setMonth(shiftMonth(month, 1))}>›</button>
       </div>
       <section className="summary home-card">
@@ -67,20 +67,27 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
           <section className="chart-card">
             <div className="section-head">
               <h2 className="section-label">Gasto por día</h2>
-              <span className="meta">promedio {hidden ? '••••' : soles(dayBars.avg, money?.currency || 'PEN')}</span>
+              <span className="meta">
+                {dayBars.peakDay
+                  ? `Pico día ${dayBars.peakDay}`
+                  : dayBars.avg
+                    ? `Prom. ${hidden ? '••••' : soles(dayBars.avg, money?.currency || 'PEN')}`
+                    : ''}
+              </span>
             </div>
             <DayBars
               bars={dayBars.bars}
               avg={dayBars.avg}
               max={dayBars.max}
+              peakDay={dayBars.peakDay}
               hidden={hidden}
               currency={money?.currency || 'PEN'}
               todayDay={viewingNow ? new Date().getDate() : 0}
             />
-            {dayBars.peakDay && (
-              <p className="hint">
-                Día de más gasto: el {dayBars.peakDay} ({hidden ? '••••' : soles(dayBars.peakCents, money?.currency || 'PEN')}).
-                En rojo pastel, días que pasaron 1,5× tu promedio{dayBars.truncated ? '; ▲ = barra cortada' : ''}.
+            {dayBars.peakDay > 0 && (
+              <p className="day-bars-foot">
+                {hidden ? '••••' : soles(dayBars.peakCents, money?.currency || 'PEN')}
+                {dayBars.avg > 0 && !hidden ? ` · prom. ${soles(dayBars.avg, money?.currency || 'PEN')}` : ''}
               </p>
             )}
           </section>
@@ -491,7 +498,7 @@ export function AccountHistory() {
     <Shell title={account?.name ?? 'Cuenta'} back="/plata/cuentas" action={<EyeButton hidden={hidden} onToggle={toggle} />}>
       <div className="month-nav">
         <button type="button" className="month-step" aria-label="Mes anterior" onClick={() => setMonth(shiftMonth(month, -1))}>‹</button>
-        <p className="kicker">{monthTitle(month, current)}</p>
+        <p className="month-title">{monthTitle(month, current)}</p>
         <button type="button" className="month-step" aria-label="Mes siguiente" disabled={month === current} onClick={() => setMonth(shiftMonth(month, 1))}>›</button>
       </div>
       {money && moves.length === 0 && <p className="empty">Esta cuenta no tiene movimientos en este mes.</p>}
@@ -631,21 +638,32 @@ function daySpendBars(money: MonthMoney | null) {
   }
 }
 
+const donutPalette = [
+  '#3C5FB8',
+  '#066B49',
+  '#8E3A9E',
+  '#C46B66',
+  '#0A7C8A',
+  '#B57A1A',
+  '#5B4B9A',
+  '#2A6F4E',
+  '#A14D6D',
+  '#3E6B8A',
+]
+
 function DonutChart({ rows, hidden, currency }: { rows: ReturnType<typeof spendRows>; hidden: boolean; currency: string }) {
   const total = rows.reduce((sum, row) => sum + row.cents, 0) || 1
   const spent = rows.reduce((sum, row) => sum + row.cents, 0)
   let offset = 0
-  const slices = rows.filter((row) => row.cents > 0).map((row) => {
+  const slices = rows.filter((row) => row.cents > 0).map((row, index) => {
     const pct = (row.cents / total) * 100
-    const slice = { ...row, pct, offset }
+    const color = donutPalette[index % donutPalette.length]
+    const slice = { ...row, pct, offset, color }
     offset += pct
     return slice
   })
   const gradient = slices.length
-    ? `conic-gradient(${slices.map((slice) => {
-        const color = slice.category.tint === 'ciruela' ? '#8E3A9E' : slice.category.tint === 'azul' ? '#3C5FB8' : '#066B49'
-        return `${color} ${slice.offset}% ${slice.offset + slice.pct}%`
-      }).join(', ')})`
+    ? `conic-gradient(${slices.map((slice) => `${slice.color} ${slice.offset}% ${slice.offset + slice.pct}%`).join(', ')})`
     : 'conic-gradient(#E3ECE4 0% 100%)'
   return (
     <div className="donut-wrap">
@@ -657,7 +675,10 @@ function DonutChart({ rows, hidden, currency }: { rows: ReturnType<typeof spendR
       <ul className="donut-legend">
         {slices.slice(0, 6).map((slice) => (
           <li key={slice.category.id}>
-            <span>{slice.category.name}</span>
+            <span className="donut-legend-name">
+              <i className="donut-swatch" style={{ background: slice.color }} aria-hidden="true" />
+              {slice.category.name}
+            </span>
             <strong>{hidden ? '••••' : soles(slice.cents, currency)} · {Math.round(slice.pct)}%</strong>
           </li>
         ))}
@@ -667,36 +688,59 @@ function DonutChart({ rows, hidden, currency }: { rows: ReturnType<typeof spendR
   )
 }
 
-function DayBars({ bars, avg, max, hidden, currency, todayDay }: {
+function DayBars({ bars, avg, max, peakDay, hidden, currency, todayDay }: {
   bars: { day: number; cents: number }[]
   avg: number
   max: number
+  peakDay: number
   hidden: boolean
   currency: string
   todayDay: number
 }) {
+  const last = bars.length
   return (
     <div className="day-bars" aria-hidden={hidden}>
       <div className="day-bars-plot">
         {bars.map((bar) => {
           const hot = avg > 0 && bar.cents > avg * 1.5
-          const height = Math.max(4, Math.round((Math.min(bar.cents, max) / max) * 96))
+          const peak = bar.day === peakDay && bar.cents > 0
+          const height = bar.cents ? Math.max(6, Math.round((Math.min(bar.cents, max) / max) * 104)) : 3
           const cut = bar.cents > max
           return (
-            <div key={bar.day} className="day-bar-col" title={hidden ? undefined : `Día ${bar.day}: ${soles(bar.cents, currency)}`}>
-              {cut && <span className="day-bar-cut">▲</span>}
-              <span className={hot ? 'day-bar hot' : 'day-bar'} style={{ height }} />
+            <div
+              key={bar.day}
+              className={peak ? 'day-bar-col peak' : 'day-bar-col'}
+              title={hidden || !bar.cents ? undefined : `Día ${bar.day}: ${soles(bar.cents, currency)}`}
+            >
+              {cut && <span className="day-bar-cut" aria-hidden="true" />}
+              <span className={hot || peak ? 'day-bar hot' : bar.cents ? 'day-bar' : 'day-bar empty'} style={{ height }} />
             </div>
           )
         })}
-        {avg > 0 && <span className="day-avg-line" style={{ bottom: `${Math.round((Math.min(avg, max) / max) * 96)}px` }} />}
+        {avg > 0 && (
+          <span
+            className="day-avg-line"
+            style={{ bottom: `${Math.round((Math.min(avg, max) / max) * 104)}px` }}
+            title={hidden ? undefined : `Promedio ${soles(avg, currency)}`}
+          />
+        )}
       </div>
       <div className="day-bars-axis">
-        {bars.map((bar) => (
-          <span key={bar.day} className={bar.day === todayDay ? 'day-axis-label today' : 'day-axis-label'}>
-            {bar.day}
-          </span>
-        ))}
+        {bars.map((bar) => {
+          const mark = bar.day === 1 || bar.day === 15 || bar.day === last || bar.day === todayDay || bar.day === peakDay
+          return (
+            <span
+              key={bar.day}
+              className={
+                bar.day === todayDay ? 'day-axis-label today'
+                  : bar.day === peakDay ? 'day-axis-label peak'
+                    : 'day-axis-label'
+              }
+            >
+              {mark ? bar.day : ''}
+            </span>
+          )
+        })}
       </div>
     </div>
   )

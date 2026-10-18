@@ -28,13 +28,33 @@ export type TaskInput = {
   repeatWeekdays: number[]
 }
 
+export type HabitCategory = 'general' | 'estudios' | 'finanzas' | 'salud'
+
+export type HabitCheck = {
+  day: string
+  count: number
+}
+
+export type HabitInput = {
+  name: string
+  nGoal: number
+  icon?: string
+  category?: HabitCategory
+  dailyGoal?: number
+}
+
 export type Habit = {
   id: number
   name: string
   nGoal: number
+  icon: string
+  category: HabitCategory
+  dailyGoal: number
+  doneToday: number
   doneThisWeek: number
   streakWeeks: number
-  checks: string[]
+  streakDays: number
+  checks: HabitCheck[]
 }
 
 export type Goal = {
@@ -63,6 +83,35 @@ export type WorkoutSession = {
 }
 export type WorkoutRecord = { exerciseName: string; weightGrams: number; reps: number; occurredOn: string }
 export type HomeCard = 'agenda' | 'habits' | 'goals' | 'workouts'
+
+export type EventColor = 'menta' | 'impulso' | 'horizonte' | 'ciruela' | 'alerta' | 'bosque'
+
+export type CalendarEvent = {
+  id: number
+  title: string
+  location: string
+  description: string
+  allDay: boolean
+  startsAt: string
+  endsAt: string
+  color: EventColor
+  remindMinutes?: number
+  repeatRule: 'none' | 'weekly'
+  repeatWeekdays: number[]
+}
+
+export type EventInput = {
+  title: string
+  location: string
+  description: string
+  allDay: boolean
+  startsAt: string
+  endsAt: string | null
+  color: EventColor
+  remindMinutes?: number | null
+  repeatRule: 'none' | 'weekly'
+  repeatWeekdays: number[]
+}
 
 export type MoneyAccount = { id: number; name: string }
 export type MoneyCategory = { id: number; name: string; kind: 'gasto' | 'ingreso'; position: number; icon: string; tint: string }
@@ -148,6 +197,24 @@ export type MoneyDraft = {
   category: string
   note: string
   day: string
+  confidence: 'alta' | 'baja'
+  question: string
+  transcript?: string
+}
+
+export type CaptureDraft = {
+  kind: 'evento' | 'tarea' | 'recordatorio' | 'gasto'
+  title: string
+  day: string
+  time: string
+  durationMin: number
+  allDay: boolean
+  remind: boolean
+  amountCents: number
+  currency: 'pen' | 'usd' | string
+  categoryId: number
+  category: string
+  categoryHint?: string
   confidence: 'alta' | 'baja'
   question: string
   transcript?: string

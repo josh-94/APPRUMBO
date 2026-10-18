@@ -24,20 +24,23 @@ function initialCurrency(money: MonthMoney, movement?: Movement | null): 'pen' |
 }
 
 export function HabitSheet({ habit, onClose, onSave, onDelete }: {
-  habit?: { id: number; name: string; nGoal: number } | null
+  habit?: { id: number; name: string; nGoal: number; icon?: string; category?: string; dailyGoal?: number } | null
   onClose: () => void
-  onSave: (name: string, nGoal: number) => Promise<void>
+  onSave: (input: { name: string; nGoal: number; icon: string; category: string; dailyGoal: number }) => Promise<void>
   onDelete?: () => Promise<void>
 }) {
   const [name, setName] = useState(habit?.name ?? '')
   const [nGoal, setNGoal] = useState(habit?.nGoal ?? 5)
+  const [icon, setIcon] = useState(habit?.icon || '✨')
+  const [category, setCategory] = useState(habit?.category || 'general')
+  const [dailyGoal, setDailyGoal] = useState(habit?.dailyGoal ?? 1)
   const [error, setError] = useState('')
   const [confirming, setConfirming] = useState(false)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     try {
-      await onSave(name.trim(), nGoal)
+      await onSave({ name: name.trim(), nGoal, icon, category, dailyGoal })
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar')
@@ -53,11 +56,40 @@ export function HabitSheet({ habit, onClose, onSave, onDelete }: {
           Nombre
           <input value={name} required maxLength={80} onChange={(event) => setName(event.target.value)} />
         </label>
+        <p className="field-label">Icono</p>
+        <div className="chips">
+          {['✨', '😴', '🏃', '💰', '💧', '📚', '🧘', '🥗', '✍️', '🎯'].map((value) => (
+            <button key={value} type="button" className={value === icon ? 'pill on' : 'pill quiet'} onClick={() => setIcon(value)}>
+              {value}
+            </button>
+          ))}
+        </div>
+        <p className="field-label">Categoría</p>
+        <div className="chips">
+          {([
+            ['general', 'General'],
+            ['estudios', 'Estudios'],
+            ['finanzas', 'Finanzas'],
+            ['salud', 'Salud'],
+          ] as const).map(([value, label]) => (
+            <button key={value} type="button" className={value === category ? 'pill on' : 'pill quiet'} onClick={() => setCategory(value)}>
+              {label}
+            </button>
+          ))}
+        </div>
         <p className="field-label">Cuántos días de 7 cuentan como semana cumplida</p>
         <div className="chips">
           {[3, 4, 5, 6, 7].map((value) => (
             <button key={value} type="button" className={value === nGoal ? 'pill on' : 'pill quiet'} onClick={() => setNGoal(value)}>
               {value} de 7
+            </button>
+          ))}
+        </div>
+        <p className="field-label">Meta del día (1 = checkbox; más = cantidad)</p>
+        <div className="chips">
+          {[1, 2, 3, 5, 8, 10].map((value) => (
+            <button key={value} type="button" className={value === dailyGoal ? 'pill on' : 'pill quiet'} onClick={() => setDailyGoal(value)}>
+              {value === 1 ? '1 vez' : `${value}`}
             </button>
           ))}
         </div>
@@ -176,7 +208,7 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
     <div className="sheet-backdrop" onClick={onClose}>
       <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void submit(event)}>
         <div className="sheet-handle" />
-        <h2>{movement ? (kind === 'gasto' ? 'Editar gasto' : 'Editar ingreso') : (kind === 'gasto' ? 'Anotar gasto' : 'Anotar ingreso')}</h2>
+        <h2>{movement?.id ? (kind === 'gasto' ? 'Editar gasto' : 'Editar ingreso') : (kind === 'gasto' ? 'Anotar gasto' : 'Anotar ingreso')}</h2>
         <div className="switch-row">
           <button type="button" className={kind === 'gasto' ? 'pill on' : 'pill quiet'} onClick={() => chooseKind('gasto')}>Gasto</button>
           <button type="button" className={kind === 'ingreso' ? 'pill on' : 'pill quiet'} onClick={() => chooseKind('ingreso')}>Ingreso</button>

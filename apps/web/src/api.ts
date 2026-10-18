@@ -1,4 +1,4 @@
-import type { Bill, Debt, DebtMove, Goal, Habit, HomeCard, MoneyCategory, MoneyDraft, MoneyPlan, MonthMoney, Movement, MovementInput, PayAccount, Task, TaskInput, TaskList, WorkoutRecord, WorkoutRoutine, WorkoutSession, WorkoutSet } from './types'
+import type { Bill, CalendarEvent, CaptureDraft, Debt, DebtMove, EventInput, Goal, Habit, HomeCard, MoneyCategory, MoneyDraft, MoneyPlan, MonthMoney, Movement, MovementInput, PayAccount, Task, TaskInput, TaskList, WorkoutRecord, WorkoutRoutine, WorkoutSession, WorkoutSet } from './types'
 
 let onUnauthorized = () => {}
 
@@ -70,16 +70,24 @@ export const api = {
   savePush: (body: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
     request<void>('/api/push/subscriptions', { method: 'POST', body: JSON.stringify(body) }),
   habits: () => request<{ habits: Habit[] }>('/api/habits'),
-  createHabit: (name: string, nGoal: number) =>
-    request<Habit>('/api/habits', { method: 'POST', body: JSON.stringify({ name, nGoal }) }),
-  updateHabit: (id: number, name: string, nGoal: number) =>
-    request<Habit>(`/api/habits/${id}`, { method: 'PATCH', body: JSON.stringify({ name, nGoal }) }),
+  createHabit: (input: { name: string; nGoal: number; icon?: string; category?: string; dailyGoal?: number }) =>
+    request<Habit>('/api/habits', { method: 'POST', body: JSON.stringify(input) }),
+  updateHabit: (id: number, input: { name: string; nGoal: number; icon?: string; category?: string; dailyGoal?: number }) =>
+    request<Habit>(`/api/habits/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   deleteHabit: (id: number) => request<void>(`/api/habits/${id}`, { method: 'DELETE' }),
-  checkHabit: (id: number, day: string, on: boolean) =>
-    on
-      ? request<void>(`/api/habits/${id}/checks`, { method: 'POST', body: JSON.stringify({ day }) })
+  checkHabit: (id: number, day: string, count: number) =>
+    count > 0
+      ? request<void>(`/api/habits/${id}/checks`, { method: 'POST', body: JSON.stringify({ day, count }) })
       : request<void>(`/api/habits/${id}/checks?day=${day}`, { method: 'DELETE' }),
   agenda: (day: string) => request<{ day: string; items: AgendaItem[] }>(`/api/agenda?day=${day}`),
+  events: (from: string, to: string) =>
+    request<{ events: CalendarEvent[] }>(`/api/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  event: (id: number) => request<CalendarEvent>(`/api/events/${id}`),
+  createEvent: (input: EventInput) =>
+    request<CalendarEvent>('/api/events', { method: 'POST', body: JSON.stringify(input) }),
+  updateEvent: (id: number, input: EventInput) =>
+    request<CalendarEvent>(`/api/events/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  deleteEvent: (id: number) => request<void>(`/api/events/${id}`, { method: 'DELETE' }),
   goals: () => request<{ goals: Goal[] }>('/api/goals'),
   saveGoal: (body: Partial<Goal> & { name: string; targetCents: number }) =>
     request<Goal>(body.id ? `/api/goals/${body.id}` : '/api/goals', { method: body.id ? 'PATCH' : 'POST', body: JSON.stringify(body) }),
@@ -109,6 +117,8 @@ export const api = {
     if (body.previous) form.set('previous', JSON.stringify(body.previous))
     return request<MoneyDraft>('/api/money/draft', { method: 'POST', body: form })
   },
+  draftCapture: (body: { text: string; intent?: 'evento' | 'tarea' | 'recordatorio' | 'gasto' | 'auto' }) =>
+    request<CaptureDraft>('/api/capture/draft', { method: 'POST', body: JSON.stringify(body) }),
   createMovement: (body: MovementInput) =>
     request<Movement>('/api/movements', { method: 'POST', body: JSON.stringify(body) }),
   updateMovement: (id: number, body: MovementInput) =>
