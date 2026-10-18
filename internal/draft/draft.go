@@ -120,7 +120,7 @@ func TryLocalMoney(text string, categories []Category, sources []PaySource, toda
 	}
 	amount, hasAmount := AmountFromText(text)
 
-	// Correction on an existing draft: category and/or medio de pago, sin nuevo monto.
+	// Correction on an existing draft: categoría, medio de pago o nota, sin nuevo monto.
 	if previous != nil && previous.AmountCents > 0 && !hasAmount {
 		kind := previous.Kind
 		if kind != "ingreso" {
@@ -128,15 +128,19 @@ func TryLocalMoney(text string, categories []Category, sources []PaySource, toda
 		}
 		cat, hasCat := matchLocalCategory(text, kind, categories)
 		src, hasSrc := MatchPaySource(text, sources)
+		noteFix, hasNote := extractNoteCorrection(text)
 		short := utf8.RuneCountInString(text) <= 48
-		if !hasCat && !hasSrc {
+		if !hasCat && !hasSrc && !hasNote {
 			return Proposal{}, false
 		}
-		if hasCat && !hasSrc && !short {
+		if hasCat && !hasSrc && !hasNote && !short {
 			return Proposal{}, false
 		}
 		day := resolveDay(text, "", today, previous)
 		note := clip(previous.Note, noteLimit)
+		if hasNote {
+			note = noteFix
+		}
 		out := Proposal{
 			Kind:        kind,
 			AmountCents: previous.AmountCents,
@@ -230,17 +234,41 @@ func matchLocalCategory(text, kind string, categories []Category) (Category, boo
 
 var (
 	localMoneyAmountRe = regexp.MustCompile(`(?i)(?:(?:s\s*/|soles?)\s*\d{1,6}(?:[.,]\d{1,2})?|\d{1,6}(?:[.,]\d{1,2})?\s*soles?|\d{1,6}[.,]\d{1,2}|\b\d{1,6}\b)`)
-	localMoneyNoiseRe  = regexp.MustCompile(`(?i)\b(gast[eé]|pase|pasé|compré|compre|en|de|mi|la|el|los|las|un|una|con|por|tarjeta|amex|yape|plin|soles?)\b`)
+	localMoneyNoiseRe  = regexp.MustCompile(`(?i)\b(agregar|añadir|anotar|mis|gastos?|ingresos?|gast[eé]|pase|pasé|compré|compre|en|de|a|mi|la|el|los|las|un|una|con|por|tarjeta|cuenta|amex|yape|plin|soles?|categor[ií]a)\b`)
+	localCategoryCueRe = regexp.MustCompile(`(?i)\bcategor[ií]a\s+\S+`)
+	noteCorrectionRe   = regexp.MustCompile(`(?i)(?:solo\s+fue\s+en|fue\s+solo\s+en|solo\s+en|la\s+nota\s+es|nota\s*:)\s+['"]?(.+?)['"]?\s*$`)
+	noteQuotedRe       = regexp.MustCompile(`['"]([^'"]{1,40})['"]`)
 )
 
 func localMoneyNote(text, category string) string {
-	note := localMoneyAmountRe.ReplaceAllString(text, " ")
+	note := localCategoryCueRe.ReplaceAllString(text, " ")
+	note = localMoneyAmountRe.ReplaceAllString(note, " ")
 	note = localMoneyNoiseRe.ReplaceAllString(note, " ")
 	if category != "" {
 		note = strings.ReplaceAll(note, category, " ")
 		note = strings.ReplaceAll(note, strings.ToLower(category), " ")
 	}
 	return clip(note, noteLimit)
+}
+
+func extractNoteCorrection(text string) (string, bool) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return "", false
+	}
+	if m := noteQuotedRe.FindStringSubmatch(text); m != nil {
+		note := clip(m[1], noteLimit)
+		if note != "" {
+			return note, true
+		}
+	}
+	if m := noteCorrectionRe.FindStringSubmatch(text); m != nil {
+		note := clip(m[1], noteLimit)
+		if note != "" {
+			return note, true
+		}
+	}
+	return "", false
 }
 
 func Normalize(text, raw string, categories []Category, today time.Time, trustModelAmount bool, previous *Proposal) (Proposal, error) {

@@ -445,33 +445,54 @@ func paySourceByID(accountID, debtID int64, sources []PaySource) (PaySource, boo
 	return PaySource{}, false
 }
 
+// Tokens that appear in account names and also in normal spend phrases ("2 soles").
+var paySourceNoise = map[string]bool{
+	"sol": true, "soles": true, "pen": true, "usd": true, "dolar": true, "dolares": true, "dólar": true, "dólares": true,
+	"ahorro": true, "ahorros": true, "cuenta": true, "tarjeta": true, "banco": true, "efectivo": true,
+}
+
 func MatchPaySource(text string, sources []PaySource) (PaySource, bool) {
 	lower := strings.ToLower(text)
+	preferCard := strings.Contains(lower, "tarjeta")
 	var best PaySource
-	bestLen := 0
+	bestScore := 0
 	for _, src := range sources {
 		name := strings.ToLower(strings.TrimSpace(src.Name))
 		if utf8.RuneCountInString(name) < 3 {
 			continue
 		}
-		if strings.Contains(lower, name) && utf8.RuneCountInString(name) > bestLen {
-			best = src
-			bestLen = utf8.RuneCountInString(name)
+		score := 0
+		if strings.Contains(lower, name) {
+			score = utf8.RuneCountInString(name) + 8
 		}
-		// token match: "amex" inside "Amex Gold"
 		for _, part := range strings.FieldsFunc(name, func(r rune) bool {
 			return r == ' ' || r == '-' || r == '/'
 		}) {
-			if utf8.RuneCountInString(part) < 3 {
+			if utf8.RuneCountInString(part) < 3 || paySourceNoise[part] {
 				continue
 			}
-			if strings.Contains(lower, part) && utf8.RuneCountInString(part) > bestLen {
-				best = src
-				bestLen = utf8.RuneCountInString(part)
+			if strings.Contains(lower, part) {
+				w := utf8.RuneCountInString(part) + 2
+				if w > score {
+					score = w
+				}
 			}
 		}
+		if score == 0 {
+			continue
+		}
+		if preferCard && src.Kind == "debt" {
+			score += 4
+		}
+		if preferCard && src.Kind == "account" {
+			score -= 2
+		}
+		if score > bestScore {
+			best = src
+			bestScore = score
+		}
 	}
-	if bestLen == 0 {
+	if bestScore == 0 {
 		return PaySource{}, false
 	}
 	return best, true

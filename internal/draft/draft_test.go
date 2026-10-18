@@ -153,6 +153,32 @@ func TestTryLocalMoneyCategoryCorrection(t *testing.T) {
 	if !ok || got.DebtID != 9 || got.SourceName != "Amex" || got.AmountCents != 3400 || got.CategoryID != 6 {
 		t.Fatalf("amex correction %+v ok=%v", got, ok)
 	}
+	previous = &Proposal{Kind: "gasto", AmountCents: 200, CategoryID: 3, Category: "Comida", Note: "agregar a mis gastos palta", Day: "2026-10-17", DebtID: 9, SourceName: "Amex"}
+	got, ok = TryLocalMoney("el gasto solo fue en 'palta'", categories, sources, today, previous)
+	if !ok || got.Note != "palta" || got.AmountCents != 200 || got.DebtID != 9 {
+		t.Fatalf("note correction %+v ok=%v", got, ok)
+	}
+}
+
+func TestMatchPaySourceIgnoresSolesInAccountName(t *testing.T) {
+	sources := []PaySource{
+		{ID: 1, Name: "Ahorros Soles - BCP", Kind: "account"},
+		{ID: 9, Name: "Amex", Kind: "debt"},
+	}
+	got, ok := MatchPaySource("agregar a mis gastos 2 soles en palta de mi tarjeta amex categoria alimentos", sources)
+	if !ok || got.ID != 9 || got.Kind != "debt" {
+		t.Fatalf("want Amex, got %+v ok=%v", got, ok)
+	}
+	if _, ok := MatchPaySource("gaste 2 soles en palta", sources); ok {
+		t.Fatal("soles alone must not match Ahorros Soles")
+	}
+}
+
+func TestLocalMoneyNoteStripsBoilerplate(t *testing.T) {
+	note := localMoneyNote("agregar a mis gastos 2 soles en palta de mi tarjeta amex categoria alimentos", "Alimentos")
+	if note != "palta" {
+		t.Fatalf("note %q", note)
+	}
 }
 
 func TestCompleteAndTranscribe(t *testing.T) {
