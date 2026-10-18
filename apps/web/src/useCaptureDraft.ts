@@ -1,12 +1,38 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api'
-import { localCaptureFromLine } from './parseEventLine'
-import type { CaptureDraft } from './types'
+import { mergeCaptureDraft } from './enrichGasto'
+import { isClearCapture, localCaptureFromLine } from './parseEventLine'
+import type { CaptureDraft, MonthMoney } from './types'
 
 type Intent = 'evento' | 'tarea' | 'recordatorio' | 'gasto' | 'auto'
 
-export function useCaptureDraft(text: string, intent: Intent) {
+function toDraft(local: ReturnType<typeof localCaptureFromLine>): CaptureDraft {
+  return {
+    kind: local.kind,
+    title: local.title,
+    day: local.day,
+    time: local.time,
+    durationMin: local.durationMin,
+    allDay: local.allDay,
+    remind: local.remind,
+    amountCents: local.amountCents,
+    currency: local.currency,
+    categoryId: local.categoryId,
+    category: local.category,
+    accountId: 0,
+    debtId: 0,
+    sourceName: '',
+    confidence: local.confidence,
+    question: local.question,
+  }
+}
+
+export function useCaptureDraft(text: string, intent: Intent, money?: MonthMoney | null) {
   const local = useMemo(() => (text.trim() ? localCaptureFromLine(text, intent) : null), [text, intent])
+  const clear = useMemo(
+    () => (local && text.trim() ? isClearCapture(text, local, intent) : false),
+    [local, text, intent],
+  )
   const [model, setModel] = useState<CaptureDraft | null>(null)
   const [loading, setLoading] = useState(false)
   const [fromModel, setFromModel] = useState(false)
@@ -14,7 +40,14 @@ export function useCaptureDraft(text: string, intent: Intent) {
 
   useEffect(() => {
     const trimmed = text.trim()
-    if (!trimmed) {
+    if (!trimmed || !local) {
+      setModel(null)
+      setFromModel(false)
+      setLoading(false)
+      return
+    }
+    if (clear) {
+      seq.current += 1
       setModel(null)
       setFromModel(false)
       setLoading(false)
@@ -40,31 +73,22 @@ export function useCaptureDraft(text: string, intent: Intent) {
         .finally(() => {
           if (id === seq.current) setLoading(false)
         })
-    }, 400)
+    }, 500)
     return () => {
       window.clearTimeout(timer)
     }
-  }, [text, intent])
+  }, [text, intent, local, clear])
 
-  const draft: CaptureDraft | null = model ?? (local
-    ? {
-        kind: local.kind,
-        title: local.title,
-        day: local.day,
-        time: local.time,
-        durationMin: local.durationMin,
-        allDay: local.allDay,
-        remind: local.remind,
-        amountCents: local.amountCents,
-        currency: local.currency,
-        categoryId: local.categoryId,
-        category: local.category,
-        confidence: local.confidence,
-        question: local.question,
-      }
-    : null)
+  const draft = useMemo(() => {
+    if (!text.trim()) return null
+    const baseLocal = local ? toDraft(local) : null
+    if (intent === 'gasto') {
+      return mergeCaptureDraft(model, baseLocal, text.trim(), money)
+    }
+    return model ?? baseLocal
+  }, [model, local, text, intent, money])
 
-  return { draft, loading, fromModel, local }
+  return { draft, loading, fromModel, local, clear }
 }
 
 export function captureToParsed(draft: CaptureDraft) {
@@ -75,5 +99,7 @@ export function captureToParsed(draft: CaptureDraft) {
     durationMin: draft.allDay ? 24 * 60 : draft.durationMin || 60,
     allDay: draft.allDay,
     preview: draft.title,
+    dateFromText: true,
+    timeFromText: Boolean(draft.time) || draft.allDay,
   }
 }

@@ -2,6 +2,8 @@ package draft
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -91,9 +93,12 @@ func TestNormalizeDecimalModelAmountAndLongNote(t *testing.T) {
 
 func TestPromptListsCategoryIDs(t *testing.T) {
 	today := time.Date(2026, 10, 17, 0, 0, 0, 0, time.UTC)
-	system, user := Prompt([]Category{{ID: 4, Name: "Transporte", Kind: "gasto"}}, today, "era transporte", &Proposal{AmountCents: 1800, CategoryID: 3})
+	system, user := Prompt([]Category{{ID: 4, Name: "Transporte", Kind: "gasto"}}, today, "era transporte", &Proposal{AmountCents: 1800, CategoryID: 3}, "Usuario: bembos\nHecho: Anoté Salidas")
 	if !strings.Contains(system, "4 Transporte") || !strings.Contains(user, "era transporte") || !strings.Contains(user, "1800") {
 		t.Fatalf("system %s user %s", system, user)
+	}
+	if !strings.Contains(user, "Memoria reciente:") || !strings.Contains(user, "bembos") {
+		t.Fatalf("memory missing in user %s", user)
 	}
 }
 
@@ -103,11 +108,24 @@ func TestCompleteAndTranscribe(t *testing.T) {
 			http.NotFound(w, r)
 			return
 		}
+		raw, _ := io.ReadAll(r.Body)
+		var req struct {
+			KeepAlive int `json:"keep_alive"`
+			Options   struct {
+				NumThread int `json:"num_thread"`
+			} `json:"options"`
+		}
+		if err := json.Unmarshal(raw, &req); err != nil {
+			t.Error(err)
+		}
+		if req.KeepAlive != -1 || req.Options.NumThread != 4 {
+			t.Errorf("keep_alive=%d num_thread=%d", req.KeepAlive, req.Options.NumThread)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"message":{"content":"{\"kind\":\"gasto\"}"}}`))
 	}))
 	defer ollama.Close()
-	got, err := Complete(context.Background(), ollama.URL, "qwen2.5vl:3b", "sistema", "almuerzo", nil)
+	got, err := Complete(context.Background(), ollama.URL, "qwen2.5vl:3b", "sistema", "almuerzo", nil, 4)
 	if err != nil || !strings.Contains(got, "gasto") {
 		t.Fatalf("%q %v", got, err)
 	}
@@ -116,7 +134,7 @@ func TestCompleteAndTranscribe(t *testing.T) {
 		http.Error(w, "model not found", http.StatusNotFound)
 	}))
 	defer missing.Close()
-	if _, err := Complete(context.Background(), missing.URL, "missing", "s", "u", nil); err != ErrPreparing {
+	if _, err := Complete(context.Background(), missing.URL, "missing", "s", "u", nil, 4); err != ErrPreparing {
 		t.Fatalf("preparing %v", err)
 	}
 

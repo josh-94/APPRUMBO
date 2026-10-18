@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -22,6 +23,7 @@ type Config struct {
 	OllamaURL       string
 	OllamaModel     string
 	OllamaTextModel string
+	OllamaNumThread int
 	WhisperURL      string
 }
 
@@ -40,7 +42,8 @@ func Load() (Config, error) {
 		GoogleRedirect:  os.Getenv("GOOGLE_REDIRECT_URL"),
 		OllamaURL:       env("OLLAMA_URL", "http://ollama:11434"),
 		OllamaModel:     env("OLLAMA_MODEL", "qwen2.5vl:3b"),
-		OllamaTextModel: env("OLLAMA_TEXT_MODEL", "qwen2.5:1.5b"),
+		OllamaTextModel: env("OLLAMA_TEXT_MODEL", "gemma3:1b"),
+		OllamaNumThread: envInt("OLLAMA_NUM_THREAD", 4),
 		WhisperURL:      env("WHISPER_URL", "http://whisper:8080"),
 	}
 	if cfg.DatabaseURL == "" || cfg.RedisURL == "" {
@@ -62,4 +65,16 @@ func env(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func envInt(key string, fallback int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return fallback
+	}
+	return n
 }

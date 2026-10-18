@@ -366,6 +366,14 @@ func (s *Store) accounts(ctx context.Context, userID int64) ([]Account, error) {
 	return out, rows.Err()
 }
 
+func (s *Store) MoneyAccounts(ctx context.Context, userID int64) ([]Account, error) {
+	return s.accounts(ctx, userID)
+}
+
+func (s *Store) MoneyCards(ctx context.Context, userID int64) ([]MoneyCard, error) {
+	return s.moneyCards(ctx, userID)
+}
+
 func (s *Store) moneyCards(ctx context.Context, userID int64) ([]MoneyCard, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, name, currency FROM debts

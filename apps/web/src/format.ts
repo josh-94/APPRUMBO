@@ -69,6 +69,13 @@ export function displayName(email: string) {
   return name ? name.charAt(0).toUpperCase() + name.slice(1) : 'ahí'
 }
 
+export function weekStartKey(date = new Date()) {
+  const monday = new Date(date)
+  const delta = (monday.getDay() + 6) % 7
+  monday.setDate(monday.getDate() - delta)
+  return todayKey(monday)
+}
+
 export function weekChips(date = new Date()) {
   const monday = new Date(date)
   const delta = (monday.getDay() + 6) % 7
@@ -77,7 +84,7 @@ export function weekChips(date = new Date()) {
   return labels.map((label, index) => {
     const day = new Date(monday)
     day.setDate(monday.getDate() + index)
-    return { label, day: day.getDate(), key: todayKey(day), today: todayKey(day) === todayKey(date) }
+    return { label, day: day.getDate(), key: todayKey(day), today: todayKey(day) === todayKey(date), weekday: index }
   })
 }
 

@@ -57,7 +57,7 @@ type modelJSON struct {
 	Question    string          `json:"question"`
 }
 
-func Prompt(categories []Category, today time.Time, text string, previous *Proposal) (string, string) {
+func Prompt(categories []Category, today time.Time, text string, previous *Proposal, memory string) (string, string) {
 	var gastos, ingresos strings.Builder
 	for _, item := range categories {
 		line := fmt.Sprintf("- %d %s\n", item.ID, item.Name)
@@ -77,7 +77,8 @@ func Prompt(categories []Category, today time.Time, text string, previous *Propo
 	}
 	system := fmt.Sprintf(`Responde solo JSON. Hoy es %s. Moneda: soles.
 Gasto: %sIngreso: %s
-kind es gasto o ingreso. amountCents son centavos (18.50 = 1850) o null si no hay monto. categoryId es un id de esa lista y del mismo kind, o 0. note hasta 80 letras. day es YYYY-MM-DD o hoy. confidence es alta o baja. question queda vacía si monto y categoría están.`,
+kind es gasto o ingreso. amountCents son centavos (18.50 = 1850) o null si no hay monto. categoryId es un id de esa lista y del mismo kind, o 0. note hasta 80 letras. day es YYYY-MM-DD o hoy. confidence es alta o baja. question queda vacía si monto y categoría están.
+Si hay memoria reciente, úsala solo como pista de hábitos (categoría/nota); el mensaje actual manda.`,
 		today.Format("2006-01-02"), gastos.String(), ingresos.String())
 
 	user := text
@@ -85,7 +86,24 @@ kind es gasto o ingreso. amountCents son centavos (18.50 = 1850) o null si no ha
 		raw, _ := json.Marshal(previous)
 		user = "Borrador anterior:\n" + string(raw) + "\n\nCorrección:\n" + text
 	}
+	if mem := clipMemory(memory); mem != "" {
+		user = "Memoria reciente:\n" + mem + "\n\n" + user
+	}
 	return system, user
+}
+
+const memoryLimit = 1800
+
+func clipMemory(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if utf8.RuneCountInString(raw) <= memoryLimit {
+		return raw
+	}
+	runes := []rune(raw)
+	return string(runes[len(runes)-memoryLimit:])
 }
 
 func Normalize(text, raw string, categories []Category, today time.Time, trustModelAmount bool, previous *Proposal) (Proposal, error) {
@@ -335,7 +353,16 @@ func predictCap(image bool) int {
 	return 160
 }
 
-func Complete(ctx context.Context, baseURL, model, system, user string, image []byte) (string, error) {
+func Complete(ctx context.Context, baseURL, model, system, user string, image []byte, numThread int) (string, error) {
+	return completeChat(ctx, baseURL, model, system, user, image, ctxSize(len(image) > 0), predictCap(len(image) > 0), numThread)
+}
+
+// CompleteCapture uses a smaller context for fast structured capture drafts.
+func CompleteCapture(ctx context.Context, baseURL, model, system, user string, numThread int) (string, error) {
+	return completeChat(ctx, baseURL, model, system, user, nil, 512, 72, numThread)
+}
+
+func completeChat(ctx context.Context, baseURL, model, system, user string, image []byte, numCtx, numPredict, numThread int) (string, error) {
 	message := map[string]any{
 		"role":    "user",
 		"content": user,
@@ -343,19 +370,24 @@ func Complete(ctx context.Context, baseURL, model, system, user string, image []
 	if len(image) > 0 {
 		message["images"] = []string{base64.StdEncoding.EncodeToString(image)}
 	}
+	options := map[string]any{
+		"temperature": 0.1,
+		"num_ctx":     numCtx,
+		"num_predict": numPredict,
+	}
+	if numThread > 0 {
+		options["num_thread"] = numThread
+	}
 	body, err := json.Marshal(map[string]any{
-		"model":  model,
-		"stream": false,
-		"format": "json",
+		"model":      model,
+		"stream":     false,
+		"format":     "json",
+		"keep_alive": -1,
 		"messages": []any{
 			map[string]string{"role": "system", "content": system},
 			message,
 		},
-		"options": map[string]any{
-			"temperature": 0.1,
-			"num_ctx":     ctxSize(len(image) > 0),
-			"num_predict": predictCap(len(image) > 0),
-		},
+		"options": options,
 	})
 	if err != nil {
 		return "", err

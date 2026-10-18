@@ -14,6 +14,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 
+	"hoy/internal/foods"
 	"hoy/internal/fx"
 	"hoy/internal/schedule"
 	"hoy/internal/session"
@@ -37,8 +38,10 @@ type Server struct {
 	OllamaURL       string
 	OllamaModel     string
 	OllamaTextModel string
+	OllamaNumThread int
 	WhisperURL      string
 	FX              *fx.Client
+	Foods           *foods.Client
 }
 
 func (s *Server) Handler() http.Handler {
@@ -90,6 +93,15 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/workouts/sessions", s.protected(s.workoutSessions))
 	mux.HandleFunc("POST /api/workouts/sessions", s.protected(s.addWorkoutSession))
 	mux.HandleFunc("GET /api/workouts/records", s.protected(s.workoutRecords))
+	mux.HandleFunc("GET /api/gym/week", s.protected(s.gymWeek))
+	mux.HandleFunc("PUT /api/gym/week", s.protected(s.setGymWeek))
+	mux.HandleFunc("PUT /api/gym/log", s.protected(s.setGymLog))
+	mux.HandleFunc("GET /api/meals", s.protected(s.meals))
+	mux.HandleFunc("POST /api/meals", s.protected(s.createMeal))
+	mux.HandleFunc("DELETE /api/meals/{id}", s.protected(s.deleteMeal))
+	mux.HandleFunc("POST /api/meals/{id}/items", s.protected(s.addMealItem))
+	mux.HandleFunc("DELETE /api/meals/{id}/items/{itemId}", s.protected(s.deleteMealItem))
+	mux.HandleFunc("GET /api/foods/search", s.protected(s.foodSearch))
 	mux.HandleFunc("GET /api/home/prefs", s.protected(s.homePrefs))
 	mux.HandleFunc("PUT /api/home/prefs", s.protected(s.homePrefs))
 	mux.HandleFunc("GET /api/money/month", s.protected(s.moneyMonth))

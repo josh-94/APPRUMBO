@@ -1,212 +1,427 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { api } from '../api'
 import { Shell } from '../components/Shell'
-import { todayKey } from '../format'
-import type { WorkoutRecord, WorkoutRoutine, WorkoutSession } from '../types'
+import { todayKey, weekChips, weekStartKey } from '../format'
+import type { DayMacros, FoodHit, GymWeek, Meal } from '../types'
 
 export function WorkoutsPage() {
-  const [routines, setRoutines] = useState<WorkoutRoutine[]>([])
-  const [sessions, setSessions] = useState<WorkoutSession[]>([])
-  const [records, setRecords] = useState<WorkoutRecord[]>([])
-  const [editing, setEditing] = useState<WorkoutRoutine | null | undefined>(undefined)
-  const [logging, setLogging] = useState<WorkoutRoutine | null>(null)
+  const today = todayKey()
+  const [week, setWeek] = useState<GymWeek | null>(null)
+  const [selectedDay, setSelectedDay] = useState(today)
+  const [meals, setMeals] = useState<Meal[]>([])
+  const [error, setError] = useState('')
+  const [addingFoodFor, setAddingFoodFor] = useState<number | null>(null)
+  const [newMealTitle, setNewMealTitle] = useState('')
 
-  function reload() {
-    api.workoutRoutines().then((data) => setRoutines(data.routines)).catch(() => setRoutines([]))
-    api.workoutSessions().then((data) => setSessions(data.sessions)).catch(() => setSessions([]))
-    api.workoutRecords().then((data) => setRecords(data.records)).catch(() => setRecords([]))
+  const chips = useMemo(() => weekChips(), [])
+  const planned = useMemo(() => new Set(week?.weekdays ?? []), [week])
+  const logs = useMemo(() => new Map((week?.logs ?? []).map((log) => [log.day, log])), [week])
+  const dayLog = logs.get(selectedDay)
+  const dayMacros = week?.dayMacros.find((item) => item.day === selectedDay) ?? emptyMacros(selectedDay)
+  const mealTotals = useMemo(() => sumMeals(meals), [meals])
+  const macros = mealTotals.kcal > 0 || meals.length > 0 ? mealTotals : dayMacros
+
+  function reloadWeek() {
+    return api.gymWeek().then(setWeek).catch(() => setWeek(null))
   }
 
-  useEffect(() => { reload() }, [])
+  function reloadMeals(day = selectedDay) {
+    return api.meals(day).then((data) => setMeals(data.meals)).catch(() => setMeals([]))
+  }
 
-  const week = weekMarks(sessions)
+  useEffect(() => {
+    void reloadWeek()
+  }, [])
+
+  useEffect(() => {
+    void reloadMeals(selectedDay)
+  }, [selectedDay])
+
+  async function togglePlan(weekday: number) {
+    const weekStart = week?.weekStart || weekStartKey()
+    const next = new Set(week?.weekdays ?? [])
+    if (next.has(weekday)) next.delete(weekday)
+    else next.add(weekday)
+    try {
+      setWeek(await api.setGymWeek(weekStart, [...next].sort((a, b) => a - b)))
+      setError('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar el plan')
+    }
+  }
+
+  async function setAttended(attended: boolean, attendedAt?: string) {
+    try {
+      const log = await api.setGymLog({
+        day: selectedDay,
+        attended,
+        attendedAt: attended ? (attendedAt || currentTime()) : undefined,
+      })
+      setWeek((prev) => {
+        if (!prev) return prev
+        const others = prev.logs.filter((item) => item.day !== log.day)
+        return { ...prev, logs: [...others, log].sort((a, b) => a.day.localeCompare(b.day)) }
+      })
+      setError('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar')
+    }
+  }
+
+  async function createMeal(event: FormEvent) {
+    event.preventDefault()
+    const title = newMealTitle.trim()
+    if (!title) return
+    try {
+      const meal = await api.createMeal({ day: selectedDay, title })
+      setMeals((items) => [...items, meal])
+      setNewMealTitle('')
+      setError('')
+      void reloadWeek()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear la comida')
+    }
+  }
+
+  async function removeMeal(id: number) {
+    try {
+      await api.deleteMeal(id)
+      setMeals((items) => items.filter((meal) => meal.id !== id))
+      void reloadWeek()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo borrar')
+    }
+  }
+
+  async function removeItem(mealId: number, itemId: number) {
+    try {
+      await api.deleteMealItem(mealId, itemId)
+      setMeals((items) => items.map((meal) => (
+        meal.id === mealId
+          ? { ...meal, items: meal.items.filter((item) => item.id !== itemId) }
+          : meal
+      )))
+      void reloadWeek()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo borrar')
+    }
+  }
 
   return (
     <Shell title="Entrenamientos" back="/tiempo">
       <section className="summary">
         <p className="label">Esta semana</p>
         <div className="week-row">
-          {week.map((day) => (
-            <div key={day.label} className={day.on ? 'day-chip today' : 'day-chip'}>
-              <small>{day.label}</small>
-              <strong>{day.on ? '●' : '·'}</strong>
-            </div>
+          {chips.map((chip, index) => {
+            const log = logs.get(chip.key)
+            const isPlanned = planned.has(index)
+            const attended = Boolean(log?.attended)
+            const selected = chip.key === selectedDay
+            const className = [
+              'day-chip',
+              selected ? 'today' : '',
+              !selected && isPlanned ? 'planned' : '',
+              !selected && attended ? 'attended' : '',
+              chip.today && !selected ? 'is-today' : '',
+            ].filter(Boolean).join(' ')
+            return (
+              <button
+                key={chip.key}
+                type="button"
+                className={className}
+                aria-pressed={selected}
+                onClick={() => setSelectedDay(chip.key)}
+              >
+                <small>{chip.label.slice(0, 1)}</small>
+                <strong>{attended ? '●' : isPlanned ? '○' : chip.day}</strong>
+              </button>
+            )
+          })}
+        </div>
+        <p className="meta">Plan de la semana</p>
+        <div className="switch-row">
+          {chips.map((chip, index) => (
+            <button
+              key={`plan-${chip.key}`}
+              type="button"
+              className={planned.has(index) ? 'pill on' : 'pill quiet'}
+              onClick={() => void togglePlan(index)}
+            >
+              {chip.label.slice(0, 1)}
+            </button>
           ))}
         </div>
       </section>
 
-      <h2 className="section-label">Rutinas</h2>
-      {routines.length === 0 && <p className="empty">Crea una rutina con tus ejercicios.</p>}
-      {routines.map((routine) => (
-        <article key={routine.id} className="goal-card">
-          <strong>{routine.name}</strong>
-          <p className="meta">{routine.exercises.map((item) => item.name).join(' · ') || 'Sin ejercicios'}</p>
-          <div className="switch-row">
-            <button type="button" className="pill on" onClick={() => setLogging(routine)}>Registrar hoy</button>
-            <button type="button" className="pill quiet" onClick={() => setEditing(routine)}>Editar</button>
-          </div>
-        </article>
-      ))}
-      <button type="button" className="ghost" onClick={() => setEditing(null)}>Nueva rutina</button>
+      <section className="paper-card home-card">
+        <h2 className="section-label">{dayHeading(selectedDay, today)}</h2>
+        <label className="habit" style={{ marginBottom: 12 }}>
+          <button
+            type="button"
+            className={dayLog?.attended ? 'check on' : 'check'}
+            aria-label="Fui al gym"
+            onClick={() => void setAttended(!dayLog?.attended, dayLog?.attendedAt || currentTime())}
+          />
+          <span className="habit-copy">
+            <strong>Fui al gym</strong>
+            <span className="meta">{dayLog?.attended ? (dayLog.attendedAt ? `A las ${dayLog.attendedAt}` : 'Asistencia marcada') : 'Sin marcar'}</span>
+          </span>
+        </label>
+        {dayLog?.attended && (
+          <label className="field">
+            Hora
+            <input
+              type="time"
+              value={dayLog.attendedAt || ''}
+              onChange={(event) => void setAttended(true, event.target.value)}
+            />
+          </label>
+        )}
 
-      {records.length > 0 && (
-        <>
-          <h2 className="section-label">Récords</h2>
-          {records.map((item) => (
-            <div key={item.exerciseName} className="money-row">
+        <h3 className="section-label">Macros del día</h3>
+        <div className="macro-row">
+          <MacroStat label="P" value={`${fmt(macros.proteinG)} g`} />
+          <MacroStat label="C" value={`${fmt(macros.carbsG)} g`} />
+          <MacroStat label="G" value={`${fmt(macros.fatG)} g`} />
+          <MacroStat label="kcal" value={fmt(macros.kcal)} />
+        </div>
+      </section>
+
+      <h2 className="section-label">Comidas libres</h2>
+      {meals.length === 0 && <p className="empty">Añade comidas del día y busca alimentos.</p>}
+      {meals.map((meal) => (
+        <article key={meal.id} className="goal-card">
+          <div className="section-head">
+            <strong>{meal.title}</strong>
+            <button type="button" className="ghost danger" onClick={() => void removeMeal(meal.id)}>Borrar</button>
+          </div>
+          {meal.items.length === 0 && <p className="meta">Sin alimentos aún.</p>}
+          {meal.items.map((item) => (
+            <div key={item.id} className="money-row">
               <div>
-                <strong>{item.exerciseName}</strong>
-                <p className="meta">{item.occurredOn}</p>
+                <strong>{item.foodName}</strong>
+                <p className="meta">
+                  {item.grams} g
+                  {item.brand ? ` · ${item.brand}` : ''}
+                  {` · P ${fmt(item.proteinG)} · C ${fmt(item.carbsG)} · G ${fmt(item.fatG)} · ${fmt(item.kcal)} kcal`}
+                </p>
               </div>
-              <strong>{(item.weightGrams / 1000).toFixed(1)} kg × {item.reps}</strong>
+              <button type="button" className="ghost" onClick={() => void removeItem(meal.id, item.id)}>×</button>
             </div>
           ))}
-        </>
-      )}
-
-      <h2 className="section-label">Últimas sesiones</h2>
-      {sessions.slice(0, 8).map((session) => (
-        <div key={session.id} className="money-row">
-          <div>
-            <strong>{session.routineName || 'Sesión'}</strong>
-            <p className="meta">{session.occurredOn}{session.durationMin ? ` · ${session.durationMin} min` : ''}</p>
-          </div>
-          <strong>{session.sets.length} series</strong>
-        </div>
+          <button type="button" className="pill quiet" onClick={() => setAddingFoodFor(meal.id)}>
+            Añadir alimento
+          </button>
+        </article>
       ))}
 
-      {editing !== undefined && (
-        <RoutineSheet
-          routine={editing}
-          onClose={() => setEditing(undefined)}
-          onSaved={() => { setEditing(undefined); reload() }}
-        />
-      )}
-      {logging && (
-        <SessionSheet
-          routine={logging}
-          onClose={() => setLogging(null)}
-          onSaved={() => { setLogging(null); reload() }}
+      <form className="switch-row" onSubmit={(event) => void createMeal(event)}>
+        <label className="field" style={{ flex: 1, margin: 0 }}>
+          Nueva comida
+          <input
+            value={newMealTitle}
+            maxLength={80}
+            placeholder="Desayuno, snack…"
+            onChange={(event) => setNewMealTitle(event.target.value)}
+          />
+        </label>
+        <button type="submit" className="primary">Crear</button>
+      </form>
+
+      {error && <p className="error">{error}</p>}
+
+      {addingFoodFor != null && (
+        <FoodSearchSheet
+          mealId={addingFoodFor}
+          onClose={() => setAddingFoodFor(null)}
+          onAdded={(item) => {
+            setMeals((items) => items.map((meal) => (
+              meal.id === addingFoodFor ? { ...meal, items: [...meal.items, item] } : meal
+            )))
+            setAddingFoodFor(null)
+            void reloadWeek()
+          }}
         />
       )}
     </Shell>
   )
 }
 
-function weekMarks(sessions: WorkoutSession[]) {
-  const labels = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
-  const monday = new Date()
-  const delta = (monday.getDay() + 6) % 7
-  monday.setDate(monday.getDate() - delta)
-  return labels.map((label, index) => {
-    const date = new Date(monday)
-    date.setDate(monday.getDate() + index)
-    const key = todayKey(date)
-    return { label, on: sessions.some((session) => session.occurredOn === key) }
-  })
-}
-
-function RoutineSheet({ routine, onClose, onSaved }: {
-  routine: WorkoutRoutine | null
+function FoodSearchSheet({ mealId, onClose, onAdded }: {
+  mealId: number
   onClose: () => void
-  onSaved: () => void
+  onAdded: (item: Meal['items'][number]) => void
 }) {
-  const [name, setName] = useState(routine?.name ?? '')
-  const [lines, setLines] = useState((routine?.exercises.map((item) => item.name) ?? ['']).join('\n') || '')
+  const [query, setQuery] = useState('')
+  const [hits, setHits] = useState<FoodHit[]>([])
+  const [selected, setSelected] = useState<FoodHit | null>(null)
+  const [grams, setGrams] = useState('100')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  async function submit(event: FormEvent) {
+  async function search(event: FormEvent) {
     event.preventDefault()
-    const exercises = lines.split('\n').map((line) => line.trim()).filter(Boolean).map((item) => ({ name: item }))
+    const q = query.trim()
+    if (!q) return
+    setBusy(true)
+    setError('')
     try {
-      await api.saveWorkoutRoutine({ id: routine?.id, name: name.trim(), exercises })
-      onSaved()
+      const data = await api.searchFoods(q)
+      setHits(data.foods)
+      setSelected(null)
+      if (data.foods.length === 0) setError('No encontré ese alimento.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar')
+      setHits([])
+      setError(err instanceof Error ? err.message : 'No pude buscar alimentos ahora.')
+    } finally {
+      setBusy(false)
     }
   }
 
+  async function addFood(event: FormEvent) {
+    event.preventDefault()
+    if (!selected) return
+    const portion = Math.max(1, Math.round(Number(grams.replace(',', '.') || 0)))
+    if (!portion) {
+      setError('Indica los gramos')
+      return
+    }
+    const macros = scaleMacros(selected, portion)
+    setBusy(true)
+    setError('')
+    try {
+      const item = await api.addMealItem(mealId, {
+        foodName: selected.name,
+        brand: selected.brand || '',
+        offId: selected.id || '',
+        grams: portion,
+        proteinG: macros.proteinG,
+        carbsG: macros.carbsG,
+        fatG: macros.fatG,
+        kcal: macros.kcal,
+      })
+      onAdded(item)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo añadir')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const preview = selected ? scaleMacros(selected, Math.max(1, Math.round(Number(grams.replace(',', '.') || 0)))) : null
+
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void submit(event)}>
+      <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void (selected ? addFood(event) : search(event))}>
         <div className="sheet-handle" />
-        <h2>{routine ? 'Editar rutina' : 'Nueva rutina'}</h2>
-        <label className="field">Nombre<input value={name} required maxLength={80} onChange={(event) => setName(event.target.value)} /></label>
+        <h2>Añadir alimento</h2>
         <label className="field">
-          Ejercicios (uno por línea)
-          <textarea rows={5} value={lines} onChange={(event) => setLines(event.target.value)} placeholder={'Sentadilla\nPress banca\nRemo'} />
+          Buscar
+          <input
+            value={query}
+            autoFocus
+            placeholder="Ej. yogurt, pan, pollo"
+            onChange={(event) => setQuery(event.target.value)}
+          />
         </label>
-        {error && <p className="error">{error}</p>}
-        <button type="submit" className="primary">Guardar</button>
-        {routine && (
-          <button type="button" className="ghost danger" onClick={() => void api.deleteWorkoutRoutine(routine.id).then(onSaved)}>
-            Archivar
+        {!selected && (
+          <button type="submit" className="primary" disabled={busy}>
+            {busy ? 'Buscando…' : 'Buscar'}
           </button>
         )}
+        {!selected && hits.map((hit) => (
+          <button
+            key={`${hit.id}-${hit.name}`}
+            type="button"
+            className="goal-card"
+            style={{ textAlign: 'left', width: '100%' }}
+            onClick={() => setSelected(hit)}
+          >
+            <strong>{hit.name}</strong>
+            <p className="meta">
+              {hit.brand || 'Sin marca'}
+              {` · ${fmt(hit.kcal)} kcal / ${hit.perGrams || 100} g`}
+            </p>
+          </button>
+        ))}
+        {selected && (
+          <>
+            <p className="meta">{selected.name}{selected.brand ? ` · ${selected.brand}` : ''}</p>
+            <label className="field">
+              Gramos
+              <input
+                inputMode="numeric"
+                value={grams}
+                onChange={(event) => setGrams(event.target.value)}
+              />
+            </label>
+            {preview && (
+              <p className="meta">
+                P {fmt(preview.proteinG)} · C {fmt(preview.carbsG)} · G {fmt(preview.fatG)} · {fmt(preview.kcal)} kcal
+              </p>
+            )}
+            <button type="submit" className="primary" disabled={busy}>Añadir</button>
+            <button type="button" className="ghost" onClick={() => setSelected(null)}>Otra búsqueda</button>
+          </>
+        )}
+        {error && <p className="error">{error}</p>}
       </form>
     </div>
   )
 }
 
-function SessionSheet({ routine, onClose, onSaved }: {
-  routine: WorkoutRoutine
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const [rows, setRows] = useState(routine.exercises.map((item) => ({ exerciseName: item.name, reps: 10, weightKg: '' })))
-  const [error, setError] = useState('')
-
-  async function submit(event: FormEvent) {
-    event.preventDefault()
-    try {
-      await api.addWorkoutSession({
-        routineId: routine.id,
-        day: todayKey(),
-        sets: rows.map((row, index) => ({
-          exerciseName: row.exerciseName,
-          reps: row.reps,
-          weightGrams: Math.round(Number(row.weightKg.replace(',', '.') || 0) * 1000),
-          position: index,
-        })),
-      })
-      onSaved()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo registrar')
-    }
-  }
-
+function MacroStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
-      <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void submit(event)}>
-        <div className="sheet-handle" />
-        <h2>{routine.name} · hoy</h2>
-        {rows.map((row, index) => (
-          <div key={row.exerciseName} className="field">
-            <strong>{row.exerciseName}</strong>
-            <div className="switch-row">
-              <label>
-                Reps
-                <input
-                  type="number"
-                  min={0}
-                  value={row.reps}
-                  onChange={(event) => setRows((items) => items.map((item, i) => i === index ? { ...item, reps: Number(event.target.value) } : item))}
-                />
-              </label>
-              <label>
-                Peso kg
-                <input
-                  inputMode="decimal"
-                  value={row.weightKg}
-                  onChange={(event) => setRows((items) => items.map((item, i) => i === index ? { ...item, weightKg: event.target.value } : item))}
-                />
-              </label>
-            </div>
-          </div>
-        ))}
-        {error && <p className="error">{error}</p>}
-        <button type="submit" className="primary">Guardar sesión</button>
-      </form>
+    <div className="macro-stat">
+      <small>{label}</small>
+      <strong>{value}</strong>
     </div>
   )
+}
+
+function emptyMacros(day: string): DayMacros {
+  return { day, proteinG: 0, carbsG: 0, fatG: 0, kcal: 0 }
+}
+
+function sumMeals(meals: Meal[]): DayMacros {
+  return meals.reduce((acc, meal) => {
+    for (const item of meal.items) {
+      acc.proteinG += item.proteinG
+      acc.carbsG += item.carbsG
+      acc.fatG += item.fatG
+      acc.kcal += item.kcal
+    }
+    return acc
+  }, emptyMacros(''))
+}
+
+function scaleMacros(hit: FoodHit, grams: number) {
+  const base = hit.perGrams > 0 ? hit.perGrams : 100
+  const factor = grams / base
+  return {
+    proteinG: round1(hit.proteinG * factor),
+    carbsG: round1(hit.carbsG * factor),
+    fatG: round1(hit.fatG * factor),
+    kcal: round1(hit.kcal * factor),
+  }
+}
+
+function round1(value: number) {
+  return Math.round(value * 10) / 10
+}
+
+function fmt(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+function currentTime() {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
+function dayHeading(day: string, today: string) {
+  if (day === today) return 'Hoy'
+  const [y, m, d] = day.split('-').map(Number)
+  const text = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'short' }).format(new Date(y, m - 1, d))
+  return text.charAt(0).toUpperCase() + text.slice(1)
 }

@@ -5,6 +5,7 @@ import { atLocalDate, todayKey } from './format'
 import type { Habit, MonthMoney, Task, TaskInput, TaskList } from './types'
 import { TaskSheet } from './components/TaskSheet'
 import { HabitSheet, MoneySheet } from './components/CaptureSheets'
+import { MoneyChat } from './components/MoneyChat'
 import { UnifiedCapture } from './components/UnifiedCapture'
 import { PayConfirm } from './components/PlanSheets'
 import { MyDay } from './screens/MyDay'
@@ -38,6 +39,7 @@ export function App() {
   const [habitOpen, setHabitOpen] = useState(false)
   const [habitEdit, setHabitEdit] = useState<Habit | null>(null)
   const [moneyOpen, setMoneyOpen] = useState(false)
+  const [moneyChatOpen, setMoneyChatOpen] = useState(false)
   const [captureOpen, setCaptureOpen] = useState(false)
   const [lifeTick, setLifeTick] = useState(0)
   const [payTask, setPayTask] = useState<Task | null>(null)
@@ -213,6 +215,13 @@ export function App() {
               onCreateTask={() => setSheet({ mode: 'create', listId: defaultList })}
               onCreateHabit={() => { setHabitEdit(null); setHabitOpen(true) }}
               onCreateMoney={() => setMoneyOpen(true)}
+              onMoneyChat={() => {
+                if (!navigator.onLine || !money) {
+                  setMoneyOpen(true)
+                  return
+                }
+                setMoneyChatOpen(true)
+              }}
               onCapture={() => setCaptureOpen(true)}
               onToggleHabit={(habit) => void toggleHabit(habit)}
               onEditHabit={(habit) => { setHabitEdit(habit); setHabitOpen(true) }}
@@ -344,6 +353,20 @@ export function App() {
             const category = await api.createCategory(name, kind)
             loadLife()
             return category
+          }}
+        />
+      )}
+      {moneyChatOpen && money && (
+        <MoneyChat
+          money={money}
+          userKey={accountEmail}
+          onClose={() => setMoneyChatOpen(false)}
+          onSaved={() => {
+            loadLife()
+          }}
+          onOffline={() => {
+            setMoneyChatOpen(false)
+            setMoneyOpen(true)
           }}
         />
       )}

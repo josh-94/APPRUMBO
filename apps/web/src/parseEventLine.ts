@@ -7,23 +7,41 @@ export type ParsedEventLine = {
   durationMin: number
   allDay: boolean
   preview: string
+  dateFromText: boolean
+  timeFromText: boolean
 }
 
 const MONTHS: Record<string, number> = {
   enero: 1,
+  ene: 1,
   febrero: 2,
+  feb: 2,
   marzo: 3,
+  mar: 3,
   abril: 4,
+  abr: 4,
   mayo: 5,
+  may: 5,
   junio: 6,
+  jun: 6,
   julio: 7,
+  jul: 7,
   agosto: 8,
+  ago: 8,
   setiembre: 9,
   septiembre: 9,
+  sep: 9,
+  set: 9,
   octubre: 10,
+  oct: 10,
   noviembre: 11,
+  nov: 11,
   diciembre: 12,
+  dic: 12,
 }
+
+const MONTH_ALT =
+  'enero|ene|febrero|feb|marzo|mar|abril|abr|mayo|may|junio|jun|julio|jul|agosto|ago|setiembre|septiembre|sep|set|octubre|oct|noviembre|nov|diciembre|dic'
 
 const WEEKDAYS: Record<string, number> = {
   domingo: 0,
@@ -57,10 +75,14 @@ function nextWeekday(from: Date, target: number) {
 }
 
 function parseAbsoluteDate(text: string, now: Date): { date: string; rest: string } | null {
-  const named = text.match(/\b(\d{1,2})\s*(?:de\s+)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|setiembre|septiembre|octubre|noviembre|diciembre)(?:\s+(?:de\s+)?(\d{4}))?\b/i)
+  const namedRe = new RegExp(
+    String.raw`\b(?:el\s+)?(\d{1,2})\s*(?:de\s+)?(${MONTH_ALT})\.?(?:\s+(?:de\s+)?(\d{4}))?\b`,
+    'i',
+  )
+  const named = text.match(namedRe)
   if (named) {
     const day = Number(named[1])
-    const month = MONTHS[named[2].toLowerCase()]
+    const month = MONTHS[named[2].toLowerCase().replace(/\.$/, '')]
     const year = named[3] ? Number(named[3]) : now.getFullYear()
     if (month && day >= 1 && day <= 31) {
       let date = ymd(year, month, day)
@@ -138,22 +160,28 @@ export function parseEventLine(raw: string, now = new Date()): ParsedEventLine {
   let time = ''
   let durationMin = 60
   let allDay = false
+  let dateFromText = false
+  let timeFromText = false
 
   const absolute = parseAbsoluteDate(text, now)
   if (absolute) {
     date = absolute.date
     text = absolute.rest
+    dateFromText = true
   } else {
     const lower = text.toLowerCase()
     if (/\bpasado mañana\b/.test(lower)) {
       date = shiftDay(now, 2)
       text = text.replace(/\bpasado mañana\b/gi, '').trim()
+      dateFromText = true
     } else if (/\bmañana\b/.test(lower)) {
       date = shiftDay(now, 1)
       text = text.replace(/\bmañana\b/gi, '').trim()
+      dateFromText = true
     } else if (/\bhoy\b/.test(lower)) {
       date = todayKey(now)
       text = text.replace(/\bhoy\b/gi, '').trim()
+      dateFromText = true
     } else {
       const weekday = text.match(/\b(?:el\s+)?(domingo|lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado)\b/i)
       if (weekday) {
@@ -161,6 +189,7 @@ export function parseEventLine(raw: string, now = new Date()): ParsedEventLine {
         if (target !== undefined) {
           date = nextWeekday(now, target)
           text = text.replace(weekday[0], ' ').replace(/\s{2,}/g, ' ').trim()
+          dateFromText = true
         }
       }
     }
@@ -169,12 +198,15 @@ export function parseEventLine(raw: string, now = new Date()): ParsedEventLine {
   if (/\bpor la mañana\b/.test(text.toLowerCase())) {
     time = '09:00'
     text = text.replace(/\bpor la mañana\b/gi, '').trim()
+    timeFromText = true
   } else if (/\bpor la tarde\b/.test(text.toLowerCase())) {
     time = '18:00'
     text = text.replace(/\bpor la tarde\b/gi, '').trim()
+    timeFromText = true
   } else if (/\bpor la noche\b/.test(text.toLowerCase())) {
     time = '20:00'
     text = text.replace(/\bpor la noche\b/gi, '').trim()
+    timeFromText = true
   }
 
   const durationMatch = text.match(/\b(\d+(?:[.,]\d+)?)\s*(h|hr|hrs|hora|horas|min|mins|minuto|minutos)\b/i)
@@ -192,12 +224,14 @@ export function parseEventLine(raw: string, now = new Date()): ParsedEventLine {
   if (extracted) {
     time = extracted.time
     text = extracted.rest
+    timeFromText = true
   }
 
   if (/\btodo el día\b/i.test(text)) {
     allDay = true
     time = ''
     text = text.replace(/\btodo el día\b/gi, '').trim()
+    timeFromText = true
   }
 
   text = text.replace(/^[+·\-\s]+/, '').replace(/\s{2,}/g, ' ').trim()
@@ -211,6 +245,8 @@ export function parseEventLine(raw: string, now = new Date()): ParsedEventLine {
     durationMin: allDay ? 24 * 60 : durationMin,
     allDay,
     preview,
+    dateFromText,
+    timeFromText,
   }
 }
 
@@ -249,15 +285,33 @@ export function dateChipLabel(day: string, now = new Date()) {
   return new Intl.DateTimeFormat('es', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(y, m - 1, d))
 }
 
+export type LocalCapture = {
+  kind: 'evento' | 'tarea' | 'recordatorio' | 'gasto'
+  title: string
+  day: string
+  time: string
+  durationMin: number
+  allDay: boolean
+  remind: boolean
+  amountCents: number
+  currency: 'pen'
+  categoryId: number
+  category: string
+  confidence: 'baja'
+  question: string
+  dateFromText: boolean
+  timeFromText: boolean
+}
+
 /** Map local parse into the shape used by capture draft UI. */
 export function localCaptureFromLine(
   raw: string,
   intent: 'evento' | 'tarea' | 'recordatorio' | 'gasto' | 'auto' = 'evento',
   now = new Date(),
-) {
+): LocalCapture {
   const parsed = parseEventLine(raw, now)
   const kind: 'evento' | 'tarea' | 'recordatorio' | 'gasto' = intent === 'auto' ? 'evento' : intent
-  const remind = kind === 'recordatorio' || (kind === 'tarea' && Boolean(parsed.time))
+  const remind = kind === 'recordatorio' || (kind === 'tarea' && parsed.timeFromText)
   let amountCents = 0
   if (kind === 'gasto') {
     const money = raw.match(/(?:s\s*\/\s*)?(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:soles?)?/i)
@@ -275,10 +329,37 @@ export function localCaptureFromLine(
     allDay: kind === 'evento' ? parsed.allDay : false,
     remind: kind === 'recordatorio' ? true : remind,
     amountCents,
-    currency: 'pen' as const,
+    currency: 'pen',
     categoryId: 0,
     category: '',
-    confidence: 'baja' as const,
+    confidence: 'baja',
     question: '',
+    dateFromText: parsed.dateFromText,
+    timeFromText: parsed.timeFromText || parsed.allDay,
   }
+}
+
+const TITLE_LEFTOVER =
+  /\b(hoy|mañana|ayer|pasado\s+mañana|a\s+las?|\d{1,2}:\d{2}|\d{1,2}\s*(a\.?\s*m\.?|p\.?\s*m\.?|am|pm)|por\s+la\s+(mañana|tarde|noche)|todo\s+el\s+día)\b/i
+
+/** True when local rules are enough — skip Ollama for speed. */
+export function isClearCapture(
+  raw: string,
+  local: LocalCapture,
+  intent: 'evento' | 'tarea' | 'recordatorio' | 'gasto' | 'auto',
+): boolean {
+  if (intent === 'gasto') return false
+  const title = local.title.trim()
+  if (title.length < 2) return false
+  if (TITLE_LEFTOVER.test(title)) return false
+  const monthLeft = new RegExp(String.raw`\b(?:el\s+)?\d{1,2}\s*(?:de\s+)?(?:${MONTH_ALT})\.?\b`, 'i')
+  if (monthLeft.test(title)) return false
+  if (title.toLowerCase() === raw.trim().toLowerCase() && (local.dateFromText || local.timeFromText)) {
+    return false
+  }
+  if (intent === 'evento' || (intent === 'auto' && local.kind === 'evento')) {
+    return local.dateFromText && (local.timeFromText || local.allDay)
+  }
+  // tarea / recordatorio: título limpio basta; fecha/hora opcionales (defaults locales)
+  return true
 }

@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { categoryIcon, categoryTint } from '../categories'
 import { CategorySheet, MoneySheet } from '../components/CaptureSheets'
-import { MoneyChat } from '../components/MoneyChat'
 import { AccountSheet, BillSheet, DebtMoveSheet, DebtSheet } from '../components/PlanSheets'
 import { EyeButton, useHideMoney } from '../components/HideMoney'
 import { Shell } from '../components/Shell'
@@ -19,8 +18,6 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
   const [money, setMoney] = useState<MonthMoney | null>(null)
   const [editing, setEditing] = useState<Movement | null>(null)
   const [adding, setAdding] = useState(false)
-  const [chat, setChat] = useState(false)
-  const [offlineNote, setOfflineNote] = useState(false)
   const [query, setQuery] = useState('')
   const [kindFilter, setKindFilter] = useState<'todos' | 'gasto' | 'ingreso'>('todos')
   const viewingNow = month === current
@@ -133,7 +130,9 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
                     <span className="move-mark" aria-hidden="true">{title.trim().charAt(0).toUpperCase()}</span>
                     <span className="move-copy">
                       <strong>{title}</strong>
-                      <span className="meta">{item.accountName ? `${item.accountName} · ` : ''}{movementDate(item.occurredOn)}</span>
+                      <span className="meta">
+                        {[item.category, item.accountName, movementDate(item.occurredOn)].filter(Boolean).join(' · ')}
+                      </span>
                     </span>
                     <strong className="move-amount">{movementAmount(item.kind, item.amountCents, item.currency, money?.currency || 'PEN', hidden)}</strong>
                     <span className="move-chevron" aria-hidden="true">›</span>
@@ -145,20 +144,6 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
         </>
       )}
 
-      {offlineNote && <p className="hint">Hace falta conexión. Anótalo a mano.</p>}
-      <button type="button" className="spend-fab chat" aria-label="Contar un gasto" onClick={() => {
-        if (!navigator.onLine || !money) {
-          setOfflineNote(!navigator.onLine)
-          onCreate()
-          return
-        }
-        setOfflineNote(false)
-        setChat(true)
-      }}>
-        <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.75">
-          <path d="M5 6h14v9H8l-3 3V6Z" />
-        </svg>
-      </button>
       <button type="button" className="spend-fab" aria-label="Anotar gasto" onClick={() => { setMonth(current); onCreate() }}>
         <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
           <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
@@ -188,18 +173,6 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
           onSave={async (name, icon, tint) => {
             await api.createCategory(name, 'gasto', { icon, tint })
             onChanged()
-          }}
-        />
-      )}
-      {chat && money && (
-        <MoneyChat
-          money={money}
-          onClose={() => setChat(false)}
-          onSaved={onChanged}
-          onOffline={() => {
-            setChat(false)
-            setOfflineNote(true)
-            onCreate()
           }}
         />
       )}
@@ -511,7 +484,9 @@ export function AccountHistory() {
                 <span className="move-mark" aria-hidden="true">{title.trim().charAt(0).toUpperCase()}</span>
                 <span className="move-copy">
                   <strong>{title}</strong>
-                  <span className="meta">{item.kind === 'ingreso' ? 'Ingreso' : 'Gasto'} · {movementDate(item.occurredOn)}</span>
+                  <span className="meta">
+                    {[item.category || (item.kind === 'ingreso' ? 'Ingreso' : 'Gasto'), movementDate(item.occurredOn)].join(' · ')}
+                  </span>
                 </span>
                 <strong className="move-amount">{movementAmount(item.kind, item.amountCents, item.currency, money?.currency || 'PEN', hidden)}</strong>
                 <span className="move-chevron" aria-hidden="true">›</span>

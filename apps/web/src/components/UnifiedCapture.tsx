@@ -35,12 +35,13 @@ export function UnifiedCapture({
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [moneyPrefill, setMoneyPrefill] = useState<Movement | null>(null)
-  const { draft, loading: drafting } = useCaptureDraft(line, kind)
+  const { draft, loading: drafting } = useCaptureDraft(line, kind, money)
 
   const previewTitle = draft?.title || ''
   const moneyReady = useMemo(() => {
     if (!draft || draft.kind !== 'gasto') return false
-    return draft.confidence === 'alta' && draft.amountCents > 0 && draft.categoryId > 0
+    const hasSource = Boolean(draft.debtId || draft.accountId)
+    return draft.confidence === 'alta' && draft.amountCents > 0 && draft.categoryId > 0 && hasSource
   }, [draft])
 
   if (moneyPrefill && money) {
@@ -70,16 +71,12 @@ export function UnifiedCapture({
           return
         }
         if (moneyReady) {
-          const accountId = money.accounts[0]?.id
-          if (!accountId) {
-            setError('Crea una cuenta primero.')
-            return
-          }
           await onSaveMoney({
             kind: 'gasto',
             currency: draft.currency === 'usd' ? 'usd' : 'pen',
             amountCents: draft.amountCents,
-            accountId,
+            accountId: draft.debtId ? undefined : (draft.accountId || money.accounts[0]?.id),
+            debtId: draft.debtId || undefined,
             categoryId: draft.categoryId,
             day: draft.day || todayKey(),
             note: draft.title,
@@ -89,14 +86,14 @@ export function UnifiedCapture({
         }
         setMoneyPrefill({
           id: 0,
-          accountId: money.accounts[0]?.id ?? 0,
-          debtId: 0,
+          accountId: draft.accountId || money.accounts[0]?.id || 0,
+          debtId: draft.debtId || 0,
           categoryId: draft.categoryId || 0,
           kind: 'gasto',
           currency: draft.currency === 'usd' ? 'usd' : 'pen',
           amountCents: draft.amountCents || 0,
           occurredOn: draft.day || todayKey(),
-          accountName: '',
+          accountName: draft.sourceName || '',
           category: draft.category || '',
           note: draft.title || line.trim(),
         })
@@ -108,7 +105,7 @@ export function UnifiedCapture({
         setError('Crea una lista primero.')
         return
       }
-      const time = draft.time || (kind === 'recordatorio' ? '09:00' : '09:00')
+      const time = draft.time || '09:00'
       const remind = kind === 'recordatorio' ? true : draft.remind || Boolean(draft.time)
       await onSaveTask({
         listId,
@@ -144,7 +141,7 @@ export function UnifiedCapture({
             autoFocus
             placeholder={
               kind === 'gasto'
-                ? 'gaste 25 en farmacia'
+                ? 'gaste 25 en farmacia con amex'
                 : kind === 'recordatorio'
                   ? 'Pagar luz mañana 6pm'
                   : 'Reunión mañana 8am'
@@ -165,6 +162,7 @@ export function UnifiedCapture({
               {kind === 'gasto' && draft.amountCents > 0 ? (
                 <span className="chip quiet">{formatMoneyChip(draft.amountCents, draft.currency)}</span>
               ) : null}
+              {kind === 'gasto' && draft.sourceName ? <span className="chip quiet">{draft.sourceName}</span> : null}
               {kind === 'gasto' && draft.category ? <span className="chip quiet">{draft.category}</span> : null}
               {kind === 'gasto' && draft.day ? <span className="chip quiet">{dateChipLabel(draft.day)}</span> : null}
             </div>

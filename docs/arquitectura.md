@@ -33,7 +33,7 @@ nginx está en [apps/web/nginx.conf](../apps/web/nginx.conf). Los archivos de la
 
 ## Qué corre en la placa
 
-Producción es el perfil `tunnel` de [deploy/compose.yaml](../deploy/compose.yaml). Un solo `docker compose` levanta todo en la misma máquina.
+Producción es el perfil `tunnel` de [deploy/compose.yaml](../deploy/compose.yaml). Un solo `docker compose` levanta todo en la misma máquina. La placa tiene unos 8 GB de RAM; el presupuesto de abajo deja margen para el SO y Docker.
 
 | Servicio | Qué hace | Tope de memoria |
 | --- | --- | --- |
@@ -43,13 +43,13 @@ Producción es el perfil `tunnel` de [deploy/compose.yaml](../deploy/compose.yam
 | `worker` | Lee esa cola y manda el push. | 64 MiB |
 | `web` | nginx. Estáticos y proxy hacia la API. | 64 MiB |
 | `cloudflared` | Túnel. El token vive en `deploy/.env`, que no está en git. | 128 MiB |
-| `ollama` | Qwen2.5 1.5B para texto y voz. Qwen2.5-VL 3B solo si hay foto. Un modelo a la vez, y se descarga a los 10 minutos. | 3.5 GiB |
-| `ollama-pull` | Baja ese modelo la primera vez y sale. No se queda encendido. | 128 MiB |
-| `whisper` | Whisper small. Transcribe la voz en español y convierte el audio del teléfono a wav. | 768 MiB |
+| `ollama` | Gemma3 1B para texto y voz. Qwen2.5-VL 3B para foto. Los dos pueden quedar cargados (`MAX_LOADED_MODELS=2`) y no se descargan por idle (`KEEP_ALIVE=-1`). | 5.5 GiB |
+| `ollama-pull` | Baja esos modelos la primera vez, los calienta y sale. No se queda encendido. | 128 MiB |
+| `whisper` | Whisper small. Transcribe la voz en español y convierte el audio del teléfono a wav (2 hilos de CPU). | 768 MiB |
 
 Redis no guarda la sesión de cada visita: la cookie viaja con el navegador y la API la verifica sola.
 
-Ollama y Whisper no publican puertos y no salen por el túnel. Solo la API les habla, dentro de la red de Docker. Los pesos quedan en los volúmenes `ollamadata` y `whispermodels`. El primer arranque los descarga; hasta que termina, el chat dice que el modelo se está preparando. El borrador no se guarda solo: la persona lo confirma y ahí la API anota el movimiento.
+Ollama y Whisper no publican puertos y no salen por el túnel. Solo la API les habla, dentro de la red de Docker. Los pesos quedan en los volúmenes `ollamadata` y `whispermodels`. El primer arranque los descarga y deja los modelos en RAM; hasta que termina, el chat dice que el modelo se está preparando. La API manda `num_thread` (`OLLAMA_NUM_THREAD`, por defecto 4) y contextos cortos. El borrador no se guarda solo: la persona lo confirma y ahí la API anota el movimiento.
 
 El reloj de la app sale de `APP_TIMEZONE` en `deploy/.env`. El ejemplo del repo dice `America/Bogota`. Lima marca la misma hora (UTC−5, sin horario de verano).
 

@@ -1,7 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import type { MoneyCategory, MonthMoney, Movement, MovementInput } from '../types'
 import { categoryIcon, categoryIcons, categoryTints } from '../categories'
 import { centsToInput, currencySymbol, todayKey } from '../format'
+import { dateChipLabel } from '../parseEventLine'
+import { useCaptureDraft } from '../useCaptureDraft'
 
 type MoneySource = { type: 'account'; id: number } | { type: 'debt'; id: number }
 
@@ -135,6 +137,35 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
   const [newName, setNewName] = useState('')
   const [error, setError] = useState('')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [phrase, setPhrase] = useState('')
+  const phraseEnabled = !movement?.id && kind === 'gasto'
+  const { draft, loading: drafting } = useCaptureDraft(phraseEnabled ? phrase : '', 'gasto', money)
+
+  useEffect(() => {
+    if (!phraseEnabled || !phrase.trim() || !draft) return
+    if (draft.amountCents > 0) setAmount(centsToInput(draft.amountCents))
+    if (draft.currency === 'usd' || draft.currency === 'pen') setCurrency(draft.currency)
+    if (draft.title.trim()) setNote(draft.title.trim())
+    if (draft.day) setDay(draft.day)
+    if (draft.categoryId > 0) setCategoryId(draft.categoryId)
+    if (draft.debtId) setSource({ type: 'debt', id: draft.debtId })
+    else if (draft.accountId) setSource({ type: 'account', id: draft.accountId })
+  }, [draft, phrase, phraseEnabled])
+
+  const noteSuggestions = uniqueNotes(money.movements, kind)
+  const categories = [...money.categories, ...created].filter((item, index, all) => item.kind === kind && all.findIndex((other) => other.id === item.id) === index)
+  const explicit = categoryId && categories.some((item) => item.id === categoryId) ? categoryId : 0
+  const otros = categories.find((item) => item.name === 'Otros')
+  const selected = explicit || (kind === 'gasto' && note.trim() && otros ? otros.id : categories[0]?.id)
+  const selectedCategory = categories.find((item) => item.id === selected)
+  const sourceReady = source.id > 0 && (source.type === 'account' || kind === 'gasto')
+  const sourceLabel = source.type === 'debt'
+    ? cards.find((item) => item.id === source.id)?.name
+    : money.accounts.find((item) => item.id === source.id)?.name
+  const cents = toCents(amount)
+  const amountLabel = cents
+    ? `${currency === 'usd' ? '$' : homeSymbol} ${(cents / 100).toFixed(2)}`
+    : ''
 
   function chooseSource(next: MoneySource) {
     setSource(next)
@@ -145,11 +176,6 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
       setCurrency('pen')
     }
   }
-  const categories = [...money.categories, ...created].filter((item, index, all) => item.kind === kind && all.findIndex((other) => other.id === item.id) === index)
-  const explicit = categoryId && categories.some((item) => item.id === categoryId) ? categoryId : 0
-  const otros = categories.find((item) => item.name === 'Otros')
-  const selected = explicit || (kind === 'gasto' && note.trim() && otros ? otros.id : categories[0]?.id)
-  const sourceReady = source.id > 0 && (source.type === 'account' || kind === 'gasto')
 
   function chooseKind(next: 'gasto' | 'ingreso') {
     setKind(next)
@@ -157,6 +183,7 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
     setAdding(false)
     setNewName('')
     setError('')
+    if (next === 'ingreso') setPhrase('')
     if (next === 'ingreso' && source.type === 'debt') {
       setSource(money.accounts[0] ? { type: 'account', id: money.accounts[0].id } : { type: 'account', id: 0 })
     }
@@ -182,7 +209,6 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    const cents = toCents(amount)
     if (!cents || !selected || !sourceReady) {
       setError(sourceReady ? 'Ese monto no parece correcto. Usa solo números, por ejemplo 25.50.' : 'Elige de dónde sale o a dónde entra el dinero.')
       return
@@ -206,48 +232,111 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void submit(event)}>
+      <form className="sheet money-sheet" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void submit(event)}>
         <div className="sheet-handle" />
-        <h2>{movement?.id ? (kind === 'gasto' ? 'Editar gasto' : 'Editar ingreso') : (kind === 'gasto' ? 'Anotar gasto' : 'Anotar ingreso')}</h2>
-        <div className="switch-row">
+        <div className="sheet-top">
+          <h2>{movement?.id ? (kind === 'gasto' ? 'Editar gasto' : 'Editar ingreso') : (kind === 'gasto' ? 'Anotar gasto' : 'Anotar ingreso')}</h2>
+          <button type="button" className="sheet-close" aria-label="Cerrar" onClick={onClose}>×</button>
+        </div>
+
+        <div className="switch-row money-kind">
           <button type="button" className={kind === 'gasto' ? 'pill on' : 'pill quiet'} onClick={() => chooseKind('gasto')}>Gasto</button>
           <button type="button" className={kind === 'ingreso' ? 'pill on' : 'pill quiet'} onClick={() => chooseKind('ingreso')}>Ingreso</button>
         </div>
-        <div className="amount-field">
-          <div className="currency-toggle" role="group" aria-label="Moneda">
-            <button type="button" className={currency === 'pen' ? 'on' : ''} aria-pressed={currency === 'pen'} onClick={() => setCurrency('pen')}>{homeSymbol}</button>
-            {homeCurrency !== 'USD' && (
-              <button type="button" className={currency === 'usd' ? 'on' : ''} aria-pressed={currency === 'usd'} onClick={() => setCurrency('usd')}>$</button>
+
+        {phraseEnabled && (
+          <>
+            <label className="field">
+              Qué gastaste
+              <input
+                value={phrase}
+                autoFocus
+                placeholder="gaste 25 en farmacia con amex"
+                onChange={(event) => setPhrase(event.target.value)}
+              />
+            </label>
+            {phrase.trim() && draft && (
+              <div className="plan-parse money-parse">
+                <p className="plan-parse-preview">
+                  Se guarda: “{draft.title || '…'}”
+                  {drafting ? <span className="hint"> · Entendiendo…</span> : null}
+                </p>
+                <div className="plan-parse-chips">
+                  {draft.amountCents > 0 ? (
+                    <span className="chip quiet">
+                      {currencySymbol(draft.currency === 'usd' ? 'USD' : 'PEN')} {(draft.amountCents / 100).toFixed(2)}
+                    </span>
+                  ) : null}
+                  {draft.sourceName ? <span className="chip quiet">{draft.sourceName}</span> : null}
+                  {draft.category ? <span className="chip quiet">{draft.category}</span> : null}
+                  {draft.day ? <span className="chip quiet">{dateChipLabel(draft.day)}</span> : null}
+                </div>
+                {draft.question ? <p className="hint">{draft.question}</p> : null}
+              </div>
             )}
+          </>
+        )}
+
+        <div className="amount-field money-amount">
+          {homeCurrency !== 'USD' && (
+            <div className="currency-toggle" role="group" aria-label="Moneda">
+              <button type="button" className={currency === 'pen' ? 'on' : ''} aria-pressed={currency === 'pen'} onClick={() => setCurrency('pen')}>
+                Soles
+              </button>
+              <button type="button" className={currency === 'usd' ? 'on' : ''} aria-pressed={currency === 'usd'} onClick={() => setCurrency('usd')}>
+                Dólares
+              </button>
+            </div>
+          )}
+          <div className="amount-value">
+            <span className="amount-prefix" aria-hidden="true">{currency === 'usd' ? '$' : homeSymbol}</span>
+            <input
+              className="amount-input"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={amount}
+              autoFocus={!phraseEnabled}
+              onChange={(event) => setAmount(event.target.value)}
+            />
           </div>
-          <input
-            className="amount-input"
-            inputMode="decimal"
-            placeholder="0.00"
-            value={amount}
-            autoFocus
-            onChange={(event) => setAmount(event.target.value)}
-          />
         </div>
+
         <label className="field">
           {kind === 'gasto' ? 'Gastaste en…' : 'De dónde'}
           <input
+            list="money-note-suggestions"
             value={note}
             maxLength={80}
             placeholder={kind === 'gasto' ? 'Farmacia, regalo, cine…' : 'Sueldo, yape, venta…'}
             onChange={(event) => setNote(event.target.value)}
           />
         </label>
+        <datalist id="money-note-suggestions">
+          {noteSuggestions.map((item) => (
+            <option key={item} value={item} />
+          ))}
+        </datalist>
+        {noteSuggestions.length > 0 && (
+          <div className="money-suggest">
+            {noteSuggestions.slice(0, 6).map((item) => (
+              <button key={item} type="button" className="chip quiet" onClick={() => setNote(item)}>
+                {item}
+              </button>
+            ))}
+          </div>
+        )}
+
         {movement && (
           <label className="field">
             Día
             <input type="date" required max={todayKey()} value={day} onChange={(event) => setDay(event.target.value)} />
           </label>
         )}
-        <p className="field-label">
-          {kind === 'gasto' ? '¿De qué cuenta o tarjeta sale?' : '¿En qué cuenta entra?'}
+
+        <p className="field-label money-section-label">
+          {kind === 'gasto' ? 'Sale de' : 'Entra a'}
         </p>
-        <div className="chips">
+        <div className="chips money-source-chips">
           {money.accounts.map((account) => (
             <button
               key={`a-${account.id}`}
@@ -262,15 +351,16 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
             <button
               key={`c-${card.id}`}
               type="button"
-              className={source.type === 'debt' && source.id === card.id ? 'pill on' : 'pill quiet'}
+              className={source.type === 'debt' && source.id === card.id ? 'pill on source-card' : 'pill quiet source-card'}
               onClick={() => chooseSource({ type: 'debt', id: card.id })}
             >
               {card.name}
             </button>
           ))}
         </div>
-        <p className="field-label">Opcional. Si se repite, guárdalo como categoría.</p>
-        <div className="chips">
+
+        <p className="field-label money-section-label">Categoría</p>
+        <div className="chips money-cat-chips">
           {categories.map((item) => (
             <button
               key={item.id}
@@ -278,11 +368,12 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
               className={item.id === selected ? 'pill on' : 'pill quiet'}
               onClick={() => setCategoryId(item.id)}
             >
-              {categoryIcon(item.icon)} {item.name}
+              <span className="cat-ico" aria-hidden="true">{categoryIcon(item.icon)}</span>
+              {item.name}
             </button>
           ))}
           <button type="button" className={adding ? 'pill on' : 'pill quiet'} onClick={() => setAdding((open) => !open)}>
-            + Categoría
+            + Nueva
           </button>
           {adding && (
             <div className="chip-add">
@@ -303,14 +394,25 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
             </div>
           )}
         </div>
+
+        {(amountLabel || sourceLabel || selectedCategory) && (
+          <p className="money-summary" aria-live="polite">
+            {[
+              amountLabel ? `${kind === 'gasto' ? '−' : '+'} ${amountLabel}` : null,
+              sourceLabel,
+              selectedCategory?.name,
+            ].filter(Boolean).join(' · ')}
+          </p>
+        )}
+
         {error && <p className="error">{error}</p>}
-        <button type="submit" className="primary">{movement ? 'Guardar' : 'Listo'}</button>
-        {movement && onDelete && !confirmingDelete && (
+        <button type="submit" className="primary">{movement?.id ? 'Guardar' : 'Listo'}</button>
+        {movement?.id && onDelete && !confirmingDelete && (
           <button type="button" className="ghost danger" onClick={() => setConfirmingDelete(true)}>
             Borrar
           </button>
         )}
-        {movement && onDelete && confirmingDelete && (
+        {movement?.id && onDelete && confirmingDelete && (
           <div className="confirm-delete">
             <p>¿Borrar este {kind === 'gasto' ? 'gasto' : 'ingreso'}?</p>
             <button type="button" className="ghost" onClick={() => setConfirmingDelete(false)}>Cancelar</button>
@@ -322,6 +424,22 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
       </form>
     </div>
   )
+}
+
+function uniqueNotes(movements: Movement[], kind: 'gasto' | 'ingreso') {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const item of movements) {
+    if (item.kind !== kind) continue
+    const note = item.note.trim()
+    if (!note) continue
+    const key = note.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(note)
+    if (out.length >= 8) break
+  }
+  return out
 }
 
 export function CategorySheet({ onClose, onSave }: {

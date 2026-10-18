@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, type AgendaItem } from '../api'
-import type { Goal, Habit, HomeCard, Task, WorkoutSession } from '../types'
-import { currencySymbol, displayName, soles, todayKey, weekChips } from '../format'
+import type { Goal, GymWeek, Habit, HomeCard, Task } from '../types'
+import { currencySymbol, displayName, soles, todayKey, weekChips, weekStartKey } from '../format'
 import { habitCountOn, habitDoneOn, habitMetaLine } from '../habitUtils'
 import { Shell } from '../components/Shell'
 import { TaskRow } from '../components/TaskRow'
@@ -17,6 +17,7 @@ type Props = {
   onCreateTask: () => void
   onCreateHabit: () => void
   onCreateMoney: () => void
+  onMoneyChat: () => void
   onCapture: () => void
   onToggleHabit: (habit: Habit) => void
   onEditHabit?: (habit: Habit) => void
@@ -42,6 +43,7 @@ export function MyDay({
   onCreateTask,
   onCreateHabit,
   onCreateMoney,
+  onMoneyChat,
   onCapture,
   onToggleHabit,
   onEditHabit,
@@ -56,14 +58,14 @@ export function MyDay({
   const { hidden } = useHideMoney()
   const [cards, setCards] = useState<HomeCard[]>(['agenda', 'habits', 'goals', 'workouts'])
   const [goals, setGoals] = useState<Goal[]>([])
-  const [sessions, setSessions] = useState<WorkoutSession[]>([])
+  const [gymWeek, setGymWeek] = useState<GymWeek | null>(null)
   const [agendaDay, setAgendaDay] = useState(todayKey())
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([])
 
   useEffect(() => {
     api.homePrefs().then((data) => setCards(data.cards)).catch(() => undefined)
     api.goals().then((data) => setGoals(data.goals)).catch(() => setGoals([]))
-    api.workoutSessions().then((data) => setSessions(data.sessions)).catch(() => setSessions([]))
+    api.gymWeek().then(setGymWeek).catch(() => setGymWeek(null))
   }, [])
 
   useEffect(() => {
@@ -71,9 +73,30 @@ export function MyDay({
   }, [agendaDay, tasks, habits])
 
   const today = todayKey()
-  const todaySessions = sessions.filter((item) => item.occurredOn === today)
+  const todayWeekday = (new Date().getDay() + 6) % 7
+  const plannedToday = gymWeek?.weekdays.includes(todayWeekday) ?? false
+  const todayLog = gymWeek?.logs.find((log) => log.day === today)
+  const gymSubtitle = todayLog?.attended
+    ? `Fuiste a las ${todayLog.attendedAt || '—'}`
+    : plannedToday
+      ? 'Hoy vas'
+      : 'Día de descanso'
   const activeGoal = goals[0]
   const agendaTasks = agendaItems.filter((item) => item.type === 'task')
+
+  async function toggleGymPlan(weekday: number) {
+    const weekStart = gymWeek?.weekStart || weekStartKey()
+    const current = new Set(gymWeek?.weekdays ?? [])
+    if (current.has(weekday)) current.delete(weekday)
+    else current.add(weekday)
+    const weekdays = [...current].sort((a, b) => a - b)
+    try {
+      const next = await api.setGymWeek(weekStart, weekdays)
+      setGymWeek(next)
+    } catch {
+      /* keep previous */
+    }
+  }
 
   return (
     <Shell tabs>
@@ -90,6 +113,12 @@ export function MyDay({
         <button type="button" className="quick-card" onClick={onCapture}><i>+</i>Anotar</button>
         <Link className="quick-card" to="/habitos"><i>o</i>Hábitos</Link>
       </div>
+
+      <button type="button" className="spend-fab chat" aria-label="Contar gasto" onClick={onMoneyChat}>
+        <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.75">
+          <path d="M5 6h14v9H8l-3 3V6Z" />
+        </svg>
+      </button>
 
       {cards.map((card) => {
         if (card === 'agenda') {
@@ -147,10 +176,15 @@ export function MyDay({
             <section key={card} className="home-card paper-card">
               <div className="section-head">
                 <h2 className="section-label">{cardLabels.habits}</h2>
-                <Link className="text-button" to="/habitos">Ver todo</Link>
+                <Link className="section-more" to="/habitos" aria-label="Hábitos">›</Link>
               </div>
               <p className="meta">{habits.filter((h) => habitDoneOn(h, today)).length}/{habits.length} hoy</p>
-              {habits.length === 0 && <p className="empty">Sin hábitos aún. <button type="button" className="text-button" onClick={onCreateHabit}>Crear uno</button></p>}
+              {habits.length === 0 && (
+                <p className="empty">
+                  Sin hábitos aún.{' '}
+                  <button type="button" className="text-button" onClick={onCreateHabit}>Crear uno</button>
+                </p>
+              )}
               {habits.map((habit) => (
                 <HabitRow
                   key={habit.id}
@@ -168,7 +202,7 @@ export function MyDay({
             <section key={card} className="home-card paper-card">
               <div className="section-head">
                 <h2 className="section-label">{cardLabels.goals}</h2>
-                <Link className="text-button" to="/plata/metas">Ver todo</Link>
+                <Link className="section-more" to="/plata/metas" aria-label="Metas">›</Link>
               </div>
               {!activeGoal && <p className="empty">Sin metas activas. <Link to="/plata/metas">Crear una</Link></p>}
               {activeGoal && (
@@ -192,10 +226,13 @@ export function MyDay({
           <section key={card} className="home-card paper-card">
             <div className="section-head">
               <h2 className="section-label">{cardLabels.workouts}</h2>
-              <Link className="text-button" to="/tiempo/entrenamientos">Ver</Link>
+              <Link className="section-more" to="/tiempo/entrenamientos" aria-label="Entrenamientos">›</Link>
             </div>
-            <p className="meta">{todaySessions.length ? `${todaySessions.length} sesión(es) hoy` : 'Día de descanso'}</p>
-            <WorkoutWeek sessions={sessions} />
+            <p className="meta">{gymSubtitle}</p>
+            <GymWeekRow
+              week={gymWeek}
+              onToggle={toggleGymPlan}
+            />
           </section>
         )
       })}
@@ -203,23 +240,36 @@ export function MyDay({
   )
 }
 
-function WorkoutWeek({ sessions }: { sessions: WorkoutSession[] }) {
+function GymWeekRow({ week, onToggle }: { week: GymWeek | null; onToggle: (weekday: number) => void }) {
   const labels = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
-  const monday = new Date()
-  const delta = (monday.getDay() + 6) % 7
-  monday.setDate(monday.getDate() - delta)
+  const chips = weekChips()
+  const planned = new Set(week?.weekdays ?? [])
+  const logs = new Map((week?.logs ?? []).map((log) => [log.day, log]))
   return (
     <div className="week-row">
       {labels.map((label, index) => {
-        const date = new Date(monday)
-        date.setDate(monday.getDate() + index)
-        const key = todayKey(date)
-        const on = sessions.some((session) => session.occurredOn === key)
+        const chip = chips[index]
+        const log = logs.get(chip.key)
+        const isPlanned = planned.has(index)
+        const attended = Boolean(log?.attended)
+        const className = [
+          'day-chip',
+          chip.today ? 'is-today' : '',
+          isPlanned ? 'planned' : '',
+          attended ? 'attended' : '',
+        ].filter(Boolean).join(' ')
         return (
-          <div key={label} className={on ? 'day-chip today' : 'day-chip'}>
+          <button
+            key={label}
+            type="button"
+            className={className}
+            aria-pressed={isPlanned}
+            aria-label={`${label}: ${isPlanned ? 'planificado' : 'sin plan'}`}
+            onClick={() => onToggle(index)}
+          >
             <small>{label}</small>
-            <strong>{on ? '●' : '·'}</strong>
-          </div>
+            <strong>{attended ? '●' : isPlanned ? '○' : '·'}</strong>
+          </button>
         )
       })}
     </div>
@@ -234,23 +284,32 @@ export function HabitRow({ habit, onToggle, onEdit, onInc }: {
 }) {
   const day = today()
   const done = habitDoneOn(habit, day)
+  const count = habitCountOn(habit, day)
   return (
-    <div className="habit">
-      <span className="habits-icon" aria-hidden>{habit.icon || '✨'}</span>
-      <div>
-        <strong>{habit.name}</strong>
-        <div className="dots" aria-hidden>
-          {Array.from({ length: habit.nGoal }, (_, index) => (
-            <span key={index} className={index < habit.doneThisWeek ? 'on' : ''} />
-          ))}
-        </div>
-        <p className="meta">{habitMetaLine(habit, day)}</p>
-      </div>
-      <div className="habit-actions">
-        {onEdit && <button type="button" className="text-button" onClick={onEdit}>Editar</button>}
-        {onInc && <button type="button" onClick={onInc}>+ {habitCountOn(habit, day)}/{habit.dailyGoal}</button>}
-        <button type="button" onClick={onToggle}>{done ? 'Hecho' : 'Marcar'}</button>
-      </div>
+    <div className={done ? 'habit done' : 'habit'}>
+      <button
+        type="button"
+        className={done ? 'check on' : 'check'}
+        aria-label={done ? `${habit.name}, hecho` : `Marcar ${habit.name}`}
+        onClick={onToggle}
+      />
+      <button type="button" className="habit-body" onClick={onEdit}>
+        <span className="habits-icon" aria-hidden>{habit.icon || '✨'}</span>
+        <span className="habit-copy">
+          <strong>{habit.name}</strong>
+          <span className="dots" aria-hidden>
+            {Array.from({ length: habit.nGoal }, (_, index) => (
+              <i key={index} className={index < habit.doneThisWeek ? 'on' : ''} />
+            ))}
+          </span>
+          <span className="meta">{habitMetaLine(habit, day)}</span>
+        </span>
+      </button>
+      {onInc && (
+        <button type="button" className="habit-plus" aria-label={`Sumar en ${habit.name}`} onClick={onInc}>
+          {count}/{habit.dailyGoal}
+        </button>
+      )}
     </div>
   )
 }

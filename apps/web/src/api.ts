@@ -1,4 +1,4 @@
-import type { Bill, CalendarEvent, CaptureDraft, Debt, DebtMove, EventInput, Goal, Habit, HomeCard, MoneyCategory, MoneyDraft, MoneyPlan, MonthMoney, Movement, MovementInput, PayAccount, Task, TaskInput, TaskList, WorkoutRecord, WorkoutRoutine, WorkoutSession, WorkoutSet } from './types'
+import type { Bill, CalendarEvent, CaptureDraft, Debt, DebtMove, EventInput, FoodHit, Goal, GymLog, GymWeek, Habit, HomeCard, Meal, MealItem, MoneyCategory, MoneyDraft, MoneyPlan, MonthMoney, Movement, MovementInput, PayAccount, Task, TaskInput, TaskList, WorkoutRecord, WorkoutRoutine, WorkoutSession, WorkoutSet } from './types'
 
 let onUnauthorized = () => {}
 
@@ -105,16 +105,33 @@ export const api = {
   addWorkoutSession: (body: { routineId?: number; day?: string; note?: string; durationMin?: number; sets: WorkoutSet[] }) =>
     request<WorkoutSession>('/api/workouts/sessions', { method: 'POST', body: JSON.stringify(body) }),
   workoutRecords: () => request<{ records: WorkoutRecord[] }>('/api/workouts/records'),
+  gymWeek: (week?: string) =>
+    request<GymWeek>(week ? `/api/gym/week?week=${encodeURIComponent(week)}` : '/api/gym/week'),
+  setGymWeek: (weekStart: string, weekdays: number[]) =>
+    request<GymWeek>('/api/gym/week', { method: 'PUT', body: JSON.stringify({ weekStart, weekdays }) }),
+  setGymLog: (body: { day: string; attended: boolean; attendedAt?: string }) =>
+    request<GymLog>('/api/gym/log', { method: 'PUT', body: JSON.stringify(body) }),
+  meals: (day: string) => request<{ meals: Meal[] }>(`/api/meals?day=${encodeURIComponent(day)}`),
+  createMeal: (body: { day: string; title: string; eatenAt?: string }) =>
+    request<Meal>('/api/meals', { method: 'POST', body: JSON.stringify(body) }),
+  deleteMeal: (id: number) => request<void>(`/api/meals/${id}`, { method: 'DELETE' }),
+  addMealItem: (mealId: number, body: Omit<MealItem, 'id'>) =>
+    request<MealItem>(`/api/meals/${mealId}/items`, { method: 'POST', body: JSON.stringify(body) }),
+  deleteMealItem: (mealId: number, itemId: number) =>
+    request<void>(`/api/meals/${mealId}/items/${itemId}`, { method: 'DELETE' }),
+  searchFoods: (q: string) =>
+    request<{ foods: FoodHit[] }>(`/api/foods/search?q=${encodeURIComponent(q)}`),
   homePrefs: () => request<{ cards: HomeCard[] }>('/api/home/prefs'),
   saveHomePrefs: (cards: HomeCard[]) =>
     request<{ cards: HomeCard[] }>('/api/home/prefs', { method: 'PUT', body: JSON.stringify({ cards }) }),
   month: (month?: string) => request<MonthMoney>(month ? `/api/money/month?month=${month}` : '/api/money/month'),
-  draftMoney: (body: { text?: string; audio?: Blob; image?: Blob; previous?: MoneyDraft }) => {
+  draftMoney: (body: { text?: string; audio?: Blob; image?: Blob; previous?: MoneyDraft; memory?: string }) => {
     const form = new FormData()
     if (body.text) form.set('text', body.text)
     if (body.audio) form.set('audio', body.audio, audioFilename(body.audio))
     if (body.image) form.set('image', body.image, 'foto.jpg')
     if (body.previous) form.set('previous', JSON.stringify(body.previous))
+    if (body.memory) form.set('memory', body.memory)
     return request<MoneyDraft>('/api/money/draft', { method: 'POST', body: form })
   },
   draftCapture: (body: { text: string; intent?: 'evento' | 'tarea' | 'recordatorio' | 'gasto' | 'auto' }) =>

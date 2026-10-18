@@ -41,18 +41,42 @@ func (s *Server) captureDraft(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 80*time.Second)
 	defer cancel()
 
-	categories, err := s.Store.Categories(ctx, currentUser(r))
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "No se pudieron leer las categorías")
-		return
+	intent := strings.ToLower(strings.TrimSpace(body.Intent))
+	needMoney := intent == "gasto" || intent == "auto" || intent == ""
+	var categories []draft.Category
+	var sources []draft.PaySource
+	if needMoney {
+		uid := currentUser(r)
+		items, err := s.Store.Categories(ctx, uid)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "No se pudieron leer las categorías")
+			return
+		}
+		categories = toDraftCategories(items)
+		accounts, err := s.Store.MoneyAccounts(ctx, uid)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "No se pudieron leer las cuentas")
+			return
+		}
+		cards, err := s.Store.MoneyCards(ctx, uid)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "No se pudieron leer las tarjetas")
+			return
+		}
+		for _, item := range accounts {
+			sources = append(sources, draft.PaySource{ID: item.ID, Name: item.Name, Kind: "account"})
+		}
+		for _, item := range cards {
+			sources = append(sources, draft.PaySource{ID: item.ID, Name: item.Name, Kind: "debt"})
+		}
 	}
-	system, user := draft.CapturePrompt(body.Intent, toDraftCategories(categories), s.today(), text)
-	raw, err := draft.Complete(ctx, s.OllamaURL, s.draftModel(false), system, user, nil)
+	system, user := draft.CapturePrompt(body.Intent, categories, sources, s.today(), text)
+	raw, err := draft.CompleteCapture(ctx, s.OllamaURL, s.draftModel(false), system, user, s.OllamaNumThread)
 	if message, failed := draftFailure(err, "No entendí eso. Dilo de otra forma."); failed {
 		writeError(w, message.status, message.text)
 		return
 	}
-	proposal, err := draft.NormalizeCapture(text, raw, body.Intent, toDraftCategories(categories), s.today())
+	proposal, err := draft.NormalizeCapture(text, raw, body.Intent, categories, sources, s.today())
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "No entendí eso. Dilo de otra forma.")
 		return
@@ -107,8 +131,8 @@ func (s *Server) moneyDraft(w http.ResponseWriter, r *http.Request) {
 	if modelText == "" {
 		modelText = "Lee la imagen y anota el gasto o el ingreso."
 	}
-	system, user := draft.Prompt(toDraftCategories(categories), s.today(), modelText, in.Previous)
-	raw, err := draft.Complete(ctx, s.OllamaURL, s.draftModel(len(in.Image) > 0), system, user, in.Image)
+	system, user := draft.Prompt(toDraftCategories(categories), s.today(), modelText, in.Previous, in.Memory)
+	raw, err := draft.Complete(ctx, s.OllamaURL, s.draftModel(len(in.Image) > 0), system, user, in.Image, s.OllamaNumThread)
 	if message, failed := draftFailure(err, "No entendí eso. Dilo de otra forma."); failed {
 		writeError(w, message.status, message.text)
 		return
@@ -141,6 +165,7 @@ type draftInput struct {
 	AudioName string
 	Image     []byte
 	Previous  *draft.Proposal
+	Memory    string
 }
 
 func readDraft(w http.ResponseWriter, r *http.Request) (draftInput, bool) {
@@ -152,6 +177,7 @@ func readDraft(w http.ResponseWriter, r *http.Request) (draftInput, bool) {
 	var body struct {
 		Text     string          `json:"text"`
 		Previous json.RawMessage `json:"previous"`
+		Memory   string          `json:"memory"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		if tooLarge(err) {
@@ -165,7 +191,7 @@ func readDraft(w http.ResponseWriter, r *http.Request) (draftInput, bool) {
 	if !ok {
 		return draftInput{}, false
 	}
-	return draftInput{Text: body.Text, Previous: previous}, true
+	return draftInput{Text: body.Text, Previous: previous, Memory: body.Memory}, true
 }
 
 func readDraftForm(w http.ResponseWriter, r *http.Request) (draftInput, bool) {
@@ -179,6 +205,7 @@ func readDraftForm(w http.ResponseWriter, r *http.Request) (draftInput, bool) {
 	}
 	var in draftInput
 	in.Text = r.FormValue("text")
+	in.Memory = r.FormValue("memory")
 	previous, ok := decodePrevious(w, []byte(r.FormValue("previous")))
 	if !ok {
 		return draftInput{}, false

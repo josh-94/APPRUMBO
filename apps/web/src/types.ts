@@ -82,6 +82,44 @@ export type WorkoutSession = {
   sets: WorkoutSet[]
 }
 export type WorkoutRecord = { exerciseName: string; weightGrams: number; reps: number; occurredOn: string }
+
+export type GymLog = { day: string; attended: boolean; attendedAt?: string }
+export type DayMacros = { day: string; proteinG: number; carbsG: number; fatG: number; kcal: number }
+export type GymWeek = {
+  weekStart: string
+  weekdays: number[]
+  logs: GymLog[]
+  dayMacros: DayMacros[]
+}
+export type MealItem = {
+  id: number
+  foodName: string
+  brand: string
+  offId: string
+  grams: number
+  proteinG: number
+  carbsG: number
+  fatG: number
+  kcal: number
+}
+export type Meal = {
+  id: number
+  day: string
+  title: string
+  eatenAt?: string
+  items: MealItem[]
+}
+export type FoodHit = {
+  id: string
+  name: string
+  brand: string
+  kcal: number
+  proteinG: number
+  carbsG: number
+  fatG: number
+  perGrams: number
+}
+
 export type HomeCard = 'agenda' | 'habits' | 'goals' | 'workouts'
 
 export type EventColor = 'menta' | 'impulso' | 'horizonte' | 'ciruela' | 'alerta' | 'bosque'
@@ -215,6 +253,9 @@ export type CaptureDraft = {
   categoryId: number
   category: string
   categoryHint?: string
+  accountId?: number
+  debtId?: number
+  sourceName?: string
   confidence: 'alta' | 'baja'
   question: string
   transcript?: string

@@ -1,20 +1,26 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { api } from '../api'
 import { shrinkImage } from '../image'
+import {
+  actionLabel,
+  loadMoneyChat,
+  memoryForDraft,
+  nextChatId,
+  saveMoneyChat,
+  trimChat,
+  type ChatBubble,
+} from '../moneyChatMemory'
 import { soles, todayKey } from '../format'
 import type { MoneyDraft, MonthMoney } from '../types'
 
-type UserBubble = { id: number; role: 'user'; text: string; imageUrl?: string }
-type DraftBubble = { id: number; role: 'draft'; draft: MoneyDraft; saved: boolean }
-type Bubble = UserBubble | DraftBubble
-
-export function MoneyChat({ money, onClose, onSaved, onOffline }: {
+export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: {
   money: MonthMoney
+  userKey?: string
   onClose: () => void
   onSaved: () => void
   onOffline: () => void
 }) {
-  const [messages, setMessages] = useState<Bubble[]>([])
+  const [messages, setMessages] = useState<ChatBubble[]>(() => loadMoneyChat(userKey))
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [recording, setRecording] = useState(false)
@@ -25,13 +31,22 @@ export function MoneyChat({ money, onClose, onSaved, onOffline }: {
   const recorderRef = useRef<MediaRecorder | null>(null)
   const alive = useRef(true)
   const offlineRef = useRef(onOffline)
-  const ids = useRef(1)
+  const ids = useRef(nextChatId(loadMoneyChat(userKey)))
+  const persistTimer = useRef(0)
   offlineRef.current = onOffline
 
   useEffect(() => {
     const log = logRef.current
     if (log) log.scrollTop = log.scrollHeight
   }, [messages, busy, error])
+
+  useEffect(() => {
+    window.clearTimeout(persistTimer.current)
+    persistTimer.current = window.setTimeout(() => {
+      saveMoneyChat(userKey, messages)
+    }, 200)
+    return () => window.clearTimeout(persistTimer.current)
+  }, [messages, userKey])
 
   useEffect(() => {
     alive.current = true
@@ -48,8 +63,9 @@ export function MoneyChat({ money, onClose, onSaved, onOffline }: {
   }, [])
 
   function nextId() {
+    const id = ids.current
     ids.current += 1
-    return ids.current
+    return id
   }
 
   function previousDraft() {
@@ -69,18 +85,25 @@ export function MoneyChat({ money, onClose, onSaved, onOffline }: {
     const label = input.text?.trim() || (input.audio ? 'Voz' : 'Foto')
     const id = nextId()
     const previous = previousDraft()
-    setMessages((items) => [...items, { id, role: 'user', text: label, imageUrl }])
+    const memory = memoryForDraft(messages)
+    setMessages((items) => trimChat([...items, { id, role: 'user', text: label, imageUrl }]))
     setText('')
     setBusy(true)
     setError('')
     try {
-      const draft = await api.draftMoney({ text: input.text?.trim(), audio: input.audio, image: input.image, previous })
+      const draft = await api.draftMoney({
+        text: input.text?.trim(),
+        audio: input.audio,
+        image: input.image,
+        previous,
+        memory: memory || undefined,
+      })
       if (!alive.current) return
       const draftId = nextId()
-      setMessages((items) => [
+      setMessages((items) => trimChat([
         ...items.map((item) => (item.id === id && item.role === 'user' ? { ...item, text: draft.transcript || item.text } : item)),
         { id: draftId, role: 'draft', draft, saved: false },
-      ])
+      ]))
     } catch (err) {
       if (!alive.current) return
       if (!navigator.onLine || err instanceof TypeError) {
@@ -167,7 +190,12 @@ export function MoneyChat({ money, onClose, onSaved, onOffline }: {
         day: draft.day,
         note: draft.note,
       })
-      setMessages((items) => items.map((item) => (item.id === id && item.role === 'draft' ? { ...item, saved: true } : item)))
+      const actionId = nextId()
+      const label = actionLabel(draft, soles)
+      setMessages((items) => trimChat([
+        ...items.map((item) => (item.id === id && item.role === 'draft' ? { ...item, saved: true } : item)),
+        { id: actionId, role: 'action', text: label },
+      ]))
       onSaved()
     } catch (err) {
       if (!navigator.onLine || err instanceof TypeError) {
@@ -199,6 +227,13 @@ export function MoneyChat({ money, onClose, onSaved, onOffline }: {
               return (
                 <div key={item.id} className="chat-user">
                   {item.imageUrl && <img src={item.imageUrl} alt="" />}
+                  <p>{item.text}</p>
+                </div>
+              )
+            }
+            if (item.role === 'action') {
+              return (
+                <div key={item.id} className="chat-action">
                   <p>{item.text}</p>
                 </div>
               )
