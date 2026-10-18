@@ -116,8 +116,9 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
   }
 
   async function confirm(id: number, draft: MoneyDraft) {
-    const accountId = money.accounts[0]?.id
-    if (!accountId || !draft.amountCents || !draft.categoryId) return
+    const debtId = draft.debtId || 0
+    const accountId = debtId ? 0 : (draft.accountId || money.accounts[0]?.id || 0)
+    if ((!accountId && !debtId) || !draft.amountCents || !draft.categoryId) return
     setSaving(id)
     setError('')
     try {
@@ -126,6 +127,7 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
         currency: 'pen',
         amountCents: draft.amountCents,
         accountId,
+        debtId,
         categoryId: draft.categoryId,
         day: draft.day,
         note: draft.note,
@@ -182,7 +184,11 @@ export function MoneyChat({ money, userKey = '', onClose, onSaved, onOffline }: 
               <div key={item.id} className="chat-draft">
                 <p className="kicker">{item.draft.kind === 'ingreso' ? 'Ingreso' : 'Gasto'}</p>
                 <strong>{item.draft.amountCents ? soles(item.draft.amountCents) : 'Sin monto'}</strong>
-                <p>{item.draft.category || 'Sin categoría'}{item.draft.note ? ` · ${item.draft.note}` : ''}</p>
+                <p>
+                  {item.draft.category || 'Sin categoría'}
+                  {item.draft.sourceName ? ` · ${item.draft.sourceName}` : ''}
+                  {item.draft.note ? ` · ${item.draft.note}` : ''}
+                </p>
                 <p className="meta">{draftDay(item.draft.day)}</p>
                 {item.draft.question && <p className="hint">{item.draft.question}</p>}
                 {item.saved && <p className="ok">Anotado</p>}

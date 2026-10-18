@@ -110,13 +110,19 @@ func (s *Server) moneyDraft(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 80*time.Second)
 	defer cancel()
 
-	categories, err := s.Store.Categories(ctx, currentUser(r))
+	uid := currentUser(r)
+	categories, err := s.Store.Categories(ctx, uid)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudieron leer las categorías")
 		return
 	}
 	cats := toDraftCategories(categories)
-	if proposal, ok := draft.TryLocalMoney(text, cats, s.today(), in.Previous); ok {
+	sources, err := s.moneyPaySources(ctx, uid)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudieron leer las cuentas")
+		return
+	}
+	if proposal, ok := draft.TryLocalMoney(text, cats, sources, s.today(), in.Previous); ok {
 		proposal.Transcript = text
 		writeJSON(w, http.StatusOK, proposal)
 		return
@@ -132,8 +138,41 @@ func (s *Server) moneyDraft(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "No entendí eso. Dilo de otra forma.")
 		return
 	}
+	if proposal.AccountID == 0 && proposal.DebtID == 0 {
+		if src, ok := draft.MatchPaySource(text, sources); ok {
+			if src.Kind == "debt" {
+				proposal.DebtID = src.ID
+			} else {
+				proposal.AccountID = src.ID
+			}
+			proposal.SourceName = src.Name
+		} else if in.Previous != nil {
+			proposal.AccountID = in.Previous.AccountID
+			proposal.DebtID = in.Previous.DebtID
+			proposal.SourceName = in.Previous.SourceName
+		}
+	}
 	proposal.Transcript = text
 	writeJSON(w, http.StatusOK, proposal)
+}
+
+func (s *Server) moneyPaySources(ctx context.Context, uid int64) ([]draft.PaySource, error) {
+	accounts, err := s.Store.MoneyAccounts(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	cards, err := s.Store.MoneyCards(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	sources := make([]draft.PaySource, 0, len(accounts)+len(cards))
+	for _, item := range accounts {
+		sources = append(sources, draft.PaySource{ID: item.ID, Name: item.Name, Kind: "account"})
+	}
+	for _, item := range cards {
+		sources = append(sources, draft.PaySource{ID: item.ID, Name: item.Name, Kind: "debt"})
+	}
+	return sources, nil
 }
 
 func (s *Server) draftModel(image bool) string {

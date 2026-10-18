@@ -40,6 +40,9 @@ type Proposal struct {
 	AmountCents int64  `json:"amountCents"`
 	CategoryID  int64  `json:"categoryId"`
 	Category    string `json:"category"`
+	AccountID   int64  `json:"accountId,omitempty"`
+	DebtID      int64  `json:"debtId,omitempty"`
+	SourceName  string `json:"sourceName,omitempty"`
 	Note        string `json:"note"`
 	Day         string `json:"day"`
 	Confidence  string `json:"confidence"`
@@ -110,21 +113,26 @@ func clipMemory(raw string, limit int) string {
 }
 
 // TryLocalMoney builds a draft without Ollama when amount and/or category are clear from text.
-func TryLocalMoney(text string, categories []Category, today time.Time, previous *Proposal) (Proposal, bool) {
+func TryLocalMoney(text string, categories []Category, sources []PaySource, today time.Time, previous *Proposal) (Proposal, bool) {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return Proposal{}, false
 	}
 	amount, hasAmount := AmountFromText(text)
 
-	// Short category correction on an existing draft (e.g. "alimentos", "transporte").
-	if previous != nil && previous.AmountCents > 0 && !hasAmount && utf8.RuneCountInString(text) <= 40 {
+	// Correction on an existing draft: category and/or medio de pago, sin nuevo monto.
+	if previous != nil && previous.AmountCents > 0 && !hasAmount {
 		kind := previous.Kind
 		if kind != "ingreso" {
 			kind = "gasto"
 		}
-		cat, ok := matchLocalCategory(text, kind, categories)
-		if !ok {
+		cat, hasCat := matchLocalCategory(text, kind, categories)
+		src, hasSrc := MatchPaySource(text, sources)
+		short := utf8.RuneCountInString(text) <= 48
+		if !hasCat && !hasSrc {
+			return Proposal{}, false
+		}
+		if hasCat && !hasSrc && !short {
 			return Proposal{}, false
 		}
 		day := resolveDay(text, "", today, previous)
@@ -132,12 +140,26 @@ func TryLocalMoney(text string, categories []Category, today time.Time, previous
 		out := Proposal{
 			Kind:        kind,
 			AmountCents: previous.AmountCents,
-			CategoryID:  cat.ID,
-			Category:    cat.Name,
+			CategoryID:  previous.CategoryID,
+			Category:    previous.Category,
+			AccountID:   previous.AccountID,
+			DebtID:      previous.DebtID,
+			SourceName:  previous.SourceName,
 			Note:        note,
 			Day:         day.Format("2006-01-02"),
 			Confidence:  "alta",
 			Question:    "",
+		}
+		if hasCat {
+			out.CategoryID = cat.ID
+			out.Category = cat.Name
+		}
+		if hasSrc {
+			applyPaySource(&out, src)
+		}
+		if out.CategoryID == 0 {
+			out.Question = "¿En qué categoría lo anoto?"
+			out.Confidence = "baja"
 		}
 		return out, true
 	}
@@ -166,9 +188,17 @@ func TryLocalMoney(text string, categories []Category, today time.Time, previous
 		Day:         day.Format("2006-01-02"),
 		Confidence:  "baja",
 	}
+	if previous != nil {
+		out.AccountID = previous.AccountID
+		out.DebtID = previous.DebtID
+		out.SourceName = previous.SourceName
+	}
 	if ok {
 		out.CategoryID = cat.ID
 		out.Category = cat.Name
+	}
+	if src, okSrc := MatchPaySource(text, sources); okSrc {
+		applyPaySource(&out, src)
 	}
 	if out.CategoryID == 0 {
 		out.Question = "¿En qué categoría lo anoto?"
@@ -176,6 +206,17 @@ func TryLocalMoney(text string, categories []Category, today time.Time, previous
 		out.Confidence = "alta"
 	}
 	return out, true
+}
+
+func applyPaySource(out *Proposal, src PaySource) {
+	out.SourceName = src.Name
+	if src.Kind == "debt" {
+		out.DebtID = src.ID
+		out.AccountID = 0
+		return
+	}
+	out.AccountID = src.ID
+	out.DebtID = 0
 }
 
 func matchLocalCategory(text, kind string, categories []Category) (Category, bool) {

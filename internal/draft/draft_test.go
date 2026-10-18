@@ -110,17 +110,18 @@ func TestTryLocalMoneyClearLine(t *testing.T) {
 		{ID: 5, Name: "Entretenimiento", Kind: "gasto"},
 		{ID: 9, Name: "Casa", Kind: "gasto"},
 	}
-	got, ok := TryLocalMoney("almuerzo 18.50", categories, today, nil)
+	sources := []PaySource{{ID: 9, Name: "Amex", Kind: "debt"}}
+	got, ok := TryLocalMoney("almuerzo 18.50", categories, sources, today, nil)
 	if !ok || got.AmountCents != 1850 || got.CategoryID != 3 || got.Category != "Comida" {
 		t.Fatalf("almuerzo %+v ok=%v", got, ok)
 	}
-	got, ok = TryLocalMoney("gaste 23 soles en cine de mi tarjeta amex", categories, today, nil)
-	if !ok || got.AmountCents != 2300 || got.CategoryID != 5 {
+	got, ok = TryLocalMoney("gaste 23 soles en cine de mi tarjeta amex", categories, sources, today, nil)
+	if !ok || got.AmountCents != 2300 || got.CategoryID != 5 || got.DebtID != 9 || got.SourceName != "Amex" {
 		t.Fatalf("cine %+v ok=%v", got, ok)
 	}
 	categories = append(categories, Category{ID: 6, Name: "Transporte", Kind: "gasto"})
-	got, ok = TryLocalMoney("gaste 34 en reparacion de llanta con mi tarjeta amex", categories, today, nil)
-	if !ok || got.AmountCents != 3400 || got.CategoryID != 6 {
+	got, ok = TryLocalMoney("gaste 34 en reparacion de llanta con mi tarjeta amex", categories, sources, today, nil)
+	if !ok || got.AmountCents != 3400 || got.CategoryID != 6 || got.DebtID != 9 {
 		t.Fatalf("llanta %+v ok=%v", got, ok)
 	}
 }
@@ -132,19 +133,25 @@ func TestTryLocalMoneyCategoryCorrection(t *testing.T) {
 		{ID: 9, Name: "Casa", Kind: "gasto"},
 		{ID: 11, Name: "Alimentos", Kind: "gasto"},
 	}
+	sources := []PaySource{{ID: 9, Name: "Amex", Kind: "debt"}}
 	previous := &Proposal{Kind: "gasto", AmountCents: 2300, Note: "cine", Day: "2026-10-17"}
-	got, ok := TryLocalMoney("alimentos", categories, today, previous)
+	got, ok := TryLocalMoney("alimentos", categories, sources, today, previous)
 	if !ok || got.AmountCents != 2300 || got.CategoryID != 11 || got.Category != "Alimentos" {
 		t.Fatalf("alimentos name %+v ok=%v", got, ok)
 	}
 	previous = &Proposal{Kind: "gasto", AmountCents: 2300, Note: "cine", Day: "2026-10-17"}
 	categories = []Category{{ID: 3, Name: "Comida", Kind: "gasto"}, {ID: 9, Name: "Casa", Kind: "gasto"}}
-	got, ok = TryLocalMoney("alimentos", categories, today, previous)
+	got, ok = TryLocalMoney("alimentos", categories, sources, today, previous)
 	if !ok || got.CategoryID != 3 || got.Category != "Comida" {
 		t.Fatalf("alimentos synonym %+v ok=%v", got, ok)
 	}
-	if _, ok = TryLocalMoney("no sé", categories, today, previous); ok {
+	if _, ok = TryLocalMoney("no sé", categories, sources, today, previous); ok {
 		t.Fatal("expected miss")
+	}
+	previous = &Proposal{Kind: "gasto", AmountCents: 3400, CategoryID: 6, Category: "Transporte", Note: "reparacion llanta", Day: "2026-10-17"}
+	got, ok = TryLocalMoney("falto anotar que lo saque de mi tarjeta amex", categories, sources, today, previous)
+	if !ok || got.DebtID != 9 || got.SourceName != "Amex" || got.AmountCents != 3400 || got.CategoryID != 6 {
+		t.Fatalf("amex correction %+v ok=%v", got, ok)
 	}
 }
 

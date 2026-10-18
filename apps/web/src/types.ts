@@ -233,6 +233,9 @@ export type MoneyDraft = {
   amountCents: number
   categoryId: number
   category: string
+  accountId?: number
+  debtId?: number
+  sourceName?: string
   note: string
   day: string
   confidence: 'alta' | 'baja'

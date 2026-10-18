@@ -182,7 +182,7 @@ func NormalizeCapture(text, raw, intent string, categories []Category, sources [
 		}
 		source, hasSource := paySourceByID(parsed.AccountID, parsed.DebtID, sources)
 		if !hasSource {
-			source, hasSource = matchPaySource(text, sources)
+			source, hasSource = MatchPaySource(text, sources)
 		}
 		if hasSource {
 			if source.Kind == "debt" {
@@ -445,7 +445,7 @@ func paySourceByID(accountID, debtID int64, sources []PaySource) (PaySource, boo
 	return PaySource{}, false
 }
 
-func matchPaySource(text string, sources []PaySource) (PaySource, bool) {
+func MatchPaySource(text string, sources []PaySource) (PaySource, bool) {
 	lower := strings.ToLower(text)
 	var best PaySource
 	bestLen := 0
