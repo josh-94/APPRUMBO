@@ -381,7 +381,7 @@ var categorySynonyms = map[string][]string{
 	"salud":      {"pastilla", "pastillas", "medicina", "doctor", "clínica", "clinica", "salud"},
 	"comida":     {"almuerzo", "cena", "desayuno", "menú", "menu", "restaurante", "café", "cafe", "comida", "alimento", "alimentos"},
 	"alimentos":  {"alimento", "alimentos", "almuerzo", "cena", "desayuno", "comida", "menú", "menu"},
-	"transporte": {"taxi", "uber", "bus", "metro", "pasaje", "combustible", "gasolina", "transporte"},
+	"transporte": {"taxi", "uber", "bus", "metro", "pasaje", "combustible", "gasolina", "transporte", "llanta", "llantas", "reparacion", "reparación"},
 	"hogar":      {"super", "supermercado", "mercado", "casa", "hogar"},
 	"casa":       {"super", "supermercado", "mercado", "casa", "hogar"},
 	"entretenimiento": {"cine", "netflix", "spotify", "juego", "entrada"},

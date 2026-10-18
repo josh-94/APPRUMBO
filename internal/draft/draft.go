@@ -270,6 +270,9 @@ func AmountFromText(text string) (int64, bool) {
 	if cents, ok := lastMoney(moneyPhrase, text); ok {
 		return cents, true
 	}
+	if cents, ok := lastMoney(spendAmount, text); ok {
+		return cents, true
+	}
 	if cents, ok := lastMoney(decimalNum, text); ok {
 		return cents, true
 	}
@@ -284,6 +287,8 @@ func AmountFromText(text string) (int64, bool) {
 
 var (
 	moneyPhrase = regexp.MustCompile(`(?i)(?:(?:s\s*/|soles?)\s*(\d{1,6}(?:[.,]\d{1,2})?)|(\d{1,6}(?:[.,]\d{1,2})?)\s*soles?)`)
+	// "gaste 34 en…" / "pagué 12 por…" — monto entero tras verbo de gasto.
+	spendAmount = regexp.MustCompile(`(?i)\b(?:gast\w*|pag\w*|compr\w*|pas[eé])\s+(\d{1,6}(?:[.,]\d{1,2})?)`)
 	decimalNum  = regexp.MustCompile(`(\d{1,6}[.,]\d{1,2})`)
 	onlyNum     = regexp.MustCompile(`^(\d{1,6}(?:[.,]\d{1,2})?)$`)
 	trailingNum = regexp.MustCompile(`(?i)^[\p{L}\s]{1,48}?(\d{1,6}(?:[.,]\d{1,2})?)\s*$`)

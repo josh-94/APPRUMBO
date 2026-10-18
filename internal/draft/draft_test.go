@@ -21,6 +21,7 @@ func TestAmountFromText(t *testing.T) {
 		{"S/ 18.50", 1850, true},
 		{"taxi 18", 1800, true},
 		{"ayer gasté 20 soles", 2000, true},
+		{"gaste 34 en reparacion de llanta con mi tarjeta amex", 3400, true},
 		{"18", 1800, true},
 		{"el 12 de octubre", 0, false},
 	}
@@ -116,6 +117,11 @@ func TestTryLocalMoneyClearLine(t *testing.T) {
 	got, ok = TryLocalMoney("gaste 23 soles en cine de mi tarjeta amex", categories, today, nil)
 	if !ok || got.AmountCents != 2300 || got.CategoryID != 5 {
 		t.Fatalf("cine %+v ok=%v", got, ok)
+	}
+	categories = append(categories, Category{ID: 6, Name: "Transporte", Kind: "gasto"})
+	got, ok = TryLocalMoney("gaste 34 en reparacion de llanta con mi tarjeta amex", categories, today, nil)
+	if !ok || got.AmountCents != 3400 || got.CategoryID != 6 {
+		t.Fatalf("llanta %+v ok=%v", got, ok)
 	}
 }
 

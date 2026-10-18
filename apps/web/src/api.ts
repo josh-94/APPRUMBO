@@ -20,7 +20,17 @@ async function request<T>(path: string, options: RequestInit = {}, redirectOnAut
     return undefined as T
   }
   const text = await response.text()
-  const data = text ? JSON.parse(text) as T & { error?: string } : undefined
+  let data: (T & { error?: string }) | undefined
+  if (text) {
+    try {
+      data = JSON.parse(text) as T & { error?: string }
+    } catch {
+      if (!response.ok) {
+        throw new Error(response.status >= 500 ? 'El servidor no respondió. Reintenta en un momento.' : 'No se pudo completar')
+      }
+      throw new Error('No se pudo leer la respuesta')
+    }
+  }
   if (!response.ok) {
     throw new Error(data?.error || 'No se pudo completar')
   }
