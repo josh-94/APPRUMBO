@@ -183,7 +183,12 @@ export function MoneyChat({ money, onClose, onSaved, onOffline }: {
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet chat-sheet" onClick={(event) => event.stopPropagation()}>
         <div className="sheet-handle" />
-        <h2>Contar un gasto</h2>
+        <div className="sheet-top">
+          <h2>Contar un gasto</h2>
+          <button type="button" className="sheet-close" aria-label="Cerrar" onClick={onClose}>
+            <CloseIcon />
+          </button>
+        </div>
         <div className="chat-log" ref={logRef}>
           {messages.length === 0 && (
             <p className="hint">Escribe, dicta o manda una foto. Lo anotas cuando la tarjeta esté lista.</p>
@@ -214,7 +219,12 @@ export function MoneyChat({ money, onClose, onSaved, onOffline }: {
               </div>
             )
           })}
-          {busy && <p className="hint">Leyendo…</p>}
+          {busy && (
+            <p className="chat-reading" role="status">
+              Leyendo
+              <span className="chat-dots" aria-hidden="true"><i /><i /><i /></span>
+            </p>
+          )}
           {error && <p className="error">{error}</p>}
         </div>
         <form className="chat-compose" onSubmit={submit}>
@@ -255,6 +265,14 @@ function draftDay(day: string) {
   const [year, month, date] = day.split('-').map(Number)
   if (!year || !month || !date) return day
   return new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long' }).format(new Date(year, month - 1, date))
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+      <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  )
 }
 
 function CameraIcon() {

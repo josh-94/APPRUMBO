@@ -1,4 +1,4 @@
-import type { Bill, Debt, Habit, MoneyCategory, MoneyDraft, MoneyPlan, MonthMoney, Movement, PayAccount, Task, TaskInput, TaskList } from './types'
+import type { Bill, Debt, DebtMove, Habit, MoneyCategory, MoneyDraft, MoneyPlan, MonthMoney, Movement, PayAccount, Task, TaskInput, TaskList } from './types'
 
 let onUnauthorized = () => {}
 
@@ -87,6 +87,10 @@ export const api = {
   saveDebt: (body: Partial<Debt> & { name: string; kind: Debt['kind'] }) =>
     request<Debt>(body.id ? `/api/debts/${body.id}` : '/api/debts', { method: body.id ? 'PATCH' : 'POST', body: JSON.stringify(body) }),
   deleteDebt: (id: number) => request<void>(`/api/debts/${id}`, { method: 'DELETE' }),
+  debtMoves: (id: number) => request<DebtMove[]>(`/api/debts/${id}/moves`),
+  addDebtMove: (id: number, body: { kind: DebtMove['kind']; currency: DebtMove['currency']; amountCents: number; day: string; note: string }) =>
+    request<DebtMove>(`/api/debts/${id}/moves`, { method: 'POST', body: JSON.stringify(body) }),
+  deleteDebtMove: (id: number, moveId: number) => request<void>(`/api/debts/${id}/moves/${moveId}`, { method: 'DELETE' }),
   saveBill: (body: Partial<Bill> & { name: string }) =>
     request<Bill>(body.id ? `/api/bills/${body.id}` : '/api/bills', { method: body.id ? 'PATCH' : 'POST', body: JSON.stringify(body) }),
   deleteBill: (id: number) => request<void>(`/api/bills/${id}`, { method: 'DELETE' }),

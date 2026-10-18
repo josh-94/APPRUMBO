@@ -3,6 +3,7 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"hoy/internal/store"
 )
@@ -126,6 +127,90 @@ func (s *Server) deleteDebt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Store.DeleteDebt(r.Context(), currentUser(r), id); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "No está")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "No se pudo borrar")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) debtMoves(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	moves, err := s.Store.DebtMoves(r.Context(), currentUser(r), id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "No está")
+		return
+	}
+	if errors.Is(err, store.ErrBadMoney) {
+		writeError(w, http.StatusUnprocessableEntity, "Solo las tarjetas tienen movimientos.")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudo leer")
+		return
+	}
+	writeJSON(w, http.StatusOK, moves)
+}
+
+func (s *Server) addDebtMove(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Kind        string `json:"kind"`
+		Currency    string `json:"currency"`
+		AmountCents int64  `json:"amountCents"`
+		Day         string `json:"day"`
+		Note        string `json:"note"`
+	}
+	if err := readJSON(w, r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "JSON inválido")
+		return
+	}
+	day, ok := s.movementDay(w, body.Day)
+	if !ok {
+		return
+	}
+	item, err := s.Store.AddDebtMove(r.Context(), currentUser(r), store.DebtMove{
+		DebtID:      id,
+		Kind:        body.Kind,
+		Currency:    body.Currency,
+		AmountCents: body.AmountCents,
+		Note:        body.Note,
+	}, day)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "No está")
+		return
+	}
+	if errors.Is(err, store.ErrBadMoney) {
+		writeError(w, http.StatusUnprocessableEntity, "Revisa el monto y el tipo de movimiento.")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudo anotar")
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
+}
+
+func (s *Server) deleteDebtMove(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	moveID, err := strconv.ParseInt(r.PathValue("moveId"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Identificador inválido")
+		return
+	}
+	if err := s.Store.DeleteDebtMove(r.Context(), currentUser(r), id, moveID); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "No está")
 			return

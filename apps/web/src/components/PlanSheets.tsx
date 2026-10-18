@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../api'
-import { centsToInput, currencies, dolares, money, parseCents, soles } from '../format'
-import type { Bill, Debt, MoneyCategory, MoneyPlan, PayAccount, PayEvery, Task } from '../types'
+import { cardTint, cardTints } from '../cardTints'
+import { centsToInput, currencies, dolares, money, parseCents, soles, todayKey } from '../format'
+import type { Bill, CardTint, Debt, MoneyCategory, MoneyPlan, PayAccount, PayEvery, Task } from '../types'
 
 const weekdays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 const payChoices: { id: Exclude<PayEvery, ''>; label: string }[] = [
@@ -149,16 +150,24 @@ export function AccountSheet({ account, onClose, onSaved }: { account: PayAccoun
   )
 }
 
-export function DebtSheet({ debt, onClose, onSaved }: { debt: Debt | null; onClose: () => void; onSaved: () => void }) {
-  const [kind, setKind] = useState<Debt['kind']>(debt?.kind ?? 'tarjeta')
+export function DebtSheet({ debt, kind: lockedKind, onClose, onSaved }: {
+  debt: Debt | null
+  kind?: Debt['kind']
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [kind] = useState<Debt['kind']>(debt?.kind ?? lockedKind ?? 'tarjeta')
   const [currency, setCurrency] = useState<Debt['currency']>(debt?.currency ?? 'pen')
   const [name, setName] = useState(debt?.name ?? '')
   const [dueDay, setDueDay] = useState(debt ? String(debt.dueDay) : '')
+  const [limit, setLimit] = useState(centsToInput(debt?.limitCents ?? 0))
+  const [tint, setTint] = useState<CardTint>(cardTint(debt?.tint ?? 'noche'))
   const [balancePen, setBalancePen] = useState(centsToInput(debt?.balancePen ?? 0))
   const [balanceUsd, setBalanceUsd] = useState(centsToInput(debt?.balanceUsd ?? 0))
   const [cuotaPen, setCuotaPen] = useState(centsToInput(debt?.cuotaPen ?? 0))
   const [cuotaUsd, setCuotaUsd] = useState(centsToInput(debt?.cuotaUsd ?? 0))
   const [error, setError] = useState('')
+  const card = kind === 'tarjeta'
 
   async function save(event: FormEvent) {
     event.preventDefault()
@@ -173,11 +182,14 @@ export function DebtSheet({ debt, onClose, onSaved }: { debt: Debt | null; onClo
         kind,
         name: name.trim(),
         dueDay: day,
-        currency: kind === 'prestamo' ? currency : 'pen',
+        currency: card ? 'pen' : currency,
         balancePen: parseCents(balancePen),
         balanceUsd: parseCents(balanceUsd),
         cuotaPen: parseCents(cuotaPen),
         cuotaUsd: parseCents(cuotaUsd),
+        last4: '',
+        limitCents: card ? parseCents(limit) : 0,
+        tint: card ? tint : 'noche',
       })
       onSaved()
       onClose()
@@ -190,38 +202,99 @@ export function DebtSheet({ debt, onClose, onSaved }: { debt: Debt | null; onClo
     <div className="sheet-backdrop" onClick={onClose}>
       <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void save(event)}>
         <div className="sheet-handle" />
-        <h2>{debt ? debt.name : 'Nueva deuda'}</h2>
-        <div className="switch-row">
-          <button type="button" className={kind === 'tarjeta' ? 'pill on' : 'pill quiet'} onClick={() => setKind('tarjeta')}>Tarjeta</button>
-          <button type="button" className={kind === 'prestamo' ? 'pill on' : 'pill quiet'} onClick={() => setKind('prestamo')}>Préstamo</button>
-        </div>
-        <label className="field">Nombre<input value={name} required maxLength={80} placeholder="Visa BCP" onChange={(event) => setName(event.target.value)} /></label>
+        <h2>{debt ? debt.name : card ? 'Nueva tarjeta' : 'Nuevo préstamo'}</h2>
+        <label className="field">Nombre<input value={name} required maxLength={80} placeholder={card ? 'Amex Gold' : 'Préstamo vehicular'} onChange={(event) => setName(event.target.value)} /></label>
+        {card && (
+          <>
+            <label className="field">Línea de crédito<input inputMode="decimal" placeholder="0.00" value={limit} onChange={(event) => setLimit(event.target.value)} /></label>
+            <p className="field-label">Color de la tarjeta</p>
+            <div className="card-tint-pick">
+              {cardTints.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`card-tint-swatch tone-${item.id}${tint === item.id ? ' on' : ''}`}
+                  aria-label={item.label}
+                  aria-pressed={tint === item.id}
+                  onClick={() => setTint(item.id)}
+                />
+              ))}
+            </div>
+          </>
+        )}
         <label className="field">Día de pago<input inputMode="numeric" required placeholder="19" value={dueDay} onChange={(event) => setDueDay(event.target.value)} /></label>
-        {kind === 'prestamo' && (
+        {!card && (
           <div className="switch-row">
             <button type="button" className={currency === 'pen' ? 'pill on' : 'pill quiet'} onClick={() => setCurrency('pen')}>Soles</button>
             <button type="button" className={currency === 'usd' ? 'pill on' : 'pill quiet'} onClick={() => setCurrency('usd')}>Dólares</button>
           </div>
         )}
-        {(kind === 'tarjeta' || currency === 'pen') && (
+        {(card || currency === 'pen') && (
           <>
-            <label className="field">Debes en soles<input inputMode="decimal" placeholder="0.00" value={balancePen} onChange={(event) => setBalancePen(event.target.value)} /></label>
-            <label className="field">Cuota en soles<input inputMode="decimal" placeholder="0.00" value={cuotaPen} onChange={(event) => setCuotaPen(event.target.value)} /></label>
+            <label className="field">{card ? 'Consumido en soles' : 'Debes en soles'}<input inputMode="decimal" placeholder="0.00" value={balancePen} onChange={(event) => setBalancePen(event.target.value)} /></label>
+            <label className="field">{card ? 'Próximo pago en soles' : 'Cuota en soles'}<input inputMode="decimal" placeholder="0.00" value={cuotaPen} onChange={(event) => setCuotaPen(event.target.value)} /></label>
           </>
         )}
-        {(kind === 'tarjeta' || currency === 'usd') && (
+        {(card || currency === 'usd') && (
           <>
-            <label className="field">Debes en dólares<input inputMode="decimal" placeholder="0.00" value={balanceUsd} onChange={(event) => setBalanceUsd(event.target.value)} /></label>
-            <label className="field">Cuota en dólares<input inputMode="decimal" placeholder="0.00" value={cuotaUsd} onChange={(event) => setCuotaUsd(event.target.value)} /></label>
+            <label className="field">{card ? 'Consumido en dólares' : 'Debes en dólares'}<input inputMode="decimal" placeholder="0.00" value={balanceUsd} onChange={(event) => setBalanceUsd(event.target.value)} /></label>
+            <label className="field">{card ? 'Próximo pago en dólares' : 'Cuota en dólares'}<input inputMode="decimal" placeholder="0.00" value={cuotaUsd} onChange={(event) => setCuotaUsd(event.target.value)} /></label>
           </>
         )}
         {error && <p className="error">{error}</p>}
         <button type="submit" className="primary">Guardar</button>
         {debt && (
           <button type="button" className="ghost danger" onClick={() => void api.deleteDebt(debt.id).then(onSaved).then(onClose).catch((err) => setError(err instanceof Error ? err.message : 'No se pudo borrar'))}>
-            Borrar deuda
+            {card ? 'Borrar tarjeta' : 'Borrar préstamo'}
           </button>
         )}
+      </form>
+    </div>
+  )
+}
+
+export function DebtMoveSheet({ debtId, onClose, onSaved }: { debtId: number; onClose: () => void; onSaved: () => void }) {
+  const [kind, setKind] = useState<'consumo' | 'pago'>('consumo')
+  const [currency, setCurrency] = useState<'pen' | 'usd'>('pen')
+  const [amount, setAmount] = useState('')
+  const [note, setNote] = useState('')
+  const [day, setDay] = useState(todayKey())
+  const [error, setError] = useState('')
+
+  async function save(event: FormEvent) {
+    event.preventDefault()
+    const cents = parseCents(amount)
+    if (!cents) {
+      setError('Ese monto no parece correcto.')
+      return
+    }
+    try {
+      await api.addDebtMove(debtId, { kind, currency, amountCents: cents, day, note: note.trim() })
+      onSaved()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo anotar')
+    }
+  }
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void save(event)}>
+        <div className="sheet-handle" />
+        <h2>{kind === 'consumo' ? 'Anotar consumo' : 'Anotar pago'}</h2>
+        <div className="switch-row">
+          <button type="button" className={kind === 'consumo' ? 'pill on' : 'pill quiet'} onClick={() => setKind('consumo')}>Consumo</button>
+          <button type="button" className={kind === 'pago' ? 'pill on' : 'pill quiet'} onClick={() => setKind('pago')}>Pago</button>
+        </div>
+        <div className="switch-row">
+          <button type="button" className={currency === 'pen' ? 'pill on' : 'pill quiet'} onClick={() => setCurrency('pen')}>Soles</button>
+          <button type="button" className={currency === 'usd' ? 'pill on' : 'pill quiet'} onClick={() => setCurrency('usd')}>Dólares</button>
+        </div>
+        <label className="field">Monto<input inputMode="decimal" required placeholder="0.00" value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
+        <label className="field">Día<input type="date" required value={day} onChange={(event) => setDay(event.target.value)} /></label>
+        <label className="field">Nota<input value={note} maxLength={80} placeholder={kind === 'consumo' ? 'Supermercado, Uber…' : 'Pago de tarjeta'} onChange={(event) => setNote(event.target.value)} /></label>
+        {error && <p className="error">{error}</p>}
+        <button type="submit" className="primary">Guardar</button>
       </form>
     </div>
   )

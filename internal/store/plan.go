@@ -35,6 +35,19 @@ type Debt struct {
 	CuotaUsd   int64  `json:"cuotaUsd"`
 	DueDay     int    `json:"dueDay"`
 	Currency   string `json:"currency"`
+	Last4      string `json:"last4"`
+	LimitCents int64  `json:"limitCents"`
+	Tint       string `json:"tint"`
+}
+
+type DebtMove struct {
+	ID          int64  `json:"id"`
+	DebtID      int64  `json:"debtId"`
+	Kind        string `json:"kind"`
+	Currency    string `json:"currency"`
+	AmountCents int64  `json:"amountCents"`
+	OccurredOn  string `json:"occurredOn"`
+	Note        string `json:"note"`
 }
 
 type Bill struct {
@@ -216,19 +229,30 @@ func (s *Store) SaveDebt(ctx context.Context, userID int64, item Debt) (Debt, er
 		item.Currency = "pen"
 	}
 	item.Name = name
+	item.Last4 = strings.TrimSpace(item.Last4)
+	if item.Kind != "tarjeta" {
+		item.Last4 = ""
+		item.LimitCents = 0
+		item.Tint = "noche"
+	} else {
+		item.Tint = cleanCardTint(item.Tint)
+	}
+	if item.LimitCents < 0 || (item.Last4 != "" && !fourDigits(item.Last4)) {
+		return Debt{}, ErrBadMoney
+	}
 	if item.ID == 0 {
 		err = s.pool.QueryRow(ctx, `
-			INSERT INTO debts (user_id, kind, name, balance_pen, balance_usd, cuota_pen, cuota_usd, due_day, currency)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			INSERT INTO debts (user_id, kind, name, balance_pen, balance_usd, cuota_pen, cuota_usd, due_day, currency, last4, limit_cents, tint)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			RETURNING id`,
-			userID, item.Kind, item.Name, item.BalancePen, item.BalanceUsd, item.CuotaPen, item.CuotaUsd, item.DueDay, item.Currency).Scan(&item.ID)
+			userID, item.Kind, item.Name, item.BalancePen, item.BalanceUsd, item.CuotaPen, item.CuotaUsd, item.DueDay, item.Currency, item.Last4, item.LimitCents, item.Tint).Scan(&item.ID)
 		return item, err
 	}
 	tag, err := s.pool.Exec(ctx, `
 		UPDATE debts SET kind = $3, name = $4, balance_pen = $5, balance_usd = $6,
-			cuota_pen = $7, cuota_usd = $8, due_day = $9, currency = $10
+			cuota_pen = $7, cuota_usd = $8, due_day = $9, currency = $10, last4 = $11, limit_cents = $12, tint = $13
 		WHERE id = $1 AND user_id = $2`,
-		item.ID, userID, item.Kind, item.Name, item.BalancePen, item.BalanceUsd, item.CuotaPen, item.CuotaUsd, item.DueDay, item.Currency)
+		item.ID, userID, item.Kind, item.Name, item.BalancePen, item.BalanceUsd, item.CuotaPen, item.CuotaUsd, item.DueDay, item.Currency, item.Last4, item.LimitCents, item.Tint)
 	if err != nil {
 		return Debt{}, err
 	}
@@ -252,6 +276,143 @@ func (s *Store) DeleteDebt(ctx context.Context, userID, id int64) error {
 	}
 	_, err = s.pool.Exec(ctx, `DELETE FROM debts WHERE id = $1 AND user_id = $2`, id, userID)
 	return err
+}
+
+func fourDigits(value string) bool {
+	if len(value) != 4 {
+		return false
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func cleanCardTint(value string) string {
+	switch strings.TrimSpace(value) {
+	case "oro", "azul", "ciruela", "bosque", "grafito", "cobre":
+		return value
+	default:
+		return "noche"
+	}
+}
+
+func (s *Store) DebtMoves(ctx context.Context, userID, debtID int64) ([]DebtMove, error) {
+	var owner int64
+	var kind string
+	err := s.pool.QueryRow(ctx, `SELECT user_id, kind FROM debts WHERE id = $1`, debtID).Scan(&owner, &kind)
+	if errors.Is(err, pgx.ErrNoRows) || owner != userID {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if kind != "tarjeta" {
+		return nil, ErrBadMoney
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, debt_id, kind, currency, amount_cents, to_char(occurred_on, 'YYYY-MM-DD'), note
+		FROM debt_moves WHERE debt_id = $1 AND user_id = $2
+		ORDER BY occurred_on DESC, id DESC`, debtID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []DebtMove{}
+	for rows.Next() {
+		var item DebtMove
+		if err := rows.Scan(&item.ID, &item.DebtID, &item.Kind, &item.Currency, &item.AmountCents, &item.OccurredOn, &item.Note); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) AddDebtMove(ctx context.Context, userID int64, item DebtMove, day time.Time) (DebtMove, error) {
+	if item.AmountCents <= 0 || (item.Kind != "consumo" && item.Kind != "pago") || (item.Currency != "pen" && item.Currency != "usd") {
+		return DebtMove{}, ErrBadMoney
+	}
+	note, err := cleanLabel(item.Note, 80)
+	if err != nil {
+		return DebtMove{}, err
+	}
+	item.Note = note
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return DebtMove{}, err
+	}
+	defer tx.Rollback(ctx)
+	var kind string
+	err = tx.QueryRow(ctx, `SELECT kind FROM debts WHERE id = $1 AND user_id = $2 FOR UPDATE`, item.DebtID, userID).Scan(&kind)
+	if errors.Is(err, pgx.ErrNoRows) || kind != "tarjeta" {
+		if err == nil || errors.Is(err, pgx.ErrNoRows) {
+			return DebtMove{}, ErrNotFound
+		}
+		return DebtMove{}, err
+	}
+	if err != nil {
+		return DebtMove{}, err
+	}
+	delta := item.AmountCents
+	if item.Kind == "pago" {
+		delta = -delta
+	}
+	if _, err = tx.Exec(ctx, `
+		UPDATE debts SET
+			balance_pen = CASE WHEN $4 = 'pen' THEN GREATEST(0, balance_pen + $3) ELSE balance_pen END,
+			balance_usd = CASE WHEN $4 = 'usd' THEN GREATEST(0, balance_usd + $3) ELSE balance_usd END
+		WHERE id = $1 AND user_id = $2`, item.DebtID, userID, delta, item.Currency); err != nil {
+		return DebtMove{}, err
+	}
+	err = tx.QueryRow(ctx, `
+		INSERT INTO debt_moves (user_id, debt_id, kind, currency, amount_cents, occurred_on, note)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id`, userID, item.DebtID, item.Kind, item.Currency, item.AmountCents, day, item.Note).Scan(&item.ID)
+	if err != nil {
+		return DebtMove{}, err
+	}
+	item.OccurredOn = day.Format("2006-01-02")
+	if err = tx.Commit(ctx); err != nil {
+		return DebtMove{}, err
+	}
+	return item, nil
+}
+
+func (s *Store) DeleteDebtMove(ctx context.Context, userID, debtID, moveID int64) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	var kind, currency string
+	var amount int64
+	err = tx.QueryRow(ctx, `
+		SELECT kind, currency, amount_cents FROM debt_moves
+		WHERE id = $1 AND debt_id = $2 AND user_id = $3`, moveID, debtID, userID).Scan(&kind, &currency, &amount)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	delta := -amount
+	if kind == "pago" {
+		delta = amount
+	}
+	if _, err = tx.Exec(ctx, `
+		UPDATE debts SET
+			balance_pen = CASE WHEN $4 = 'pen' THEN GREATEST(0, balance_pen + $3) ELSE balance_pen END,
+			balance_usd = CASE WHEN $4 = 'usd' THEN GREATEST(0, balance_usd + $3) ELSE balance_usd END
+		WHERE id = $1 AND user_id = $2`, debtID, userID, delta, currency); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM debt_moves WHERE id = $1 AND user_id = $2`, moveID, userID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *Store) SaveBill(ctx context.Context, userID int64, item Bill) (Bill, error) {
@@ -533,7 +694,7 @@ func (s *Store) payAccounts(ctx context.Context, userID int64) ([]PayAccount, er
 
 func (s *Store) debts(ctx context.Context, userID int64) ([]Debt, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, kind, name, balance_pen, balance_usd, cuota_pen, cuota_usd, due_day, currency
+		SELECT id, kind, name, balance_pen, balance_usd, cuota_pen, cuota_usd, due_day, currency, last4, limit_cents, tint
 		FROM debts WHERE user_id = $1 ORDER BY due_day, id`, userID)
 	if err != nil {
 		return nil, err
@@ -542,7 +703,7 @@ func (s *Store) debts(ctx context.Context, userID int64) ([]Debt, error) {
 	var out []Debt
 	for rows.Next() {
 		var item Debt
-		if err := rows.Scan(&item.ID, &item.Kind, &item.Name, &item.BalancePen, &item.BalanceUsd, &item.CuotaPen, &item.CuotaUsd, &item.DueDay, &item.Currency); err != nil {
+		if err := rows.Scan(&item.ID, &item.Kind, &item.Name, &item.BalancePen, &item.BalanceUsd, &item.CuotaPen, &item.CuotaUsd, &item.DueDay, &item.Currency, &item.Last4, &item.LimitCents, &item.Tint); err != nil {
 			return nil, err
 		}
 		out = append(out, item)

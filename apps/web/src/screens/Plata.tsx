@@ -4,11 +4,12 @@ import { api } from '../api'
 import { categoryIcon, categoryTint } from '../categories'
 import { CategorySheet, MoneySheet } from '../components/CaptureSheets'
 import { MoneyChat } from '../components/MoneyChat'
-import { AccountSheet, BillSheet, DebtSheet } from '../components/PlanSheets'
+import { AccountSheet, BillSheet, DebtMoveSheet, DebtSheet } from '../components/PlanSheets'
 import { EyeButton, useHideMoney } from '../components/HideMoney'
 import { Shell } from '../components/Shell'
+import { cardTint } from '../cardTints'
 import { currencySymbol, dolares, money, soles } from '../format'
-import type { Bill, Debt, MoneyCategory, MoneyPlan, MonthMoney, Movement, PayAccount } from '../types'
+import type { Bill, Debt, DebtMove, MoneyCategory, MoneyPlan, MonthMoney, Movement, PayAccount } from '../types'
 
 export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; onChanged: () => void; refresh: number }) {
   const current = currentMonthKey()
@@ -93,14 +94,18 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
           })}
         </div>
       )}
-      <nav className="plan-links">
+      <nav className="plan-links four">
         <Link className="plan-link cuentas" to="/plata/cuentas">
           <i aria-hidden="true"><WalletIcon /></i>
           Cuentas
         </Link>
-        <Link className="plan-link deudas" to="/plata/deudas">
+        <Link className="plan-link tarjetas" to="/plata/tarjetas">
           <i aria-hidden="true"><CardIcon /></i>
-          Deudas
+          Tarjetas
+        </Link>
+        <Link className="plan-link prestamos" to="/plata/prestamos">
+          <i aria-hidden="true"><LoanIcon /></i>
+          Préstamos
         </Link>
         <Link className="plan-link pagos" to="/plata/pagos">
           <i aria-hidden="true"><CalendarIcon /></i>
@@ -154,27 +159,214 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
   )
 }
 
-export function DeudasPage() {
+export function TarjetasPage() {
+  const navigate = useNavigate()
   const { hidden, toggle } = useHideMoney()
   const { plan, reload } = usePlan()
-  const [debt, setDebt] = useState<Debt | null | undefined>(undefined)
+  const cards = plan?.debts.filter((item) => item.kind === 'tarjeta') ?? []
+  const [editing, setEditing] = useState<Debt | null | undefined>(undefined)
+  const fx = plan?.fxHundredths ?? 340
+  const totalPen = cards.reduce((sum, item) => sum + cardDebtPen(item, fx), 0)
+  const totalUsd = cards.reduce((sum, item) => sum + item.balanceUsd, 0)
 
   return (
-    <Shell title="Deudas" back="/plata">
+    <Shell title="Tarjetas" back="/plata">
       <section className="summary">
         <div className="summary-top">
           <p className="label">Deuda total</p>
           <EyeButton hidden={hidden} onToggle={toggle} />
         </div>
-        <strong>{plan ? mask(hidden, soles(plan.debtTotalPen)) : '…'}</strong>
+        <strong>{plan ? mask(hidden, soles(totalPen)) : '…'}</strong>
         <p>
-          {plan && (plan.debtPen > 0 || plan.debtUsd > 0)
-            ? `${mask(hidden, soles(plan.debtPen))} y ${mask(hidden, dolares(plan.debtUsd))}`
-            : 'Tarjetas y préstamos. El sueldo no entra aquí.'}
+          {cards.length
+            ? `${mask(hidden, soles(cards.reduce((sum, item) => sum + item.balancePen, 0)))} y ${mask(hidden, dolares(totalUsd))}`
+            : 'Elige una tarjeta para ver pagos y movimientos.'}
         </p>
-        {plan && plan.cuotaTotalPen > 0 && <p>Cuotas de este mes: {mask(hidden, soles(plan.cuotaTotalPen))}</p>}
       </section>
-      {plan?.debts.map((item) => (
+
+      {cards.length === 0 && <p className="hint">Agrega una tarjeta para ver línea, disponible y movimientos.</p>}
+
+      <div className="card-list">
+        {cards.map((item) => (
+          <article key={item.id} className={`credit-card tone-${cardTint(item.tint)}`}>
+            <button type="button" className="credit-open" onClick={() => navigate(`/plata/tarjetas/${item.id}`)}>
+              <div className="credit-card-top">
+                <strong>{item.name}</strong>
+              </div>
+              <div className="credit-metrics">
+                <div>
+                  <span>Consumido</span>
+                  <strong>{mask(hidden, soles(cardDebtPen(item, fx)))}</strong>
+                </div>
+                <div>
+                  <span>Disponible</span>
+                  <strong>{mask(hidden, soles(cardAvailable(item, fx)))}</strong>
+                </div>
+              </div>
+              <div className="credit-track" aria-hidden="true">
+                <span style={{ width: `${cardUsedPct(item, fx)}%` }} />
+              </div>
+              <p className="credit-line">
+                Línea de crédito: {item.limitCents ? mask(hidden, soles(item.limitCents)) : 'Sin línea'}
+              </p>
+            </button>
+            <button type="button" className="account-edit" aria-label={`Editar ${item.name}`} onClick={() => setEditing(item)}>
+              <PencilIcon />
+            </button>
+          </article>
+        ))}
+      </div>
+
+      <button type="button" className="ghost" onClick={() => setEditing(null)}>Agregar tarjeta</button>
+      {editing !== undefined && (
+        <DebtSheet debt={editing} kind="tarjeta" onClose={() => setEditing(undefined)} onSaved={reload} />
+      )}
+    </Shell>
+  )
+}
+
+export function TarjetaDetail() {
+  const { id } = useParams()
+  const cardId = Number(id)
+  const { hidden, toggle } = useHideMoney()
+  const { plan, reload } = usePlan()
+  const [editing, setEditing] = useState<Debt | null | undefined>(undefined)
+  const [addingMove, setAddingMove] = useState(false)
+  const [moves, setMoves] = useState<DebtMove[]>([])
+  const card = plan?.debts.find((item) => item.id === cardId && item.kind === 'tarjeta')
+  const fx = plan?.fxHundredths ?? 340
+
+  useEffect(() => {
+    if (!card) {
+      setMoves([])
+      return
+    }
+    api.debtMoves(card.id).then(setMoves).catch(() => setMoves([]))
+  }, [card?.id, plan])
+
+  function refresh() {
+    reload()
+  }
+
+  return (
+    <Shell back="/plata/tarjetas" action={<EyeButton hidden={hidden} onToggle={toggle} />}>
+      {!card && <p className="empty">Esa tarjeta ya no está.</p>}
+      {card && (
+        <>
+          <article className={`credit-card tone-${cardTint(card.tint)}`}>
+            <div className="credit-card-top">
+              <strong>{card.name}</strong>
+              <button type="button" className="account-edit" aria-label={`Editar ${card.name}`} onClick={() => setEditing(card)}>
+                <PencilIcon />
+              </button>
+            </div>
+            <div className="credit-metrics">
+              <div>
+                <span>Consumido</span>
+                <strong>{mask(hidden, soles(cardDebtPen(card, fx)))}</strong>
+              </div>
+              <div>
+                <span>Disponible</span>
+                <strong>{mask(hidden, soles(cardAvailable(card, fx)))}</strong>
+              </div>
+            </div>
+            <div className="credit-track" aria-hidden="true">
+              <span style={{ width: `${cardUsedPct(card, fx)}%` }} />
+            </div>
+            <p className="credit-line">
+              Línea de crédito: {card.limitCents ? mask(hidden, soles(card.limitCents)) : 'Sin línea'}
+            </p>
+          </article>
+
+          <section className="card-facts">
+            <div className="card-fact">
+              <span>Prox. pago</span>
+              <strong>{nextPayLabel(card.dueDay)}</strong>
+            </div>
+            <div className="card-fact">
+              <span>A pagar</span>
+              <strong>
+                {mask(hidden, soles(card.cuotaPen))}
+                {card.cuotaUsd ? ` · ${mask(hidden, dolares(card.cuotaUsd))}` : ''}
+              </strong>
+            </div>
+            {(card.balancePen > 0 || card.balanceUsd > 0) && (
+              <div className="card-fact">
+                <span>Consumido</span>
+                <strong>
+                  {mask(hidden, soles(card.balancePen))}
+                  {card.balanceUsd ? ` · ${mask(hidden, dolares(card.balanceUsd))}` : ''}
+                </strong>
+              </div>
+            )}
+          </section>
+
+          <div className="section-head">
+            <h2>Movimientos</h2>
+            <button type="button" className="text-button" onClick={() => setAddingMove(true)}>Anotar</button>
+          </div>
+          {moves.length === 0 && <p className="empty">Aún no hay consumos ni pagos en esta tarjeta.</p>}
+          {moves.length > 0 && (
+            <div className="ledger">
+              {moves.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={item.kind === 'pago' ? 'move ingreso' : 'move gasto'}
+                  onClick={() => {
+                    if (window.confirm('¿Borrar este movimiento?')) {
+                      void api.deleteDebtMove(card.id, item.id).then(refresh)
+                    }
+                  }}
+                >
+                  <span className="move-mark" aria-hidden="true">{(item.note || item.kind).trim().charAt(0).toUpperCase()}</span>
+                  <span className="move-copy">
+                    <strong>{item.note || (item.kind === 'pago' ? 'Pago' : 'Consumo')}</strong>
+                    <span className="meta">{item.kind === 'pago' ? 'Pago' : 'Consumo'} · {movementDate(item.occurredOn)}</span>
+                  </span>
+                  <strong className="move-amount">{debtMoveAmount(item, hidden)}</strong>
+                  <span className="move-chevron" aria-hidden="true">›</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      {editing !== undefined && (
+        <DebtSheet debt={editing} kind="tarjeta" onClose={() => setEditing(undefined)} onSaved={refresh} />
+      )}
+      {addingMove && card && (
+        <DebtMoveSheet debtId={card.id} onClose={() => setAddingMove(false)} onSaved={refresh} />
+      )}
+    </Shell>
+  )
+}
+
+export function PrestamosPage() {
+  const { hidden, toggle } = useHideMoney()
+  const { plan, reload } = usePlan()
+  const loans = plan?.debts.filter((item) => item.kind === 'prestamo') ?? []
+  const [debt, setDebt] = useState<Debt | null | undefined>(undefined)
+  const totalPen = loans.reduce((sum, item) => sum + cardDebtPen(item, plan?.fxHundredths ?? 340), 0)
+  const totalUsd = loans.reduce((sum, item) => sum + item.balanceUsd, 0)
+  const cuotaPen = loans.reduce((sum, item) => sum + item.cuotaPen + Math.floor((item.cuotaUsd * (plan?.fxHundredths ?? 340)) / 100), 0)
+
+  return (
+    <Shell title="Préstamos" back="/plata">
+      <section className="summary">
+        <div className="summary-top">
+          <p className="label">Deuda total</p>
+          <EyeButton hidden={hidden} onToggle={toggle} />
+        </div>
+        <strong>{plan ? mask(hidden, soles(totalPen)) : '…'}</strong>
+        <p>
+          {loans.length
+            ? `${mask(hidden, soles(loans.reduce((sum, item) => sum + item.balancePen, 0)))} y ${mask(hidden, dolares(totalUsd))}`
+            : 'Cuotas fijas. El sueldo no entra aquí.'}
+        </p>
+        {cuotaPen > 0 && <p>Cuotas de este mes: {mask(hidden, soles(cuotaPen))}</p>}
+      </section>
+      {loans.map((item) => (
         <button key={item.id} type="button" className="money-row plan-row" onClick={() => setDebt(item)}>
           <div>
             <strong>{item.name}</strong>
@@ -183,8 +375,8 @@ export function DeudasPage() {
           <strong>{mask(hidden, debtAmount(item))}</strong>
         </button>
       ))}
-      <button type="button" className="ghost" onClick={() => setDebt(null)}>Agregar deuda</button>
-      {debt !== undefined && <DebtSheet debt={debt} onClose={() => setDebt(undefined)} onSaved={reload} />}
+      <button type="button" className="ghost" onClick={() => setDebt(null)}>Agregar préstamo</button>
+      {debt !== undefined && <DebtSheet debt={debt} kind="prestamo" onClose={() => setDebt(undefined)} onSaved={reload} />}
     </Shell>
   )
 }
@@ -407,11 +599,56 @@ function debtMeta(debt: Debt, hidden: boolean) {
   return bits.join(' · ')
 }
 
+function cardDebtPen(debt: Debt, fx: number) {
+  return debt.balancePen + Math.floor((debt.balanceUsd * fx) / 100)
+}
+
+function cardAvailable(debt: Debt, fx: number) {
+  if (!debt.limitCents) return 0
+  return Math.max(0, debt.limitCents - cardDebtPen(debt, fx))
+}
+
+function cardUsedPct(debt: Debt, fx: number) {
+  if (!debt.limitCents) return 0
+  return Math.min(100, Math.round((cardDebtPen(debt, fx) / debt.limitCents) * 100))
+}
+
+function nextPayLabel(dueDay: number) {
+  const now = new Date()
+  let year = now.getFullYear()
+  let month = now.getMonth()
+  if (now.getDate() > dueDay) month += 1
+  if (month > 11) {
+    month = 0
+    year += 1
+  }
+  const last = new Date(year, month + 1, 0).getDate()
+  const day = Math.min(dueDay, last)
+  return `${String(day).padStart(2, '0')}/${String(month + 1).padStart(2, '0')}`
+}
+
+function debtMoveAmount(item: DebtMove, hidden: boolean) {
+  if (hidden) return item.currency === 'usd' ? '$ ••••' : 'S/ ••••'
+  if (item.currency === 'usd') return item.kind === 'pago' ? dolares(item.amountCents) : `− ${dolares(item.amountCents)}`
+  const number = soles(item.amountCents).replace(/^S\/\s*/, '')
+  return item.kind === 'pago' ? `S/ ${number}` : `S/ −${number}`
+}
+
 function CardIcon() {
   return (
     <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.75">
       <rect x="3" y="6" width="18" height="13" rx="2" />
       <path d="M3 10h18M7 15h4" />
+    </svg>
+  )
+}
+
+function LoanIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M4 7h16v10H4z" />
+      <path d="M8 11h8M8 14h5" />
+      <path d="M7 7V5.5A1.5 1.5 0 0 1 8.5 4h7A1.5 1.5 0 0 1 17 5.5V7" />
     </svg>
   )
 }

@@ -63,6 +63,7 @@ export type PayAccount = {
   currency: string
   balanceCents: number
 }
+export type CardTint = 'noche' | 'oro' | 'azul' | 'ciruela' | 'bosque' | 'grafito' | 'cobre'
 export type Debt = {
   id: number
   kind: 'tarjeta' | 'prestamo'
@@ -73,6 +74,18 @@ export type Debt = {
   cuotaUsd: number
   dueDay: number
   currency: 'pen' | 'usd'
+  last4: string
+  limitCents: number
+  tint: CardTint
+}
+export type DebtMove = {
+  id: number
+  debtId: number
+  kind: 'consumo' | 'pago'
+  currency: 'pen' | 'usd'
+  amountCents: number
+  occurredOn: string
+  note: string
 }
 export type Bill = { id: number; name: string; amountCents: number; dueDay: number; categoryId: number; category: string }
 export type MoneyPlan = {
