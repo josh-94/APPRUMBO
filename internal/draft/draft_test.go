@@ -102,6 +102,46 @@ func TestPromptListsCategoryIDs(t *testing.T) {
 	}
 }
 
+func TestTryLocalMoneyClearLine(t *testing.T) {
+	today := time.Date(2026, 10, 17, 0, 0, 0, 0, time.UTC)
+	categories := []Category{
+		{ID: 3, Name: "Comida", Kind: "gasto"},
+		{ID: 5, Name: "Entretenimiento", Kind: "gasto"},
+		{ID: 9, Name: "Casa", Kind: "gasto"},
+	}
+	got, ok := TryLocalMoney("almuerzo 18.50", categories, today, nil)
+	if !ok || got.AmountCents != 1850 || got.CategoryID != 3 || got.Category != "Comida" {
+		t.Fatalf("almuerzo %+v ok=%v", got, ok)
+	}
+	got, ok = TryLocalMoney("gaste 23 soles en cine de mi tarjeta amex", categories, today, nil)
+	if !ok || got.AmountCents != 2300 || got.CategoryID != 5 {
+		t.Fatalf("cine %+v ok=%v", got, ok)
+	}
+}
+
+func TestTryLocalMoneyCategoryCorrection(t *testing.T) {
+	today := time.Date(2026, 10, 17, 0, 0, 0, 0, time.UTC)
+	categories := []Category{
+		{ID: 3, Name: "Comida", Kind: "gasto"},
+		{ID: 9, Name: "Casa", Kind: "gasto"},
+		{ID: 11, Name: "Alimentos", Kind: "gasto"},
+	}
+	previous := &Proposal{Kind: "gasto", AmountCents: 2300, Note: "cine", Day: "2026-10-17"}
+	got, ok := TryLocalMoney("alimentos", categories, today, previous)
+	if !ok || got.AmountCents != 2300 || got.CategoryID != 11 || got.Category != "Alimentos" {
+		t.Fatalf("alimentos name %+v ok=%v", got, ok)
+	}
+	previous = &Proposal{Kind: "gasto", AmountCents: 2300, Note: "cine", Day: "2026-10-17"}
+	categories = []Category{{ID: 3, Name: "Comida", Kind: "gasto"}, {ID: 9, Name: "Casa", Kind: "gasto"}}
+	got, ok = TryLocalMoney("alimentos", categories, today, previous)
+	if !ok || got.CategoryID != 3 || got.Category != "Comida" {
+		t.Fatalf("alimentos synonym %+v ok=%v", got, ok)
+	}
+	if _, ok = TryLocalMoney("no sé", categories, today, previous); ok {
+		t.Fatal("expected miss")
+	}
+}
+
 func TestCompleteAndTranscribe(t *testing.T) {
 	ollama := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/chat" {
@@ -112,7 +152,9 @@ func TestCompleteAndTranscribe(t *testing.T) {
 		var req struct {
 			KeepAlive int `json:"keep_alive"`
 			Options   struct {
-				NumThread int `json:"num_thread"`
+				NumThread  int `json:"num_thread"`
+				NumCtx     int `json:"num_ctx"`
+				NumPredict int `json:"num_predict"`
 			} `json:"options"`
 		}
 		if err := json.Unmarshal(raw, &req); err != nil {
@@ -125,9 +167,32 @@ func TestCompleteAndTranscribe(t *testing.T) {
 		_, _ = w.Write([]byte(`{"message":{"content":"{\"kind\":\"gasto\"}"}}`))
 	}))
 	defer ollama.Close()
-	got, err := Complete(context.Background(), ollama.URL, "qwen2.5vl:3b", "sistema", "almuerzo", nil, 4)
+	got, err := Complete(context.Background(), ollama.URL, "qwen2.5:3b", "sistema", "almuerzo", nil, 4)
 	if err != nil || !strings.Contains(got, "gasto") {
 		t.Fatalf("%q %v", got, err)
+	}
+
+	money := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		var req struct {
+			Options struct {
+				NumCtx     int `json:"num_ctx"`
+				NumPredict int `json:"num_predict"`
+				NumThread  int `json:"num_thread"`
+			} `json:"options"`
+		}
+		if err := json.Unmarshal(raw, &req); err != nil {
+			t.Error(err)
+		}
+		if req.Options.NumCtx != 512 || req.Options.NumPredict != 72 || req.Options.NumThread != 4 {
+			t.Errorf("money options %+v", req.Options)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"message":{"content":"{\"kind\":\"gasto\"}"}}`))
+	}))
+	defer money.Close()
+	if _, err := CompleteMoney(context.Background(), money.URL, "qwen2.5:3b", "s", "u", 4); err != nil {
+		t.Fatalf("CompleteMoney %v", err)
 	}
 
 	missing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

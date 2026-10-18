@@ -86,24 +86,120 @@ Si hay memoria reciente, úsala solo como pista de hábitos (categoría/nota); e
 		raw, _ := json.Marshal(previous)
 		user = "Borrador anterior:\n" + string(raw) + "\n\nCorrección:\n" + text
 	}
-	if mem := clipMemory(memory); mem != "" {
+	if mem := clipMemory(memory, moneyMemoryLimit); mem != "" {
 		user = "Memoria reciente:\n" + mem + "\n\n" + user
 	}
 	return system, user
 }
 
-const memoryLimit = 1800
+const moneyMemoryLimit = 400
 
-func clipMemory(raw string) string {
+func clipMemory(raw string, limit int) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return ""
 	}
-	if utf8.RuneCountInString(raw) <= memoryLimit {
+	if limit <= 0 {
+		limit = moneyMemoryLimit
+	}
+	if utf8.RuneCountInString(raw) <= limit {
 		return raw
 	}
 	runes := []rune(raw)
-	return string(runes[len(runes)-memoryLimit:])
+	return string(runes[len(runes)-limit:])
+}
+
+// TryLocalMoney builds a draft without Ollama when amount and/or category are clear from text.
+func TryLocalMoney(text string, categories []Category, today time.Time, previous *Proposal) (Proposal, bool) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return Proposal{}, false
+	}
+	amount, hasAmount := AmountFromText(text)
+
+	// Short category correction on an existing draft (e.g. "alimentos", "transporte").
+	if previous != nil && previous.AmountCents > 0 && !hasAmount && utf8.RuneCountInString(text) <= 40 {
+		kind := previous.Kind
+		if kind != "ingreso" {
+			kind = "gasto"
+		}
+		cat, ok := matchLocalCategory(text, kind, categories)
+		if !ok {
+			return Proposal{}, false
+		}
+		day := resolveDay(text, "", today, previous)
+		note := clip(previous.Note, noteLimit)
+		out := Proposal{
+			Kind:        kind,
+			AmountCents: previous.AmountCents,
+			CategoryID:  cat.ID,
+			Category:    cat.Name,
+			Note:        note,
+			Day:         day.Format("2006-01-02"),
+			Confidence:  "alta",
+			Question:    "",
+		}
+		return out, true
+	}
+
+	if !hasAmount {
+		return Proposal{}, false
+	}
+
+	kind := "gasto"
+	cat, ok := matchLocalCategory(text, "gasto", categories)
+	if !ok {
+		if c, okIn := matchLocalCategory(text, "ingreso", categories); okIn {
+			kind = "ingreso"
+			cat, ok = c, true
+		}
+	}
+	day := resolveDay(text, "", today, previous)
+	note := localMoneyNote(text, cat.Name)
+	if note == "" && previous != nil {
+		note = clip(previous.Note, noteLimit)
+	}
+	out := Proposal{
+		Kind:        kind,
+		AmountCents: amount,
+		Note:        note,
+		Day:         day.Format("2006-01-02"),
+		Confidence:  "baja",
+	}
+	if ok {
+		out.CategoryID = cat.ID
+		out.Category = cat.Name
+	}
+	if out.CategoryID == 0 {
+		out.Question = "¿En qué categoría lo anoto?"
+	} else {
+		out.Confidence = "alta"
+	}
+	return out, true
+}
+
+func matchLocalCategory(text, kind string, categories []Category) (Category, bool) {
+	if kind == "gasto" {
+		if cat, ok := matchGastoCategory(text, categories); ok {
+			return cat, true
+		}
+	}
+	return categoryByName(text, kind, categories)
+}
+
+var (
+	localMoneyAmountRe = regexp.MustCompile(`(?i)(?:(?:s\s*/|soles?)\s*\d{1,6}(?:[.,]\d{1,2})?|\d{1,6}(?:[.,]\d{1,2})?\s*soles?|\d{1,6}[.,]\d{1,2}|\b\d{1,6}\b)`)
+	localMoneyNoiseRe  = regexp.MustCompile(`(?i)\b(gast[eé]|pase|pasé|compré|compre|en|de|mi|la|el|los|las|un|una|con|por|tarjeta|amex|yape|plin|soles?)\b`)
+)
+
+func localMoneyNote(text, category string) string {
+	note := localMoneyAmountRe.ReplaceAllString(text, " ")
+	note = localMoneyNoiseRe.ReplaceAllString(note, " ")
+	if category != "" {
+		note = strings.ReplaceAll(note, category, " ")
+		note = strings.ReplaceAll(note, strings.ToLower(category), " ")
+	}
+	return clip(note, noteLimit)
 }
 
 func Normalize(text, raw string, categories []Category, today time.Time, trustModelAmount bool, previous *Proposal) (Proposal, error) {
@@ -355,6 +451,11 @@ func predictCap(image bool) int {
 
 func Complete(ctx context.Context, baseURL, model, system, user string, image []byte, numThread int) (string, error) {
 	return completeChat(ctx, baseURL, model, system, user, image, ctxSize(len(image) > 0), predictCap(len(image) > 0), numThread)
+}
+
+// CompleteMoney uses a small context for fast money chat drafts on CPU.
+func CompleteMoney(ctx context.Context, baseURL, model, system, user string, numThread int) (string, error) {
+	return completeChat(ctx, baseURL, model, system, user, nil, 512, 72, numThread)
 }
 
 // CompleteCapture uses a smaller context for fast structured capture drafts.

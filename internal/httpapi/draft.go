@@ -115,13 +115,19 @@ func (s *Server) moneyDraft(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "No se pudieron leer las categorías")
 		return
 	}
-	system, user := draft.Prompt(toDraftCategories(categories), s.today(), text, in.Previous, in.Memory)
-	raw, err := draft.Complete(ctx, s.OllamaURL, s.draftModel(false), system, user, nil, s.OllamaNumThread)
+	cats := toDraftCategories(categories)
+	if proposal, ok := draft.TryLocalMoney(text, cats, s.today(), in.Previous); ok {
+		proposal.Transcript = text
+		writeJSON(w, http.StatusOK, proposal)
+		return
+	}
+	system, user := draft.Prompt(cats, s.today(), text, in.Previous, in.Memory)
+	raw, err := draft.CompleteMoney(ctx, s.OllamaURL, s.draftModel(false), system, user, s.OllamaNumThread)
 	if message, failed := draftFailure(err, "No entendí eso. Dilo de otra forma."); failed {
 		writeError(w, message.status, message.text)
 		return
 	}
-	proposal, err := draft.Normalize(text, raw, toDraftCategories(categories), s.today(), false, in.Previous)
+	proposal, err := draft.Normalize(text, raw, cats, s.today(), false, in.Previous)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "No entendí eso. Dilo de otra forma.")
 		return
