@@ -315,9 +315,55 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .ghost { width: 100%; margin-top: 8px; background: transparent; }
 .danger { color: var(--danger); border-color: transparent; background: transparent; cursor: pointer; }
 .ghost.danger { border: 1px solid #f0d2cc; }
-.confirm-delete { margin-top: 8px; }
-.confirm-delete p { margin: 8px 0 0; text-align: center; font-weight: 700; }
-.confirm-delete .ghost { margin-top: 8px; }
+.sheet-with-footer {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+.sheet-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+.sheet-footer {
+  flex: none;
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+.sheet-footer .primary { margin-top: 0; }
+.sheet-footer .money-summary { margin: 0; }
+.sheet-delete {
+  justify-self: center;
+  margin: 2px 0 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--danger);
+}
+.sheet-delete:hover,
+.sheet-delete:visited {
+  color: var(--danger);
+  text-decoration: none;
+}
+.confirm-delete {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: stretch;
+}
+.confirm-delete p {
+  grid-column: 1 / -1;
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.confirm-delete .ghost { margin-top: 0; width: 100%; }
 
 .moment { padding-top: 24px; }
 .moment-title { font-size: 2.6rem; margin: 12px 0; }

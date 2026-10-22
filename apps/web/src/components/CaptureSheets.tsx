@@ -244,12 +244,13 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <form className="sheet money-sheet" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void submit(event)}>
+      <form className="sheet money-sheet sheet-with-footer" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void submit(event)}>
         <div className="sheet-handle" />
         <div className="sheet-top">
           <h2>{movement?.id ? (kind === 'gasto' ? 'Editar gasto' : 'Editar ingreso') : (kind === 'gasto' ? 'Anotar gasto' : 'Anotar ingreso')}</h2>
           <button type="button" className="sheet-close" aria-label="Cerrar" onClick={onClose}>×</button>
         </div>
+        <div className="sheet-scroll">
 
         <div className="switch-row money-kind">
           <button type="button" className={kind === 'gasto' ? 'pill on' : 'pill quiet'} onClick={() => chooseKind('gasto')}>Gasto</button>
@@ -410,32 +411,43 @@ export function MoneySheet({ money, movement, onClose, onSave, onDelete, onCreat
           )}
         </div>
 
-        {(amountLabel || sourceLabel || selectedCategory) && (
-          <p className="money-summary" aria-live="polite">
-            {[
-              amountLabel ? `${kind === 'gasto' ? '−' : '+'} ${amountLabel}` : null,
-              sourceLabel,
-              selectedCategory?.name,
-            ].filter(Boolean).join(' · ')}
-          </p>
-        )}
+        </div>
 
-        {error && <p className="error">{error}</p>}
-        <button type="submit" className="primary">{movement?.id ? 'Guardar' : 'Listo'}</button>
-        {movement?.id && onDelete && !confirmingDelete && (
-          <button type="button" className="ghost danger" onClick={() => setConfirmingDelete(true)}>
-            Borrar
-          </button>
-        )}
-        {movement?.id && onDelete && confirmingDelete && (
-          <div className="confirm-delete">
-            <p>¿Borrar este {kind === 'gasto' ? 'gasto' : 'ingreso'}?</p>
-            <button type="button" className="ghost" onClick={() => setConfirmingDelete(false)}>Cancelar</button>
-            <button type="button" className="ghost danger" onClick={() => void onDelete().catch((err) => setError(err instanceof Error ? err.message : 'No se pudo borrar'))}>
-              Sí, borrar
-            </button>
-          </div>
-        )}
+        <div className="sheet-footer">
+          {(amountLabel || sourceLabel || selectedCategory) && (
+            <p className="money-summary" aria-live="polite">
+              {[
+                amountLabel ? `${kind === 'gasto' ? '−' : '+'} ${amountLabel}` : null,
+                sourceLabel,
+                selectedCategory?.name,
+              ].filter(Boolean).join(' · ')}
+            </p>
+          )}
+          {error && <p className="error">{error}</p>}
+          {!confirmingDelete && (
+            <>
+              <button type="submit" className="primary">{movement?.id ? 'Guardar' : 'Listo'}</button>
+              {movement?.id && onDelete && (
+                <button type="button" className="text-button danger sheet-delete" onClick={() => setConfirmingDelete(true)}>
+                  Borrar {kind === 'gasto' ? 'gasto' : 'ingreso'}
+                </button>
+              )}
+            </>
+          )}
+          {movement?.id && onDelete && confirmingDelete && (
+            <div className="confirm-delete">
+              <p>¿Borrar este {kind === 'gasto' ? 'gasto' : 'ingreso'}?</p>
+              <button type="button" className="ghost" onClick={() => setConfirmingDelete(false)}>Cancelar</button>
+              <button
+                type="button"
+                className="ghost danger"
+                onClick={() => void onDelete().catch((err) => setError(err instanceof Error ? err.message : 'No se pudo borrar'))}
+              >
+                Sí, borrar
+              </button>
+            </div>
+          )}
+        </div>
       </form>
     </div>
   )
