@@ -15,14 +15,17 @@ import (
 var ErrUnavailable = errors.New("foods unavailable")
 
 type Hit struct {
-	ID       string  `json:"id"`
-	Name     string  `json:"name"`
-	Brand    string  `json:"brand"`
-	Kcal     float64 `json:"kcal"`
-	ProteinG float64 `json:"proteinG"`
-	CarbsG   float64 `json:"carbsG"`
-	FatG     float64 `json:"fatG"`
-	PerGrams float64 `json:"perGrams"`
+	ID           string  `json:"id"`
+	Name         string  `json:"name"`
+	Brand        string  `json:"brand"`
+	Kcal         float64 `json:"kcal"`
+	ProteinG     float64 `json:"proteinG"`
+	CarbsG       float64 `json:"carbsG"`
+	FatG         float64 `json:"fatG"`
+	PerGrams     float64 `json:"perGrams"`
+	Source       string  `json:"source,omitempty"`
+	ServingGrams int     `json:"servingGrams,omitempty"`
+	ServingLabel string  `json:"servingLabel,omitempty"`
 }
 
 type Client struct {
@@ -134,13 +137,17 @@ func nutriment(values map[string]any, keys ...string) float64 {
 	return 0
 }
 
-// ScaleMacros scales per-100g values to the given portion grams.
-func ScaleMacros(per100 Hit, grams int) (protein, carbs, fat, kcal float64) {
+// ScaleMacros scales stored per-portion values to the given grams.
+func ScaleMacros(base Hit, grams int) (protein, carbs, fat, kcal float64) {
 	if grams <= 0 {
 		return 0, 0, 0, 0
 	}
-	factor := float64(grams) / 100
-	return round1(per100.ProteinG * factor), round1(per100.CarbsG * factor), round1(per100.FatG * factor), round1(per100.Kcal * factor)
+	per := base.PerGrams
+	if per <= 0 {
+		per = 100
+	}
+	factor := float64(grams) / per
+	return round1(base.ProteinG * factor), round1(base.CarbsG * factor), round1(base.FatG * factor), round1(base.Kcal * factor)
 }
 
 func round1(value float64) float64 {

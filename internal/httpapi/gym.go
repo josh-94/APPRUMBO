@@ -184,11 +184,20 @@ func (s *Server) foodSearch(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"foods": []foods.Hit{}})
 		return
 	}
-	client := s.Foods
-	if client == nil {
-		client = foods.NewClient()
+	localRows, err := s.Store.SearchFoods(r.Context(), query, 12)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "No pude buscar alimentos ahora.")
+		return
 	}
-	hits, err := client.Search(r.Context(), query)
+	local := make([]foods.Hit, 0, len(localRows))
+	for _, row := range localRows {
+		local = append(local, foods.FromLocal(
+			row.ID, row.Slug, row.Name, row.Brand,
+			row.ProteinG, row.CarbsG, row.FatG, row.Kcal, row.PerGrams,
+			row.ServingGrams, row.ServingLabel, row.Source,
+		))
+	}
+	hits, err := foods.MergeSearch(r.Context(), local, s.Foods, query)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "No pude buscar alimentos ahora.")
 		return

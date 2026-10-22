@@ -11,6 +11,7 @@ export function WorkoutsPage() {
   const [meals, setMeals] = useState<Meal[]>([])
   const [error, setError] = useState('')
   const [addingFoodFor, setAddingFoodFor] = useState<number | null>(null)
+  const [pickingMeal, setPickingMeal] = useState(false)
   const [newMealTitle, setNewMealTitle] = useState('')
 
   const chips = useMemo(() => weekChips(), [])
@@ -68,19 +69,42 @@ export function WorkoutsPage() {
     }
   }
 
-  async function createMeal(event: FormEvent) {
-    event.preventDefault()
-    const title = newMealTitle.trim()
-    if (!title) return
+  async function createMealWithTitle(title: string, openFood = false) {
+    const trimmed = title.trim()
+    if (!trimmed) return
     try {
-      const meal = await api.createMeal({ day: selectedDay, title })
+      const meal = await api.createMeal({ day: selectedDay, title: trimmed })
       setMeals((items) => [...items, meal])
       setNewMealTitle('')
       setError('')
+      setPickingMeal(false)
+      if (openFood) setAddingFoodFor(meal.id)
       void reloadWeek()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo crear la comida')
     }
+  }
+
+  async function createMeal(event: FormEvent) {
+    event.preventDefault()
+    await createMealWithTitle(newMealTitle)
+  }
+
+  async function startAddFood(mealId?: number) {
+    if (mealId != null) {
+      setPickingMeal(false)
+      setAddingFoodFor(mealId)
+      return
+    }
+    if (meals.length === 1) {
+      setAddingFoodFor(meals[0].id)
+      return
+    }
+    if (meals.length === 0) {
+      await createMealWithTitle('Comida', true)
+      return
+    }
+    setPickingMeal(true)
   }
 
   async function removeMeal(id: number) {
@@ -107,22 +131,33 @@ export function WorkoutsPage() {
     }
   }
 
+  const selectedChip = chips.find((chip) => chip.key === selectedDay)
+  const selectedPlanned = selectedChip ? planned.has(selectedChip.weekday) : false
+  const plannedCount = planned.size
+  const attendedCount = chips.filter((chip) => logs.get(chip.key)?.attended).length
+
   return (
     <Shell title="Entrenamientos" back="/tiempo">
-      <section className="summary">
-        <p className="label">Esta semana</p>
-        <div className="week-row">
+      <section className="gym-panel paper-card">
+        <div className="gym-panel-head">
+          <div>
+            <h2 className="section-label">Esta semana</h2>
+            <p className="meta">Toca un día · ✓ fuiste · borde planeado</p>
+          </div>
+          <p className="gym-panel-count">{attendedCount} asist. · {plannedCount} plan</p>
+        </div>
+        <div className="gym-week">
           {chips.map((chip, index) => {
             const log = logs.get(chip.key)
             const isPlanned = planned.has(index)
             const attended = Boolean(log?.attended)
             const selected = chip.key === selectedDay
             const className = [
-              'day-chip',
-              selected ? 'today' : '',
-              !selected && isPlanned ? 'planned' : '',
-              !selected && attended ? 'attended' : '',
-              chip.today && !selected ? 'is-today' : '',
+              'gym-day',
+              selected ? 'is-selected' : '',
+              chip.today ? 'is-today' : '',
+              attended ? 'is-attended' : '',
+              !attended && isPlanned ? 'is-planned' : '',
             ].filter(Boolean).join(' ')
             return (
               <button
@@ -130,43 +165,60 @@ export function WorkoutsPage() {
                 type="button"
                 className={className}
                 aria-pressed={selected}
+                aria-label={`${weekdayLabel(chip.weekday + 1)} ${chip.day}${attended ? ', asististe' : isPlanned ? ', planeado' : ''}`}
                 onClick={() => setSelectedDay(chip.key)}
               >
                 <small>{weekdayLabel(chip.weekday + 1)}</small>
                 <strong>{chip.day}</strong>
+                <span className="gym-day-mark" aria-hidden>
+                  {attended ? '✓' : isPlanned ? '·' : ''}
+                </span>
               </button>
             )
           })}
         </div>
-        <p className="meta">Plan de la semana</p>
-        <div className="switch-row">
+      </section>
+
+      <section className="gym-panel paper-card">
+        <h2 className="section-label">Plan de entrenamiento</h2>
+        <p className="meta">Días que quieres ir</p>
+        <div className="gym-plan">
           {chips.map((chip, index) => (
             <button
               key={`plan-${chip.key}`}
               type="button"
-              className={planned.has(index) ? 'pill on' : 'pill quiet'}
+              className={planned.has(index) ? 'gym-plan-day on' : 'gym-plan-day'}
+              aria-pressed={planned.has(index)}
               onClick={() => void togglePlan(index)}
             >
-              {chip.label.slice(0, 1)}
+              <small>{weekdayLabel(chip.weekday + 1)}</small>
+              <strong>{chip.day}</strong>
             </button>
           ))}
         </div>
       </section>
 
-      <section className="paper-card home-card">
+      <section className="gym-panel paper-card">
         <h2 className="section-label">{dayHeading(selectedDay, today)}</h2>
-        <label className="habit" style={{ marginBottom: 12 }}>
-          <button
-            type="button"
-            className={dayLog?.attended ? 'check on' : 'check'}
-            aria-label="Fui al gym"
-            onClick={() => void setAttended(!dayLog?.attended, dayLog?.attendedAt || currentTime())}
-          />
-          <span className="habit-copy">
+        <p className="meta gym-day-status">
+          {selectedPlanned ? 'Día planeado' : 'Sin plan este día'}
+          {dayLog?.attended ? ' · asistencia marcada' : ''}
+        </p>
+        <button
+          type="button"
+          className={dayLog?.attended ? 'gym-attend on' : 'gym-attend'}
+          onClick={() => void setAttended(!dayLog?.attended, dayLog?.attendedAt || currentTime())}
+        >
+          <span className={dayLog?.attended ? 'check on' : 'check'} aria-hidden />
+          <span className="gym-attend-copy">
             <strong>Fui al gym</strong>
-            <span className="meta">{dayLog?.attended ? (dayLog.attendedAt ? `A las ${dayLog.attendedAt}` : 'Asistencia marcada') : 'Sin marcar'}</span>
+            <span className="meta">
+              {dayLog?.attended
+                ? (dayLog.attendedAt ? `A las ${dayLog.attendedAt}` : 'Asistencia marcada')
+                : 'Toca si entrenaste'}
+            </span>
           </span>
-        </label>
+        </button>
         {dayLog?.attended && (
           <label className="field">
             Hora
@@ -178,55 +230,89 @@ export function WorkoutsPage() {
           </label>
         )}
 
-        <h3 className="section-label">Macros del día</h3>
-        <div className="macro-row">
-          <MacroStat label="P" value={`${fmt(macros.proteinG)} g`} />
-          <MacroStat label="C" value={`${fmt(macros.carbsG)} g`} />
-          <MacroStat label="G" value={`${fmt(macros.fatG)} g`} />
-          <MacroStat label="kcal" value={fmt(macros.kcal)} />
+        <div className="macro-summary">
+          <div className="macro-kcal">
+            <strong>{fmt(macros.kcal)}</strong>
+            <span>kcal hoy</span>
+          </div>
+          <div className="macro-bars">
+            <MacroBar label="Proteína" short="P" grams={macros.proteinG} kcal={macros.proteinG * 4} totalKcal={macros.kcal} />
+            <MacroBar label="Carbos" short="C" grams={macros.carbsG} kcal={macros.carbsG * 4} totalKcal={macros.kcal} />
+            <MacroBar label="Grasas" short="G" grams={macros.fatG} kcal={macros.fatG * 9} totalKcal={macros.kcal} />
+          </div>
+          <button type="button" className="primary macro-add" onClick={() => void startAddFood()}>
+            Añadir alimento
+          </button>
         </div>
       </section>
 
-      <h2 className="section-label">Comidas libres</h2>
-      {meals.length === 0 && <p className="empty">Añade comidas del día y busca alimentos.</p>}
-      {meals.map((meal) => (
-        <article key={meal.id} className="goal-card">
-          <div className="section-head">
-            <strong>{meal.title}</strong>
-            <button type="button" className="ghost danger" onClick={() => void removeMeal(meal.id)}>Borrar</button>
+      {pickingMeal && (
+        <section className="gym-panel paper-card">
+          <h2 className="section-label">¿A qué comida?</h2>
+          <div className="meal-pick">
+            {meals.map((meal) => (
+              <button key={meal.id} type="button" className="pill quiet" onClick={() => void startAddFood(meal.id)}>
+                {meal.title}
+              </button>
+            ))}
+            <button type="button" className="ghost" onClick={() => setPickingMeal(false)}>Cancelar</button>
           </div>
-          {meal.items.length === 0 && <p className="meta">Sin alimentos aún.</p>}
-          {meal.items.map((item) => (
-            <div key={item.id} className="money-row">
-              <div>
-                <strong>{item.foodName}</strong>
-                <p className="meta">
-                  {item.grams} g
-                  {item.brand ? ` · ${item.brand}` : ''}
-                  {` · P ${fmt(item.proteinG)} · C ${fmt(item.carbsG)} · G ${fmt(item.fatG)} · ${fmt(item.kcal)} kcal`}
-                </p>
-              </div>
-              <button type="button" className="ghost" onClick={() => void removeItem(meal.id, item.id)}>×</button>
-            </div>
-          ))}
-          <button type="button" className="pill quiet" onClick={() => setAddingFoodFor(meal.id)}>
-            Añadir alimento
-          </button>
-        </article>
-      ))}
+        </section>
+      )}
 
-      <form className="switch-row" onSubmit={(event) => void createMeal(event)}>
-        <label className="field" style={{ flex: 1, margin: 0 }}>
-          Nueva comida
-          <input
-            value={newMealTitle}
-            maxLength={80}
-            placeholder="Desayuno, snack…"
-            onChange={(event) => setNewMealTitle(event.target.value)}
-          />
-        </label>
-        <button type="submit" className="primary">Crear</button>
-      </form>
+      <section className="gym-panel paper-card">
+        <h2 className="section-label">Comidas</h2>
+        <div className="meal-presets">
+          {MEAL_PRESETS.map((title) => (
+            <button
+              key={title}
+              type="button"
+              className="pill quiet"
+              onClick={() => void createMealWithTitle(title)}
+            >
+              {title}
+            </button>
+          ))}
+        </div>
+        {meals.length === 0 && <p className="empty">Elige un atajo o crea una comida.</p>}
+        {meals.map((meal) => (
+          <article key={meal.id} className="meal-card">
+            <div className="section-head">
+              <strong>{meal.title}</strong>
+              <button type="button" className="ghost danger" onClick={() => void removeMeal(meal.id)}>Borrar</button>
+            </div>
+            {meal.items.length === 0 && <p className="meta">Sin alimentos aún.</p>}
+            {meal.items.map((item) => (
+              <div key={item.id} className="food-row">
+                <div>
+                  <strong>{item.foodName}</strong>
+                  <p className="meta">
+                    {item.grams} g
+                    {item.brand ? ` · ${item.brand}` : ''}
+                    {` · ${fmt(item.kcal)} kcal`}
+                  </p>
+                </div>
+                <button type="button" className="ghost" onClick={() => void removeItem(meal.id, item.id)}>×</button>
+              </div>
+            ))}
+            <button type="button" className="pill quiet" onClick={() => void startAddFood(meal.id)}>
+              Añadir
+            </button>
+          </article>
+        ))}
+        <form className="meal-create" onSubmit={(event) => void createMeal(event)}>
+          <label className="field" style={{ flex: 1, margin: 0 }}>
+            Otra comida
+            <input
+              value={newMealTitle}
+              maxLength={80}
+              placeholder="Nombre…"
+              onChange={(event) => setNewMealTitle(event.target.value)}
+            />
+          </label>
+          <button type="submit" className="primary">Crear</button>
+        </form>
+      </section>
 
       {error && <p className="error">{error}</p>}
 
@@ -247,6 +333,8 @@ export function WorkoutsPage() {
   )
 }
 
+const MEAL_PRESETS = ['Desayuno', 'Almuerzo', 'Cena', 'Snack']
+
 function FoodSearchSheet({ mealId, onClose, onAdded }: {
   mealId: number
   onClose: () => void
@@ -259,8 +347,8 @@ function FoodSearchSheet({ mealId, onClose, onAdded }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  async function search(event: FormEvent) {
-    event.preventDefault()
+  async function search(event?: FormEvent) {
+    event?.preventDefault()
     const q = query.trim()
     if (!q) return
     setBusy(true)
@@ -276,6 +364,13 @@ function FoodSearchSheet({ mealId, onClose, onAdded }: {
     } finally {
       setBusy(false)
     }
+  }
+
+  function pickHit(hit: FoodHit) {
+    setSelected(hit)
+    const serving = hit.servingGrams && hit.servingGrams > 0 ? hit.servingGrams : 100
+    setGrams(String(serving))
+    setError('')
   }
 
   async function addFood(event: FormEvent) {
@@ -308,45 +403,80 @@ function FoodSearchSheet({ mealId, onClose, onAdded }: {
     }
   }
 
-  const preview = selected ? scaleMacros(selected, Math.max(1, Math.round(Number(grams.replace(',', '.') || 0)))) : null
+  const portionGrams = Math.max(1, Math.round(Number(grams.replace(',', '.') || 0)))
+  const preview = selected ? scaleMacros(selected, portionGrams) : null
+  const shortcuts = selected
+    ? [
+        selected.servingGrams && selected.servingGrams > 0
+          ? { label: selected.servingLabel || `${selected.servingGrams} g`, grams: selected.servingGrams }
+          : null,
+        { label: '50 g', grams: 50 },
+        { label: '100 g', grams: 100 },
+        { label: '150 g', grams: 150 },
+      ].filter((item): item is { label: string; grams: number } => Boolean(item))
+    : []
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={(event) => void (selected ? addFood(event) : search(event))}>
         <div className="sheet-handle" />
         <h2>Añadir alimento</h2>
-        <label className="field">
-          Buscar
-          <input
-            value={query}
-            autoFocus
-            placeholder="Ej. yogurt, pan, pollo"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
         {!selected && (
-          <button type="submit" className="primary" disabled={busy}>
-            {busy ? 'Buscando…' : 'Buscar'}
-          </button>
+          <>
+            <label className="field">
+              Buscar
+              <input
+                value={query}
+                autoFocus
+                placeholder="Huevo, arroz, pollo…"
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+            <button type="submit" className="primary" disabled={busy}>
+              {busy ? 'Buscando…' : 'Buscar'}
+            </button>
+            <div className="food-hits">
+              {hits.map((hit) => (
+                <button
+                  key={`${hit.id}-${hit.name}`}
+                  type="button"
+                  className="food-hit"
+                  onClick={() => pickHit(hit)}
+                >
+                  <span className="food-hit-top">
+                    <strong>{hit.name}</strong>
+                    {hit.source === 'local' && <span className="food-badge">Común</span>}
+                  </span>
+                  <span className="meta">
+                    {hit.brand ? `${hit.brand} · ` : ''}
+                    {fmt(hit.kcal)} kcal / {hit.perGrams || 100} g
+                    {hit.servingLabel ? ` · ${hit.servingLabel}` : ''}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
         )}
-        {!selected && hits.map((hit) => (
-          <button
-            key={`${hit.id}-${hit.name}`}
-            type="button"
-            className="goal-card"
-            style={{ textAlign: 'left', width: '100%' }}
-            onClick={() => setSelected(hit)}
-          >
-            <strong>{hit.name}</strong>
-            <p className="meta">
-              {hit.brand || 'Sin marca'}
-              {` · ${fmt(hit.kcal)} kcal / ${hit.perGrams || 100} g`}
-            </p>
-          </button>
-        ))}
         {selected && (
           <>
-            <p className="meta">{selected.name}{selected.brand ? ` · ${selected.brand}` : ''}</p>
+            <div className="food-selected">
+              <strong>{selected.name}</strong>
+              <p className="meta">
+                {selected.source === 'local' ? 'Común' : selected.brand || 'Open Food Facts'}
+              </p>
+            </div>
+            <div className="portion-shortcuts">
+              {shortcuts.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  className={Number(grams) === item.grams ? 'pill on' : 'pill quiet'}
+                  onClick={() => setGrams(String(item.grams))}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
             <label className="field">
               Gramos
               <input
@@ -356,9 +486,12 @@ function FoodSearchSheet({ mealId, onClose, onAdded }: {
               />
             </label>
             {preview && (
-              <p className="meta">
-                P {fmt(preview.proteinG)} · C {fmt(preview.carbsG)} · G {fmt(preview.fatG)} · {fmt(preview.kcal)} kcal
-              </p>
+              <div className="portion-preview">
+                <strong>{fmt(preview.kcal)} kcal</strong>
+                <span className="meta">
+                  P {fmt(preview.proteinG)} g · C {fmt(preview.carbsG)} g · G {fmt(preview.fatG)} g
+                </span>
+              </div>
             )}
             <button type="submit" className="primary" disabled={busy}>Añadir</button>
             <button type="button" className="ghost" onClick={() => setSelected(null)}>Otra búsqueda</button>
@@ -370,11 +503,23 @@ function FoodSearchSheet({ mealId, onClose, onAdded }: {
   )
 }
 
-function MacroStat({ label, value }: { label: string; value: string }) {
+function MacroBar({ label, short, grams, kcal, totalKcal }: {
+  label: string
+  short: string
+  grams: number
+  kcal: number
+  totalKcal: number
+}) {
+  const pct = totalKcal > 0 ? Math.min(100, Math.round((kcal / totalKcal) * 100)) : 0
   return (
-    <div className="macro-stat">
-      <small>{label}</small>
-      <strong>{value}</strong>
+    <div className="macro-bar">
+      <div className="macro-bar-head">
+        <span><strong>{short}</strong> {label}</span>
+        <span>{fmt(grams)} g · {pct}%</span>
+      </div>
+      <div className="macro-bar-track" aria-hidden>
+        <i style={{ width: `${pct}%` }} />
+      </div>
     </div>
   )
 }

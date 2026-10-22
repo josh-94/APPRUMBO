@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Shell } from '../components/Shell'
-import { longDate, todayKey, weekChips } from '../format'
+import { longDate, todayKey, weekdayLabel, weekChips } from '../format'
 import {
   HABIT_CATEGORIES,
   addDaysKey,
@@ -62,7 +62,11 @@ export function HabitsPage({ habits, onCreate, onEdit, onSetCount }: Props) {
           <div className="habits-ring" style={{ ['--pct' as string]: `${pct}%` }}>
             <span>{pct}%</span>
           </div>
-          <small>{habits.filter((h) => habitDoneOn(h, selected)).length}/{habits.length} hoy</small>
+          <small>
+            {habits.filter((h) => habitDoneOn(h, selected)).length}/{habits.length}
+            {' '}
+            {selected === today ? 'hoy' : 'hechos'}
+          </small>
         </div>
         <div className="habits-stat">
           <strong>{streak}</strong>
@@ -120,18 +124,30 @@ export function HabitsPage({ habits, onCreate, onEdit, onSetCount }: Props) {
           </div>
 
           <div className="habits-week">
-            {chips.map((chip) => (
-              <button
-                key={chip.key}
-                type="button"
-                className={chip.key === selected ? 'habits-day on' : 'habits-day'}
-                disabled={chip.key > today}
-                onClick={() => setSelected(chip.key)}
-              >
-                <small>{chip.label.charAt(0)}</small>
-                <strong>{chip.day}</strong>
-              </button>
-            ))}
+            {chips.map((chip) => {
+              const dayDone = habits.length > 0 && habits.every((habit) => habitDoneOn(habit, chip.key))
+              const dayPartial = !dayDone && habits.some((habit) => habitDoneOn(habit, chip.key))
+              const className = [
+                'habits-day',
+                chip.key === selected ? 'on' : '',
+                dayDone ? 'done' : '',
+                dayPartial ? 'partial' : '',
+                chip.today ? 'is-today' : '',
+              ].filter(Boolean).join(' ')
+              return (
+                <button
+                  key={chip.key}
+                  type="button"
+                  className={className}
+                  disabled={chip.key > today}
+                  aria-label={`${weekdayLabel(chip.weekday + 1)} ${chip.day}${dayDone ? ', cumplido' : dayPartial ? ', parcial' : ''}`}
+                  onClick={() => setSelected(chip.key)}
+                >
+                  <small>{weekdayLabel(chip.weekday + 1)}</small>
+                  <strong>{chip.day}</strong>
+                </button>
+              )
+            })}
           </div>
 
           <div className="habits-filters">

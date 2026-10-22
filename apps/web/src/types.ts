@@ -118,6 +118,9 @@ export type FoodHit = {
   carbsG: number
   fatG: number
   perGrams: number
+  source?: 'local' | 'off' | string
+  servingGrams?: number
+  servingLabel?: string
 }
 
 export type HomeCard = 'agenda' | 'habits' | 'goals' | 'workouts'
