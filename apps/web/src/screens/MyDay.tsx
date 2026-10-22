@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, type AgendaItem } from '../api'
 import type { Goal, GymWeek, Habit, HomeCard, Task } from '../types'
-import { currencySymbol, displayName, soles, todayKey, weekChips, weekStartKey } from '../format'
+import { currencySymbol, displayName, soles, todayKey, weekdayLabel, weekChips, weekStartKey } from '../format'
 import { habitCountOn, habitDoneOn, habitMetaLine } from '../habitUtils'
 import { Shell } from '../components/Shell'
 import { TaskRow } from '../components/TaskRow'
@@ -173,27 +173,31 @@ export function MyDay({
         }
         if (card === 'habits') {
           return (
-            <section key={card} className="home-card paper-card">
+            <section key={card} className="home-card paper-card habits-home">
               <div className="section-head">
-                <h2 className="section-label">{cardLabels.habits}</h2>
+                <div className="section-copy">
+                  <h2 className="section-label">{cardLabels.habits}</h2>
+                  <p className="meta">{habits.filter((h) => habitDoneOn(h, today)).length}/{habits.length} hoy</p>
+                </div>
                 <Link className="section-more" to="/habitos" aria-label="Hábitos">›</Link>
               </div>
-              <p className="meta">{habits.filter((h) => habitDoneOn(h, today)).length}/{habits.length} hoy</p>
               {habits.length === 0 && (
                 <p className="empty">
                   Sin hábitos aún.{' '}
                   <button type="button" className="text-button" onClick={onCreateHabit}>Crear uno</button>
                 </p>
               )}
-              {habits.map((habit) => (
-                <HabitRow
-                  key={habit.id}
-                  habit={habit}
-                  onToggle={() => onToggleHabit(habit)}
-                  onEdit={onEditHabit ? () => onEditHabit(habit) : undefined}
-                  onInc={onIncHabit && habit.dailyGoal > 1 && !habitDoneOn(habit, today) ? () => onIncHabit(habit) : undefined}
-                />
-              ))}
+              <div className="habits-home-list">
+                {habits.map((habit) => (
+                  <HabitRow
+                    key={habit.id}
+                    habit={habit}
+                    onToggle={() => onToggleHabit(habit)}
+                    onEdit={onEditHabit ? () => onEditHabit(habit) : undefined}
+                    onInc={onIncHabit && habit.dailyGoal > 1 && !habitDoneOn(habit, today) ? () => onIncHabit(habit) : undefined}
+                  />
+                ))}
+              </div>
             </section>
           )
         }
@@ -204,7 +208,12 @@ export function MyDay({
                 <h2 className="section-label">{cardLabels.goals}</h2>
                 <Link className="section-more" to="/plata/metas" aria-label="Metas">›</Link>
               </div>
-              {!activeGoal && <p className="empty">Sin metas activas. <Link to="/plata/metas">Crear una</Link></p>}
+              {!activeGoal && (
+                <p className="empty">
+                  Sin metas activas.{' '}
+                  <Link className="text-button" to="/plata/metas">Crear una</Link>
+                </p>
+              )}
               {activeGoal && (
                 <div className="goal-top">
                   <div>
@@ -241,14 +250,13 @@ export function MyDay({
 }
 
 function GymWeekRow({ week, onToggle }: { week: GymWeek | null; onToggle: (weekday: number) => void }) {
-  const labels = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
   const chips = weekChips()
   const planned = new Set(week?.weekdays ?? [])
   const logs = new Map((week?.logs ?? []).map((log) => [log.day, log]))
   return (
     <div className="week-row">
-      {labels.map((label, index) => {
-        const chip = chips[index]
+      {chips.map((chip, index) => {
+        const label = weekdayLabel(chip.weekday + 1)
         const log = logs.get(chip.key)
         const isPlanned = planned.has(index)
         const attended = Boolean(log?.attended)
@@ -258,17 +266,18 @@ function GymWeekRow({ week, onToggle }: { week: GymWeek | null; onToggle: (weekd
           isPlanned ? 'planned' : '',
           attended ? 'attended' : '',
         ].filter(Boolean).join(' ')
+        const state = attended ? 'asististe' : isPlanned ? 'programado' : 'sin plan'
         return (
           <button
-            key={label}
+            key={chip.key}
             type="button"
             className={className}
             aria-pressed={isPlanned}
-            aria-label={`${label}: ${isPlanned ? 'planificado' : 'sin plan'}`}
+            aria-label={`${label} ${chip.day}: ${state}. Toca para ${isPlanned ? 'quitar' : 'programar'} el entrenamiento`}
             onClick={() => onToggle(index)}
           >
             <small>{label}</small>
-            <strong>{attended ? '●' : isPlanned ? '○' : '·'}</strong>
+            <strong>{chip.day}</strong>
           </button>
         )
       })}
@@ -285,6 +294,7 @@ export function HabitRow({ habit, onToggle, onEdit, onInc }: {
   const day = today()
   const done = habitDoneOn(habit, day)
   const count = habitCountOn(habit, day)
+  const chips = weekChips()
   return (
     <div className={done ? 'habit done' : 'habit'}>
       <button
@@ -297,10 +307,19 @@ export function HabitRow({ habit, onToggle, onEdit, onInc }: {
         <span className="habits-icon" aria-hidden>{habit.icon || '✨'}</span>
         <span className="habit-copy">
           <strong>{habit.name}</strong>
-          <span className="dots" aria-hidden>
-            {Array.from({ length: habit.nGoal }, (_, index) => (
-              <i key={index} className={index < habit.doneThisWeek ? 'on' : ''} />
-            ))}
+          <span className="habit-week" aria-hidden>
+            {chips.map((chip) => {
+              const marked = habitDoneOn(habit, chip.key)
+              return (
+                <span
+                  key={chip.key}
+                  className={['habit-day', marked ? 'on' : '', chip.today ? 'is-today' : ''].filter(Boolean).join(' ')}
+                >
+                  <small>{weekdayLabel(chip.weekday + 1)}</small>
+                  <strong>{chip.day}</strong>
+                </span>
+              )
+            })}
           </span>
           <span className="meta">{habitMetaLine(habit, day)}</span>
         </span>

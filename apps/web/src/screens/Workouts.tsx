@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { api } from '../api'
 import { Shell } from '../components/Shell'
-import { todayKey, weekChips, weekStartKey } from '../format'
+import { todayKey, weekdayLabel, weekChips, weekStartKey } from '../format'
 import type { DayMacros, FoodHit, GymWeek, Meal } from '../types'
 
 export function WorkoutsPage() {
@@ -132,8 +132,8 @@ export function WorkoutsPage() {
                 aria-pressed={selected}
                 onClick={() => setSelectedDay(chip.key)}
               >
-                <small>{chip.label.slice(0, 1)}</small>
-                <strong>{attended ? '●' : isPlanned ? '○' : chip.day}</strong>
+                <small>{weekdayLabel(chip.weekday + 1)}</small>
+                <strong>{chip.day}</strong>
               </button>
             )
           })}

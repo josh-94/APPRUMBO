@@ -352,7 +352,25 @@ button, input, textarea, select { font: inherit; color: inherit; }
 }
 .app-mark { width: 32px; height: 32px; display: block; }
 .login form { display: grid; gap: 12px; }
-.text-button { justify-self: start; padding: 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; }
+.text-button {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: inherit;
+  text-decoration: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+a.text-button:hover,
+a.text-button:visited,
+button.text-button:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
 .google {
   display: inline-flex;
   justify-content: center;
@@ -439,8 +457,25 @@ button.day-chip { appearance: none; }
 .day-chip.is-today:not(.today):not(.planned):not(.attended) {
   border-color: color-mix(in srgb, var(--ink) 18%, transparent);
 }
-.day-chip strong { display: block; font-size: 18px; }
-.day-chip small { color: var(--muted); font-size: 11px; }
+.day-chip strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.day-chip small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.day-chip.today small { color: rgba(255, 255, 255, 0.85); }
+.day-chip.planned small,
+.day-chip.attended small { color: inherit; opacity: 0.75; }
 .macro-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1369,6 +1404,124 @@ button.plan-row, button.money-row { width: 100%; border: 0; text-align: left; cu
   border-radius: var(--rumbo-radius-card);
   padding: 14px 16px;
   box-shadow: var(--rumbo-shadow-sm);
+}
+.habits-home {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px 18px;
+}
+.habits-home .section-head {
+  margin: 0;
+  align-items: flex-start;
+}
+.habits-home .section-label { margin: 0; }
+.habits-home .section-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.habits-home .section-copy .meta { margin: 0; }
+.home-card .empty { padding: 4px 0 0; margin: 0; font: inherit; }
+.habits-home-list {
+  display: grid;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+}
+.habits-home .habit {
+  display: flex;
+  justify-content: flex-start;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  margin: 0;
+  padding: 12px 0;
+  width: 100%;
+  min-width: 0;
+  gap: 12px;
+  align-items: center;
+  box-sizing: border-box;
+}
+.habits-home .habit + .habit {
+  border-top: 1px solid var(--line);
+}
+.habits-home .habit .check {
+  order: 3;
+  flex: none;
+  width: 28px;
+  height: 28px;
+}
+.habits-home .habit-plus { order: 2; flex: none; }
+.habits-home .habit-body {
+  order: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+.habits-home .habits-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  font-size: 22px;
+}
+.habits-home .habit-copy {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+.habits-home .habit-copy > strong {
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.habits-home .habit-copy .meta {
+  margin: 0;
+  display: block;
+}
+.habit-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+}
+.habit-day {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 4px 0;
+  border-radius: 10px;
+  color: var(--muted);
+}
+.habit-day small {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.habit-day strong {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+}
+.habit-day.is-today {
+  background: var(--rumbo-color-primary-soft);
+  color: var(--ink);
+}
+.habit-day.on {
+  color: var(--rumbo-color-primary);
+}
+.habit-day.on strong {
+  color: var(--rumbo-color-primary);
 }
 .goal-card {
   background: var(--card);
