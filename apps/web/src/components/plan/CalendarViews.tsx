@@ -11,7 +11,11 @@ import {
 } from './calendarUtils'
 import { todayKey } from '../../format'
 
-const HOURS = Array.from({ length: 16 }, (_, i) => i + 6) // 06:00 – 21:00
+const DAY_START_HOUR = 0
+const DAY_END_HOUR = 24 // exclusivo: filas 00:00 – 23:00
+const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR }, (_, i) => i + DAY_START_HOUR)
+const DAY_ROW_PX = 52
+const WEEK_ROW_PX = 44
 
 type Common = {
   items: OverlayItem[]
@@ -50,9 +54,9 @@ export function CalendarDayView({ items, anchor, onOpenEvent, onOpenTask }: Comm
           {timed.map((item) => {
             const startMin = minutesFromMidnight(item.startsAt!)
             const dur = item.endsAt ? durationMinutes(item.startsAt!, item.endsAt) : 60
-            const top = ((startMin - 6 * 60) / 60) * 52
-            const height = Math.max((dur / 60) * 52, 44)
-            if (startMin < 6 * 60 || startMin >= 22 * 60) return null
+            if (startMin < DAY_START_HOUR * 60 || startMin >= DAY_END_HOUR * 60) return null
+            const top = ((startMin - DAY_START_HOUR * 60) / 60) * DAY_ROW_PX
+            const height = Math.max((dur / 60) * DAY_ROW_PX, 44)
             const endLabel = item.endsAt
               ? new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit' }).format(new Date(item.endsAt))
               : ''
@@ -139,9 +143,9 @@ export function CalendarWeekView({ items, anchor, onOpenEvent, onOpenTask, onSel
               .map((item) => {
                 const startMin = minutesFromMidnight(item.startsAt!)
                 const dur = item.endsAt ? durationMinutes(item.startsAt!, item.endsAt) : 60
-                const top = ((startMin - 6 * 60) / 60) * 44
-                const height = Math.max((dur / 60) * 44, 22)
-                if (startMin < 6 * 60 || startMin >= 22 * 60) return null
+                if (startMin < DAY_START_HOUR * 60 || startMin >= DAY_END_HOUR * 60) return null
+                const top = ((startMin - DAY_START_HOUR * 60) / 60) * WEEK_ROW_PX
+                const height = Math.max((dur / 60) * WEEK_ROW_PX, 22)
                 return (
                   <button
                     key={item.key}

@@ -2292,7 +2292,7 @@ textarea {
 .cal-chip.compact { padding: 4px 6px; font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal-timeline {
   position: relative;
-  min-height: calc(16 * 52px);
+  min-height: calc(24 * 52px);
 }
 .cal-hour-row {
   display: grid;
@@ -2398,7 +2398,7 @@ textarea {
 .cal-week-col {
   position: relative;
   border-left: 1px solid var(--line);
-  min-height: calc(16 * 44px);
+  min-height: calc(24 * 44px);
 }
 .cal-week-col .cal-hour-lane { height: 44px; border-top: 1px solid var(--line); }
 .cal-week-col .cal-block { left: 2px; right: 2px; }
