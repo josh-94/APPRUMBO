@@ -2304,6 +2304,36 @@ textarea {
   height: 100%;
 }
 .cal-timed-layer { position: absolute; left: 56px; right: 0; top: 0; bottom: 0; }
+.cal-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+.cal-now-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: var(--rumbo-color-alert);
+  box-shadow: 0 0 0 2px var(--rumbo-color-surface);
+}
+.cal-now-line {
+  flex: 1;
+  height: 2px;
+  background: var(--rumbo-color-alert);
+  border-radius: 1px;
+}
+.cal-now-week {
+  left: 40px;
+  right: 0;
+  width: auto;
+}
 .cal-block {
   position: absolute;
   left: 4px;

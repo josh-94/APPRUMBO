@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import type { OverlayItem } from './calendarUtils'
 import {
   durationMinutes,
@@ -25,11 +26,50 @@ type Common = {
   onSelectDay?: (day: string) => void
 }
 
+function nowMinutesFromMidnight() {
+  const d = new Date()
+  return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60
+}
+
+function useNowMinutes(active: boolean) {
+  const [minutes, setMinutes] = useState(nowMinutesFromMidnight)
+  useEffect(() => {
+    if (!active) return
+    setMinutes(nowMinutesFromMidnight())
+    const id = window.setInterval(() => setMinutes(nowMinutesFromMidnight()), 30_000)
+    return () => window.clearInterval(id)
+  }, [active])
+  return minutes
+}
+
+function nowTopPx(minutes: number, rowPx: number) {
+  return ((minutes - DAY_START_HOUR * 60) / 60) * rowPx
+}
+
 export function CalendarDayView({ items, anchor, onOpenEvent, onOpenTask }: Common) {
   const dayItems = itemsOnDay(items, anchor)
   const allDay = dayItems.filter((item) => item.allDay)
   const timed = dayItems.filter((item) => !item.allDay && item.startsAt)
   const today = todayKey()
+  const isToday = anchor === today
+  const nowMin = useNowMinutes(isToday)
+  const timelineRef = useRef<HTMLDivElement>(null)
+  const scrolled = useRef(false)
+
+  useEffect(() => {
+    scrolled.current = false
+  }, [anchor])
+
+  useEffect(() => {
+    if (!isToday || scrolled.current) return
+    const el = timelineRef.current
+    if (!el) return
+    scrolled.current = true
+    const top = nowTopPx(nowMin, DAY_ROW_PX)
+    const rect = el.getBoundingClientRect()
+    const target = window.scrollY + rect.top + top - window.innerHeight * 0.35
+    window.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
+  }, [isToday, nowMin, timed.length])
 
   return (
     <div className="cal-day">
@@ -43,7 +83,7 @@ export function CalendarDayView({ items, anchor, onOpenEvent, onOpenTask }: Comm
           </div>
         </div>
       )}
-      <div className="cal-timeline">
+      <div className="cal-timeline" ref={timelineRef}>
         {HOURS.map((hour) => (
           <div key={hour} className="cal-hour-row">
             <span className="cal-hour-label">{hourLabel(hour)}</span>
@@ -80,6 +120,16 @@ export function CalendarDayView({ items, anchor, onOpenEvent, onOpenTask }: Comm
               </button>
             )
           })}
+          {isToday && (
+            <div
+              className="cal-now"
+              style={{ top: nowTopPx(nowMin, DAY_ROW_PX) }}
+              aria-hidden="true"
+            >
+              <span className="cal-now-dot" />
+              <span className="cal-now-line" />
+            </div>
+          )}
         </div>
       </div>
       {dayItems.length === 0 && (
@@ -92,6 +142,8 @@ export function CalendarDayView({ items, anchor, onOpenEvent, onOpenTask }: Comm
 export function CalendarWeekView({ items, anchor, onOpenEvent, onOpenTask, onSelectDay }: Common) {
   const days = weekDays(anchor)
   const today = todayKey()
+  const showNow = days.includes(today)
+  const nowMin = useNowMinutes(showNow)
 
   return (
     <div className="cal-week">
@@ -163,6 +215,16 @@ export function CalendarWeekView({ items, anchor, onOpenEvent, onOpenTask, onSel
               })}
           </div>
         ))}
+        {showNow && (
+          <div
+            className="cal-now cal-now-week"
+            style={{ top: nowTopPx(nowMin, WEEK_ROW_PX) }}
+            aria-hidden="true"
+          >
+            <span className="cal-now-dot" />
+            <span className="cal-now-line" />
+          </div>
+        )}
       </div>
     </div>
   )
