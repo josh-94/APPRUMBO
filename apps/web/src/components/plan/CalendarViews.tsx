@@ -132,9 +132,6 @@ export function CalendarDayView({ items, anchor, onOpenEvent, onOpenTask }: Comm
           )}
         </div>
       </div>
-      {dayItems.length === 0 && (
-        <p className="empty">{anchor === today ? 'Hoy no tienes nada con hora en el calendario.' : 'Nada en este día.'}</p>
-      )}
     </div>
   )
 }

@@ -68,7 +68,8 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .top-row.has-back .eye { margin-right: -9px; }
 
 .main { padding-bottom: 88px; }
-.main.with-tabs { padding-bottom: calc(168px + env(safe-area-inset-bottom)); }
+/* Solo lo necesario para no tapar la tab bar (~68px) + aire; el FAB es fixed y no exige más. */
+.main.with-tabs { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
 
 .icon-btn, .tab, .pill, .ghost, .primary, .weekday, .check, .list-link, .card-body {
   text-decoration: none;
@@ -192,7 +193,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(12px + env(safe-area-inset-bottom));
+  bottom: max(6px, env(safe-area-inset-bottom));
   width: min(440px, calc(100% - 24px));
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1352,7 +1353,7 @@ button.plan-row, button.money-row { width: 100%; border: 0; text-align: left; cu
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  margin: 8px 0 12px;
+  margin: 8px 0 0;
 }
 .plan-links.four { grid-template-columns: repeat(4, 1fr); }
 .plan-link {
@@ -1552,7 +1553,7 @@ button.plan-row, button.money-row { width: 100%; border: 0; text-align: left; cu
   z-index: 4;
   left: auto;
   right: max(18px, calc((100% - 480px) / 2 + 18px));
-  bottom: calc(96px + env(safe-area-inset-bottom));
+  bottom: calc(84px + env(safe-area-inset-bottom));
   width: 56px;
   height: 56px;
   display: grid;
@@ -1573,7 +1574,7 @@ button.plan-row, button.money-row { width: 100%; border: 0; text-align: left; cu
   box-shadow: var(--rumbo-shadow-md);
 }
 .main.with-tabs .spend-fab.chat {
-  bottom: calc(96px + env(safe-area-inset-bottom));
+  bottom: calc(84px + env(safe-area-inset-bottom));
 }
 .spend-col.add { width: 96px; cursor: pointer; }
 .spend-col.add .spend-name { white-space: normal; line-height: 1.2; }
@@ -1718,6 +1719,7 @@ button.plan-row, button.money-row { width: 100%; border: 0; text-align: left; cu
 }
 .timeline-hour { font-weight: 700; font-variant-numeric: tabular-nums; }
 .home-card { margin: 0 0 14px; }
+.home-card:last-child { margin-bottom: 0; }
 .paper-card {
   background: var(--card);
   border-radius: var(--rumbo-radius-card);
@@ -2266,7 +2268,8 @@ textarea {
   color: var(--rumbo-color-ink);
 }
 
-.cal-day { margin: 0 0 24px; }
+.cal-day { margin: 0 0 8px; }
+.cal-day .cal-timeline { margin-bottom: 0; }
 .cal-allday {
   display: grid;
   grid-template-columns: 56px 1fr;
