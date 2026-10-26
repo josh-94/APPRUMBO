@@ -3,6 +3,17 @@ import type { CalendarEvent, EventColor, EventInput } from '../../types'
 import { combineLocal, dateInput, timeInput, weekdayLabel } from '../../format'
 import { DURATION_PILLS, EVENT_COLORS, durationMinutes, parseDay } from './calendarUtils'
 
+type RemindUnit = 'minutes' | 'hours' | 'days' | 'weeks'
+
+const REMIND_UNITS: { id: RemindUnit; label: string; minutes: number }[] = [
+  { id: 'minutes', label: 'minutos', minutes: 1 },
+  { id: 'hours', label: 'horas', minutes: 60 },
+  { id: 'days', label: 'días', minutes: 24 * 60 },
+  { id: 'weeks', label: 'semanas', minutes: 7 * 24 * 60 },
+]
+
+const MAX_REMIND_MINUTES = 4 * 7 * 24 * 60
+
 type Props = {
   event: CalendarEvent | null
   defaultDay?: string
@@ -21,7 +32,10 @@ export function EventSheet({ event, defaultDay, onClose, onSave, onDelete }: Pro
   const [endDate, setEndDate] = useState(dateInput(event?.endsAt ?? null) || defaultDay || dateInput(new Date().toISOString()))
   const [endTime, setEndTime] = useState(event && !event.allDay ? timeInput(event.endsAt) : '10:00')
   const [color, setColor] = useState<EventColor>(event?.color ?? 'menta')
-  const [remind, setRemind] = useState(event?.remindMinutes != null)
+  const initialRemind = splitRemind(event?.remindMinutes)
+  const [remindOn, setRemindOn] = useState(event?.remindMinutes != null)
+  const [remindValue, setRemindValue] = useState(initialRemind.value)
+  const [remindUnit, setRemindUnit] = useState<RemindUnit>(initialRemind.unit)
   const [repeat, setRepeat] = useState(event?.repeatRule === 'weekly')
   const [days, setDays] = useState<number[]>(event?.repeatWeekdays ?? [])
   const [duration, setDuration] = useState(() =>
@@ -84,6 +98,11 @@ export function EventSheet({ event, defaultDay, onClose, onSave, onDelete }: Pro
       } else {
         endsAt = combineLocal(endDate, endTime)
       }
+      const remindMinutes = remindOn ? toRemindMinutes(remindValue, remindUnit) : null
+      if (remindOn && (remindMinutes == null || remindMinutes < 0 || remindMinutes > MAX_REMIND_MINUTES)) {
+        setError('El aviso debe ser entre 0 minutos y 4 semanas')
+        return
+      }
       await onSave(
         {
           title,
@@ -93,7 +112,7 @@ export function EventSheet({ event, defaultDay, onClose, onSave, onDelete }: Pro
           startsAt,
           endsAt,
           color,
-          remindMinutes: remind ? 30 : null,
+          remindMinutes,
           repeatRule: repeat ? 'weekly' : 'none',
           repeatWeekdays: repeat ? days : [],
         },
@@ -188,27 +207,21 @@ export function EventSheet({ event, defaultDay, onClose, onSave, onDelete }: Pro
             </div>
           </>
         )}
-        <div className="split">
-          <label className="checkline">
-            <input
-              type="checkbox"
-              checked={repeat}
-              onChange={(ev) => {
-                const on = ev.target.checked
-                setRepeat(on)
-                if (on && days.length === 0) {
-                  const weekday = ((parseDay(startDate).getDay() + 6) % 7) + 1
-                  setDays([weekday])
-                }
-              }}
-            />
-            Se repite
-          </label>
-          <label className="checkline">
-            <input type="checkbox" checked={remind} onChange={(ev) => setRemind(ev.target.checked)} />
-            Aviso (30 min)
-          </label>
-        </div>
+        <label className="checkline">
+          <input
+            type="checkbox"
+            checked={repeat}
+            onChange={(ev) => {
+              const on = ev.target.checked
+              setRepeat(on)
+              if (on && days.length === 0) {
+                const weekday = ((parseDay(startDate).getDay() + 6) % 7) + 1
+                setDays([weekday])
+              }
+            }}
+          />
+          Se repite
+        </label>
         {repeat && (
           <div className="weekdays">
             {[1, 2, 3, 4, 5, 6, 7].map((day) => (
@@ -226,6 +239,101 @@ export function EventSheet({ event, defaultDay, onClose, onSave, onDelete }: Pro
               </button>
             ))}
           </div>
+        )}
+        <p className="field-label">Aviso</p>
+        {remindOn ? (
+          <div className="remind-block">
+            <div className="remind-top">
+              <span className="remind-kind">Notificación</span>
+              <button
+                type="button"
+                className="icon-btn remind-remove"
+                aria-label="Quitar aviso"
+                onClick={() => setRemindOn(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="remind-controls">
+              <div className="remind-stepper" role="group" aria-label="Cuánto antes">
+                <button
+                  type="button"
+                  className="remind-step"
+                  aria-label="Menos"
+                  disabled={remindValue <= 0}
+                  onClick={() => setRemindValue((n) => Math.max(0, n - remindStep(remindUnit)))}
+                >
+                  −
+                </button>
+                <input
+                  className="remind-value"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  enterKeyHint="done"
+                  aria-label="Cantidad"
+                  value={String(remindValue)}
+                  onChange={(ev) => {
+                    const digits = ev.target.value.replace(/\D/g, '')
+                    if (digits === '') {
+                      setRemindValue(0)
+                      return
+                    }
+                    setRemindValue(Math.min(999, Number(digits)))
+                  }}
+                  onBlur={() => setRemindValue((n) => Math.max(0, Math.min(999, Math.round(n) || 0)))}
+                />
+                <button
+                  type="button"
+                  className="remind-step"
+                  aria-label="Más"
+                  disabled={remindValue >= 999}
+                  onClick={() => setRemindValue((n) => Math.min(999, n + remindStep(remindUnit)))}
+                >
+                  +
+                </button>
+              </div>
+              <select
+                className="remind-unit"
+                aria-label="Unidad de tiempo"
+                value={remindUnit}
+                onChange={(ev) => setRemindUnit(ev.target.value as RemindUnit)}
+              >
+                {REMIND_UNITS.map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="remind-presets" role="group" aria-label="Anticipación rápida">
+              {remindPresets(remindUnit).map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className={remindValue === preset ? 'chip on' : 'chip'}
+                  onClick={() => setRemindValue(preset)}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="linkish"
+            onClick={() => {
+              setRemindOn(true)
+              setRemindValue(30)
+              setRemindUnit('minutes')
+            }}
+          >
+            Añadir una notificación
+          </button>
+        )}
+        {remindOn && (
+          <p className="hint">Push al teléfono, con la anticipación que elijas. Actívalo en Cuenta si aún no.</p>
         )}
         <p className="field-label">Color</p>
         <div className="event-swatches">
@@ -272,4 +380,33 @@ function visibleFrame() {
     width: viewport.width,
     height: viewport.height,
   }
+}
+
+function splitRemind(minutes?: number | null): { value: number; unit: RemindUnit } {
+  if (minutes == null || minutes < 0) return { value: 30, unit: 'minutes' }
+  for (const unit of [...REMIND_UNITS].reverse()) {
+    if (minutes === 0 && unit.id === 'minutes') return { value: 0, unit: 'minutes' }
+    if (minutes >= unit.minutes && minutes % unit.minutes === 0) {
+      return { value: minutes / unit.minutes, unit: unit.id }
+    }
+  }
+  return { value: minutes, unit: 'minutes' }
+}
+
+function toRemindMinutes(value: number, unit: RemindUnit): number | null {
+  if (!Number.isFinite(value) || value < 0) return null
+  const factor = REMIND_UNITS.find((item) => item.id === unit)?.minutes ?? 1
+  return Math.round(value) * factor
+}
+
+function remindStep(unit: RemindUnit) {
+  if (unit === 'minutes') return 5
+  return 1
+}
+
+function remindPresets(unit: RemindUnit) {
+  if (unit === 'minutes') return [5, 10, 15, 30, 45]
+  if (unit === 'hours') return [1, 2, 3, 6, 12]
+  if (unit === 'days') return [1, 2, 3, 5, 7]
+  return [1, 2, 3, 4]
 }

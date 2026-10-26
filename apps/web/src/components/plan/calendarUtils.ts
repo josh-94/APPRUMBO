@@ -1,4 +1,4 @@
-import type { CalendarEvent, EventColor, Goal, Task } from '../../types'
+import type { CalendarEvent, EventColor, Goal, GoogleCalendarEvent, Task } from '../../types'
 import { todayKey } from '../../format'
 
 export const EVENT_COLORS: { id: EventColor; label: string }[] = [
@@ -21,11 +21,11 @@ export const DURATION_PILLS = [
 ]
 
 export type PlanView = 'day' | 'week' | 'month'
-export type PlanLayer = 'events' | 'tasks' | 'goals'
+export type PlanLayer = 'events' | 'tasks' | 'goals' | 'google'
 
 export type OverlayItem = {
   key: string
-  kind: 'event' | 'task' | 'goal'
+  kind: 'event' | 'task' | 'goal' | 'google'
   id: number
   title: string
   day: string
@@ -34,6 +34,7 @@ export type OverlayItem = {
   endsAt: string | null
   color: EventColor | 'task' | 'goal'
   hour?: string
+  htmlLink?: string
 }
 
 export function startOfWeek(day: string) {
@@ -144,6 +145,22 @@ export function toOverlayEvents(events: CalendarEvent[]): OverlayItem[] {
     endsAt: event.endsAt,
     color: event.color,
     hour: event.allDay ? undefined : new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit' }).format(new Date(event.startsAt)),
+  }))
+}
+
+export function toOverlayGoogle(events: GoogleCalendarEvent[]): OverlayItem[] {
+  return events.map((event) => ({
+    key: `gcal-${event.id}`,
+    kind: 'google' as const,
+    id: event.id,
+    title: event.title,
+    day: eventDayKey(event.startsAt),
+    allDay: event.allDay,
+    startsAt: event.startsAt,
+    endsAt: event.endsAt,
+    color: (event.color || 'horizonte') as EventColor,
+    hour: event.allDay ? undefined : new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit' }).format(new Date(event.startsAt)),
+    htmlLink: event.htmlLink || undefined,
   }))
 }
 

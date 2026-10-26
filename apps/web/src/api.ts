@@ -1,4 +1,4 @@
-import type { Bill, CalendarEvent, CaptureDraft, Debt, DebtMove, EventInput, FoodHit, Goal, GymLog, GymWeek, Habit, HomeCard, Meal, MealItem, MoneyCategory, MoneyDraft, MoneyPlan, MonthMoney, Movement, MovementInput, PayAccount, Task, TaskInput, TaskList, WorkoutRecord, WorkoutRoutine, WorkoutSession, WorkoutSet } from './types'
+import type { Bill, CalendarEvent, CaptureDraft, Debt, DebtMove, EventInput, FoodHit, Goal, GoogleCalendarEvent, GoogleCalendarStatus, GymLog, GymWeek, Habit, HomeCard, Meal, MealItem, MoneyCategory, MoneyDraft, MoneyPlan, MonthMoney, Movement, MovementInput, PayAccount, Task, TaskInput, TaskList, WorkoutRecord, WorkoutRoutine, WorkoutSession, WorkoutSet } from './types'
 
 let onUnauthorized = () => {}
 
@@ -98,6 +98,17 @@ export const api = {
   updateEvent: (id: number, input: EventInput) =>
     request<CalendarEvent>(`/api/events/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   deleteEvent: (id: number) => request<void>(`/api/events/${id}`, { method: 'DELETE' }),
+  googleCalendarStatus: () => request<GoogleCalendarStatus>('/api/google/calendar/status'),
+  googleEvents: (from: string, to: string, sync = false) =>
+    request<{ connected: boolean; events: GoogleCalendarEvent[] }>(
+      `/api/google/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${sync ? '&sync=1' : ''}`,
+    ),
+  syncGoogleCalendar: (from: string, to: string) =>
+    request<{ connected: boolean; events: GoogleCalendarEvent[] }>(
+      `/api/google/calendar/sync?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      { method: 'POST' },
+    ),
+  disconnectGoogleCalendar: () => request<void>('/api/google/calendar', { method: 'DELETE' }),
   goals: () => request<{ goals: Goal[] }>('/api/goals'),
   saveGoal: (body: Partial<Goal> & { name: string; targetCents: number }) =>
     request<Goal>(body.id ? `/api/goals/${body.id}` : '/api/goals', { method: body.id ? 'PATCH' : 'POST', body: JSON.stringify(body) }),

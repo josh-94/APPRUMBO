@@ -50,6 +50,9 @@ services:
       OLLAMA_TEXT_MODEL: ${OLLAMA_TEXT_MODEL:-gemma3:1b}
       OLLAMA_NUM_THREAD: ${OLLAMA_NUM_THREAD:-4}
       WHISPER_URL: ${WHISPER_URL:-}
+    # Host :8080 para Vite (npm run dev) y pruebas locales.
+    ports:
+      - "8080:8080"
     mem_limit: 128m
     restart: unless-stopped
     depends_on:

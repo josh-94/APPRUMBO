@@ -16,6 +16,7 @@ import (
 	"hoy/internal/config"
 	"hoy/internal/foods"
 	"hoy/internal/fx"
+	"hoy/internal/gcal"
 	"hoy/internal/httpapi"
 	"hoy/internal/notify"
 	"hoy/internal/store"
@@ -66,10 +67,12 @@ func main() {
 		SessionSecret:   cfg.SessionSecret,
 		CookieSecure:    cfg.CookieSecure,
 		VAPIDPublic:     cfg.VAPIDPublic,
-		GoogleID:        cfg.GoogleID,
-		GoogleSecret:    cfg.GoogleSecret,
-		GoogleRedirect:  cfg.GoogleRedirect,
-		OllamaURL:       cfg.OllamaURL,
+		GoogleID:               cfg.GoogleID,
+		GoogleSecret:           cfg.GoogleSecret,
+		GoogleRedirect:         cfg.GoogleRedirect,
+		GoogleCalendarRedirect: cfg.GoogleCalendarRedirect,
+		GCal:                   gcal.New(),
+		OllamaURL:              cfg.OllamaURL,
 		OllamaModel:     cfg.OllamaModel,
 		OllamaTextModel: cfg.OllamaTextModel,
 		OllamaNumThread: cfg.OllamaNumThread,

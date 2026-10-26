@@ -21,9 +21,12 @@ import (
 const stream = "notifications"
 
 type Message struct {
-	TaskID   int64     `json:"taskId"`
+	TaskID   int64     `json:"taskId,omitempty"`
+	EventID  int64     `json:"eventId,omitempty"`
 	UserID   int64     `json:"userId"`
 	Title    string    `json:"title"`
+	Body     string    `json:"body,omitempty"`
+	URL      string    `json:"url,omitempty"`
 	RemindAt time.Time `json:"remindAt"`
 	Dedupe   string    `json:"dedupe"`
 }
@@ -77,6 +80,11 @@ func RunScheduler(ctx context.Context, db *store.Store, client *redis.Client, lo
 }
 
 func publishDue(ctx context.Context, db *store.Store, client *redis.Client, loc *time.Location) {
+	publishDueTasks(ctx, db, client, loc)
+	publishDueEvents(ctx, db, client)
+}
+
+func publishDueTasks(ctx context.Context, db *store.Store, client *redis.Client, loc *time.Location) {
 	due, err := db.DueReminders(ctx, 50)
 	if err != nil {
 		slog.Error("due reminders", "err", err)
@@ -87,8 +95,9 @@ func publishDue(ctx context.Context, db *store.Store, client *redis.Client, loc 
 			TaskID:   item.TaskID,
 			UserID:   item.UserID,
 			Title:    item.Title,
+			URL:      "/tarea/" + itoa(item.TaskID),
 			RemindAt: item.RemindAt,
-			Dedupe:   item.RemindAt.UTC().Format(time.RFC3339Nano) + ":" + itoa(item.TaskID),
+			Dedupe:   "task:" + item.RemindAt.UTC().Format(time.RFC3339Nano) + ":" + itoa(item.TaskID),
 		}
 		if err := Publish(ctx, client, msg); err != nil {
 			slog.Error("publish reminder", "task", item.TaskID, "err", err)
@@ -105,6 +114,71 @@ func publishDue(ctx context.Context, db *store.Store, client *redis.Client, loc 
 			slog.Error("claim reminder", "task", item.TaskID, "err", err)
 		}
 	}
+}
+
+func publishDueEvents(ctx context.Context, db *store.Store, client *redis.Client) {
+	due, err := db.DueEventReminders(ctx, 50)
+	if err != nil {
+		slog.Error("due event reminders", "err", err)
+		return
+	}
+	for _, item := range due {
+		msg := Message{
+			EventID:  item.EventID,
+			UserID:   item.UserID,
+			Title:    item.Title,
+			Body:     eventRemindBody(item.Title, item.RemindMinutes),
+			URL:      "/tiempo",
+			RemindAt: item.RemindAt,
+			Dedupe:   "event:" + item.RemindAt.UTC().Format(time.RFC3339Nano) + ":" + itoa(item.EventID),
+		}
+		if err := Publish(ctx, client, msg); err != nil {
+			slog.Error("publish event reminder", "event", item.EventID, "err", err)
+			continue
+		}
+		if err := db.ClaimEventReminder(ctx, item.EventID, item.RemindAt); err != nil {
+			slog.Error("claim event reminder", "event", item.EventID, "err", err)
+		}
+	}
+}
+
+func eventRemindBody(title string, minutes int) string {
+	when := formatRemindOffset(minutes)
+	if when == "" {
+		return title
+	}
+	return title + " · en " + when
+}
+
+func formatRemindOffset(minutes int) string {
+	if minutes <= 0 {
+		return "este momento"
+	}
+	if minutes%(7*24*60) == 0 {
+		n := minutes / (7 * 24 * 60)
+		if n == 1 {
+			return "1 semana"
+		}
+		return itoa(int64(n)) + " semanas"
+	}
+	if minutes%(24*60) == 0 {
+		n := minutes / (24 * 60)
+		if n == 1 {
+			return "1 día"
+		}
+		return itoa(int64(n)) + " días"
+	}
+	if minutes%60 == 0 {
+		n := minutes / 60
+		if n == 1 {
+			return "1 hora"
+		}
+		return itoa(int64(n)) + " horas"
+	}
+	if minutes == 1 {
+		return "1 minuto"
+	}
+	return itoa(int64(minutes)) + " minutos"
 }
 
 func RunWorker(ctx context.Context, db *store.Store, client *redis.Client, publicKey, privateKey, subject string) error {
@@ -168,11 +242,22 @@ func handle(ctx context.Context, db *store.Store, client *redis.Client, publicKe
 		slog.Error("subscriptions", "err", err)
 		return
 	}
+	body := msg.Body
+	if body == "" {
+		body = msg.Title
+	}
+	url := msg.URL
+	if url == "" && msg.TaskID != 0 {
+		url = "/tarea/" + itoa(msg.TaskID)
+	}
+	if url == "" {
+		url = "/dia"
+	}
 	payload, _ := json.Marshal(map[string]string{
 		"title": "RUMBO",
-		"body":  msg.Title,
+		"body":  body,
 		"tag":   msg.Dedupe,
-		"url":   "/tarea/" + itoa(msg.TaskID),
+		"url":   url,
 	})
 	for _, sub := range subs {
 		resp, err := webpush.SendNotification(payload, &webpush.Subscription{

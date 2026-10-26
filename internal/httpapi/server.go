@@ -16,6 +16,7 @@ import (
 
 	"hoy/internal/foods"
 	"hoy/internal/fx"
+	"hoy/internal/gcal"
 	"hoy/internal/schedule"
 	"hoy/internal/session"
 	"hoy/internal/store"
@@ -32,10 +33,12 @@ type Server struct {
 	SessionSecret   string
 	CookieSecure    bool
 	VAPIDPublic     string
-	GoogleID        string
-	GoogleSecret    string
-	GoogleRedirect  string
-	OllamaURL       string
+	GoogleID               string
+	GoogleSecret           string
+	GoogleRedirect         string
+	GoogleCalendarRedirect string
+	GCal                   *gcal.Client
+	OllamaURL              string
 	OllamaModel     string
 	OllamaTextModel string
 	OllamaNumThread int
@@ -83,6 +86,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/events/{id}", s.protected(s.eventByID))
 	mux.HandleFunc("PATCH /api/events/{id}", s.protected(s.updateEvent))
 	mux.HandleFunc("DELETE /api/events/{id}", s.protected(s.deleteEvent))
+	mux.HandleFunc("GET /api/google/calendar/status", s.protected(s.googleCalendarStatus))
+	mux.HandleFunc("GET /api/google/calendar/connect", s.protected(s.googleCalendarConnect))
+	mux.HandleFunc("GET /api/google/calendar/callback", s.googleCalendarCallback)
+	mux.HandleFunc("DELETE /api/google/calendar", s.protected(s.googleCalendarDisconnect))
+	mux.HandleFunc("GET /api/google/events", s.protected(s.listGoogleEvents))
+	mux.HandleFunc("POST /api/google/calendar/sync", s.protected(s.syncGoogleCalendarNow))
 	mux.HandleFunc("GET /api/goals", s.protected(s.goals))
 	mux.HandleFunc("POST /api/goals", s.protected(s.saveGoal))
 	mux.HandleFunc("PATCH /api/goals/{id}", s.protected(s.saveGoal))

@@ -17,10 +17,11 @@ type Config struct {
 	VAPIDPublic     string
 	VAPIDPrivate    string
 	VAPIDSubject    string
-	GoogleID        string
-	GoogleSecret    string
-	GoogleRedirect  string
-	OllamaURL       string
+	GoogleID               string
+	GoogleSecret           string
+	GoogleRedirect         string
+	GoogleCalendarRedirect string
+	OllamaURL              string
 	OllamaModel     string
 	OllamaTextModel string
 	OllamaNumThread int
@@ -39,10 +40,11 @@ func Load() (Config, error) {
 		VAPIDPublic:     os.Getenv("VAPID_PUBLIC_KEY"),
 		VAPIDPrivate:    os.Getenv("VAPID_PRIVATE_KEY"),
 		VAPIDSubject:    env("VAPID_SUBJECT", "mailto:hello@codewithjosh.codes"),
-		GoogleID:        os.Getenv("GOOGLE_CLIENT_ID"),
-		GoogleSecret:    os.Getenv("GOOGLE_CLIENT_SECRET"),
-		GoogleRedirect:  os.Getenv("GOOGLE_REDIRECT_URL"),
-		OllamaURL:       env("OLLAMA_URL", "http://ollama:11434"),
+		GoogleID:               os.Getenv("GOOGLE_CLIENT_ID"),
+		GoogleSecret:           os.Getenv("GOOGLE_CLIENT_SECRET"),
+		GoogleRedirect:         os.Getenv("GOOGLE_REDIRECT_URL"),
+		GoogleCalendarRedirect: os.Getenv("GOOGLE_CALENDAR_REDIRECT_URL"),
+		OllamaURL:              env("OLLAMA_URL", "http://ollama:11434"),
 		OllamaModel:     os.Getenv("OLLAMA_MODEL"),
 		OllamaTextModel: env("OLLAMA_TEXT_MODEL", "gemma3:1b"),
 		OllamaNumThread: envInt("OLLAMA_NUM_THREAD", 4),

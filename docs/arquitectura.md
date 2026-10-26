@@ -54,6 +54,14 @@ Ollama no publica puertos y no sale por el túnel. Solo la API le habla, dentro 
 
 El reloj de la app sale de `APP_TIMEZONE` en `deploy/.env`. El ejemplo del repo dice `America/Bogota`. Lima marca la misma hora (UTC−5, sin horario de verano).
 
+### Google (login y Calendar)
+
+Login usa `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `GOOGLE_REDIRECT_URL` (`/api/auth/google/callback`). Eso solo pide `openid email profile`; el access token no se guarda.
+
+Google Calendar es un flujo aparte, solo lectura: en Cuenta el usuario pulsa **Conectar Google Calendar** (`GET /api/google/calendar/connect` → callback `/api/google/calendar/callback`). Scope: `https://www.googleapis.com/auth/calendar.readonly`, con `access_type=offline` y consentimiento forzado para obtener refresh token. Se guarda en `user_google_tokens`; los eventos del calendario `primary` viven en `google_calendar_events` y se muestran en Planificar como capa aparte (no editables). Sync: `POST /api/google/calendar/sync` o al listar (`GET /api/google/events`) si el último sync tiene más de 15 minutos.
+
+En Google Cloud Console hace falta habilitar **Google Calendar API** y registrar el redirect de Calendar (`GOOGLE_CALENDAR_REDIRECT_URL`, o el derivado automático desde el redirect de login). Producción: `https://mi.apprumbo.online/api/google/calendar/callback`.
+
 Para publicar un cambio: `rumbo publicar`. Baja la rama con fast-forward, reconstruye las imágenes en la placa y espera a que `/healthz` de la API responda. Postgres no se borra: los datos están en el volumen `pgdata`.
 
 No hay copia de seguridad de `pgdata` en este repositorio. Si se pierde el disco, se pierde la base.

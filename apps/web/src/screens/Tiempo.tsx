@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
-import type { CalendarEvent, EventInput, Goal, Task } from '../types'
+import type { CalendarEvent, EventInput, Goal, GoogleCalendarEvent, Task } from '../types'
 import { todayKey } from '../format'
 import { Shell } from '../components/Shell'
 import { EventSheet } from '../components/plan/EventSheet'
@@ -13,6 +13,7 @@ import {
   shiftAnchor,
   toOverlayEvents,
   toOverlayGoals,
+  toOverlayGoogle,
   toOverlayTasks,
   todayStatusLabel,
 } from '../components/plan/calendarUtils'
@@ -29,11 +30,13 @@ export function Tiempo({ tasks, onOpenTask, refresh }: Props) {
   const [view, setView] = useState<PlanView>('day')
   const [anchor, setAnchor] = useState(todayKey())
   const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [layers, setLayers] = useState<Record<PlanLayer, boolean>>({
     events: true,
     tasks: true,
     goals: true,
+    google: true,
   })
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [quick, setQuick] = useState('')
@@ -49,6 +52,13 @@ export function Tiempo({ tasks, onOpenTask, refresh }: Props) {
 
   useEffect(() => {
     api.events(range.from, range.to).then((data) => setEvents(data.events)).catch(() => setEvents([]))
+  }, [range.from, range.to, refresh, tick])
+
+  useEffect(() => {
+    api
+      .googleEvents(range.from, range.to)
+      .then((data) => setGoogleEvents(data.events))
+      .catch(() => setGoogleEvents([]))
   }, [range.from, range.to, refresh, tick])
 
   useEffect(() => {
@@ -69,10 +79,11 @@ export function Tiempo({ tasks, onOpenTask, refresh }: Props) {
   const overlays = useMemo(() => {
     const items = []
     if (layers.events) items.push(...toOverlayEvents(events))
+    if (layers.google) items.push(...toOverlayGoogle(googleEvents))
     if (layers.tasks) items.push(...toOverlayTasks(tasks ?? []))
     if (layers.goals) items.push(...toOverlayGoals(goals))
     return items
-  }, [events, tasks, goals, layers])
+  }, [events, googleEvents, tasks, goals, layers])
 
   const todayTimedCount = useMemo(
     () => events.filter((event) => !event.allDay && todayKey(new Date(event.startsAt)) === today).length,
@@ -239,7 +250,8 @@ export function Tiempo({ tasks, onOpenTask, refresh }: Props) {
               {(
                 [
                   ['events', 'Eventos', 'menta'],
-                  ['tasks', 'Tareas', 'horizonte'],
+                  ['google', 'Google', 'horizonte'],
+                  ['tasks', 'Tareas', 'impulso'],
                   ['goals', 'Objetivos', 'ciruela'],
                 ] as const
               ).map(([key, label, tint]) => (
@@ -256,7 +268,7 @@ export function Tiempo({ tasks, onOpenTask, refresh }: Props) {
               <button
                 type="button"
                 className="text-button"
-                onClick={() => setLayers({ events: true, tasks: true, goals: true })}
+                onClick={() => setLayers({ events: true, google: true, tasks: true, goals: true })}
               >
                 Mostrar todo
               </button>

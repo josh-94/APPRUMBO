@@ -133,6 +133,52 @@ func (s *Store) DeleteEvent(ctx context.Context, userID, id int64) error {
 	return nil
 }
 
+type DueEventReminder struct {
+	EventID       int64
+	UserID        int64
+	Title         string
+	RemindAt      time.Time
+	RemindMinutes int
+}
+
+func (s *Store) DueEventReminders(ctx context.Context, limit int) ([]DueEventReminder, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT e.id, e.user_id, e.title,
+		       e.starts_at - (e.remind_minutes * interval '1 minute') AS remind_at,
+		       e.remind_minutes
+		FROM calendar_events e
+		WHERE e.remind_minutes IS NOT NULL
+		  AND e.starts_at - (e.remind_minutes * interval '1 minute') <= now()
+		  AND e.starts_at - (e.remind_minutes * interval '1 minute') > now() - interval '6 hours'
+		  AND NOT EXISTS (
+		    SELECT 1 FROM event_reminder_log l
+		    WHERE l.event_id = e.id
+		      AND l.remind_at = e.starts_at - (e.remind_minutes * interval '1 minute')
+		  )
+		ORDER BY remind_at
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []DueEventReminder{}
+	for rows.Next() {
+		var item DueEventReminder
+		if err := rows.Scan(&item.EventID, &item.UserID, &item.Title, &item.RemindAt, &item.RemindMinutes); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) ClaimEventReminder(ctx context.Context, eventID int64, remindAt time.Time) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO event_reminder_log (event_id, remind_at) VALUES ($1, $2)
+		ON CONFLICT DO NOTHING`, eventID, remindAt)
+	return err
+}
+
 type eventScanner interface {
 	Scan(dest ...any) error
 }
@@ -201,7 +247,7 @@ func normalizeEvent(input EventInput) (CalendarEvent, error) {
 	if rule == "weekly" && len(days) == 0 {
 		return CalendarEvent{}, ErrBadMoney
 	}
-	if input.RemindMinutes != nil && (*input.RemindMinutes < 0 || *input.RemindMinutes > 7*24*60) {
+	if input.RemindMinutes != nil && (*input.RemindMinutes < 0 || *input.RemindMinutes > 4*7*24*60) {
 		return CalendarEvent{}, ErrBadMoney
 	}
 	return CalendarEvent{

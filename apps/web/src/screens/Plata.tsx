@@ -54,6 +54,24 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
         <button type="button" className={tab === 'resumen' ? 'pill on' : 'pill quiet'} onClick={() => setTab('resumen')}>Resumen</button>
         <Link className="pill quiet" to="/plata/metas">Metas</Link>
       </div>
+      <nav className="plan-links four">
+        <Link className="plan-link cuentas" to="/plata/cuentas">
+          <i aria-hidden="true"><WalletIcon /></i>
+          Cuentas
+        </Link>
+        <Link className="plan-link tarjetas" to="/plata/tarjetas">
+          <i aria-hidden="true"><CardIcon /></i>
+          Tarjetas
+        </Link>
+        <Link className="plan-link prestamos" to="/plata/prestamos">
+          <i aria-hidden="true"><LoanIcon /></i>
+          Préstamos
+        </Link>
+        <Link className="plan-link pagos" to="/plata/pagos">
+          <i aria-hidden="true"><CalendarIcon /></i>
+          Pagos
+        </Link>
+      </nav>
 
       {tab === 'resumen' && (
         <>
@@ -149,24 +167,6 @@ export function Plata({ onCreate, onChanged, refresh }: { onCreate: () => void; 
           <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
         </svg>
       </button>
-      <nav className="plan-links four">
-        <Link className="plan-link cuentas" to="/plata/cuentas">
-          <i aria-hidden="true"><WalletIcon /></i>
-          Cuentas
-        </Link>
-        <Link className="plan-link tarjetas" to="/plata/tarjetas">
-          <i aria-hidden="true"><CardIcon /></i>
-          Tarjetas
-        </Link>
-        <Link className="plan-link prestamos" to="/plata/prestamos">
-          <i aria-hidden="true"><LoanIcon /></i>
-          Préstamos
-        </Link>
-        <Link className="plan-link pagos" to="/plata/pagos">
-          <i aria-hidden="true"><CalendarIcon /></i>
-          Pagos
-        </Link>
-      </nav>
       {adding && (
         <CategorySheet
           onClose={() => setAdding(false)}

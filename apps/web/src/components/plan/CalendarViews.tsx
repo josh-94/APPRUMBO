@@ -106,10 +106,7 @@ export function CalendarDayView({ items, anchor, onOpenEvent, onOpenTask }: Comm
                 type="button"
                 className={`cal-block color-${item.color}`}
                 style={{ top, height }}
-                onClick={() => {
-                  if (item.kind === 'event') onOpenEvent(item.id)
-                  else if (item.kind === 'task') onOpenTask?.(item.id)
-                }}
+                onClick={() => openOverlay(item, onOpenEvent, onOpenTask)}
               >
                 <strong className="cal-block-title">{item.title}</strong>
                 {item.hour && (
@@ -201,10 +198,7 @@ export function CalendarWeekView({ items, anchor, onOpenEvent, onOpenTask, onSel
                     type="button"
                     className={`cal-block compact color-${item.color}`}
                     style={{ top, height }}
-                    onClick={() => {
-                      if (item.kind === 'event') onOpenEvent(item.id)
-                      else if (item.kind === 'task') onOpenTask?.(item.id)
-                    }}
+                    onClick={() => openOverlay(item, onOpenEvent, onOpenTask)}
                   >
                     <strong className="cal-block-title">{item.title}</strong>
                   </button>
@@ -263,8 +257,7 @@ export function CalendarMonthView({ items, anchor, onOpenEvent, onOpenTask, onSe
                     className={`cal-month-pill color-${item.color}`}
                     onClick={(ev) => {
                       ev.stopPropagation()
-                      if (item.kind === 'event') onOpenEvent(item.id)
-                      else if (item.kind === 'task') onOpenTask?.(item.id)
+                      openOverlay(item, onOpenEvent, onOpenTask)
                     }}
                   >
                     {item.title}
@@ -294,12 +287,21 @@ function OverlayChip({
     <button
       type="button"
       className={compact ? `cal-chip compact color-${item.color}` : `cal-chip color-${item.color}`}
-      onClick={() => {
-        if (item.kind === 'event') onOpenEvent(item.id)
-        else if (item.kind === 'task') onOpenTask?.(item.id)
-      }}
+      onClick={() => openOverlay(item, onOpenEvent, onOpenTask)}
     >
       {item.title}
     </button>
   )
+}
+
+function openOverlay(
+  item: OverlayItem,
+  onOpenEvent: (id: number) => void,
+  onOpenTask?: (id: number) => void,
+) {
+  if (item.kind === 'event') onOpenEvent(item.id)
+  else if (item.kind === 'task') onOpenTask?.(item.id)
+  else if (item.kind === 'google' && item.htmlLink) {
+    window.open(item.htmlLink, '_blank', 'noopener,noreferrer')
+  }
 }

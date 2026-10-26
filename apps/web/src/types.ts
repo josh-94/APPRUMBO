@@ -141,6 +141,27 @@ export type CalendarEvent = {
   repeatWeekdays: number[]
 }
 
+export type GoogleCalendarEvent = {
+  id: number
+  googleEventId: string
+  googleCalendarId: string
+  title: string
+  location: string
+  description: string
+  allDay: boolean
+  startsAt: string
+  endsAt: string
+  htmlLink: string
+  color: EventColor
+  source: 'google'
+}
+
+export type GoogleCalendarStatus = {
+  configured: boolean
+  connected: boolean
+  lastSyncAt?: string
+}
+
 export type EventInput = {
   title: string
   location: string
